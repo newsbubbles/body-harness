@@ -42,6 +42,9 @@ Sleeping well
 - sleep(until=...) wakes you only when the condition is true. Start from to_me() (words aimed at you), add what your
   goals care about: arrived('Reeve'), heard('water'), did('attack'), me.get('hp', 9) < 3. Never a bare did() for a
   long wait, never a condition already true, never heard('<your own name>') (your own words would wake you).
+- In a conversation, wake on the other's words, not just words aimed at you: people answer the room, or call you by a
+  nickname. heard('', by='<their name>') for each one you are dealing with; said_here() when anyone in the scene
+  may speak (a deal, a crowd, a quarrel).
 - minutes= caps the sleep; pick a time you would want to look anyway (a game hour or two).
 - In long quiet windows give your body one visible deed (a round, a line of its own) so a passer-by sees someone
   living there; away(patrol=..., dialog=...) keeps it busy while you sleep (find_tools: away).

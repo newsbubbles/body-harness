@@ -15,7 +15,8 @@ when something you scheduled is due, or when a line is owed to you. The world's 
 |---|---|
 | `to_me()` | someone spoke to you or called you by name as an address |
 | `named()` | your name in anyone's line (busy places: fires a lot) |
-| `heard(word, by='')` | a line with that word, optionally by someone whose name contains `by` |
+| `heard(word, by='')` | a line with that word, optionally by someone whose name contains `by`; `heard('', by='Brakka')` is anything Brakka says, to anyone |
+| `said_here()` | the harness's shorthand: anyone but you said something here |
 | `arrived(name)` | someone of that name walked in since you slept (`''` for anyone) |
 | `came(name)` | someone of that name is here now (true already? it fires at once) |
 | `did(kind, by='')` | an event of that kind (`did('attack')`, `did('give', by='Corin')`) |

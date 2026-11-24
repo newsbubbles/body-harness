@@ -315,6 +315,11 @@ class Mind:
             warn = self._lint(until)
             if warn:
                 return "Not asleep yet: " + warn
+        if "said_here()" in until:
+            # the harness's shorthand: anyone but you said something here (heard('') would hear your own lines too)
+            mine = json.dumps(str((self.bundle.get("you") or {}).get("name") or ""))
+            until = until.replace("said_here()", f"any(e['kind'] in ('say', 'talked') and e['actor'] != {mine} "
+                                                  f"for e in events)")
         partners = [p for p in dict.fromkeys(turn.get("partners") or []) if p.lower() not in until.lower()][:3]
         if partners:
             # someone you are talking with may answer the room, or call you by a nickname: to_me() misses both

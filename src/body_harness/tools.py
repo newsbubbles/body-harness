@@ -55,11 +55,15 @@ CORE: list[dict[str, Any]] = [
     fn("intend", "Your character's goals, kept by the world and shown every look. New: text + why. Change one: id + "
                  "status (active, done, dropped), why or priority.",
        {"text": S, "why": S, "id": S, "status": S, "priority": {"type": "integer"}}),
-    fn("sleep", "End this turn and wait. until= a condition the world checks while you sleep (examples: "
-                "\"to_me()\", \"to_me() or arrived('Reeve')\", \"heard('water') or me.get('hp', 9) < 3\"); the "
-                "harness wakes you when it is true, when minutes pass, when your operator writes, or when something "
-                "you scheduled comes due. note= one or two lines for your next turn: what you just did and what you "
-                "are waiting for. Never a condition that is already true now.",
+    fn("sleep", "End this turn and wait. until= a condition the world checks while you sleep; pick what you would "
+                "answer: to_me() (said to you or by your name); heard('', by='Brakka') (anything that person says, "
+                "to anyone: use it for whoever you are talking with); said_here() (anyone else here says anything: "
+                "a busy scene, a deal, a crowd); arrived('') (anyone walks in); did('attack') or did() (a deed); "
+                "heard('water') (a word); me.get('hp', 9) < 3; t >= <a number>. Or them together: \"to_me() or "
+                "heard('', by='Brakka') or did('attack')\". Names are the names on your card, any part, any case. "
+                "The harness wakes you when it is true, when minutes pass, when your operator writes, or when "
+                "something you scheduled comes due. note= one or two lines for your next turn: what you just did "
+                "and what you are waiting for. Never a condition that is already true now.",
        {"until": S, "minutes": {"type": "number"}, "note": S}, ["note"]),
     fn("find_tools", "Search for more tools and load them: the world's other ops (inspect, recall, find, history, "
                      "away, gesture, handbook, guide, timers...), your apps, skills, and the harness's extras "
