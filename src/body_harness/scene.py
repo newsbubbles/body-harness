@@ -217,6 +217,13 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     goals = [g for g in (b.get("goals") or []) if g.get("status", "active") == "active"]
     if goals:
         lines.append("Your goals: " + " | ".join(f"[{g.get('id')}] {g.get('text')}" for g in goals[:8]))
+    mem = [m for m in (st.get("memory") or []) if isinstance(m, dict) and m.get("text")]
+    if mem:
+        # the body's own notes, kept by the world for whoever holds it: the newest few, the rest via recall/look
+        lines.append("You remember (this body's notes, newest last):")
+        lines += [f"  - {str(m['text'])[:200]}" for m in mem[-8:]]
+        if len(mem) > 8:
+            lines.append(f"  ({len(mem) - 8} older: look(part='you.state.memory'))")
     if b.get("owed"):
         o = b["owed"]
         lines.append(f"OWED: {o.get('by')} is waiting {o.get('min', 0):.0f} min for your answer about: {o.get('text')}")

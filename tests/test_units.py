@@ -131,3 +131,11 @@ def test_repeats():
     assert _repeats("Yes, Captain. I'll sleep by the wall and count the horses when they come.", said,
                     ["Captain Ruhl"]) is None
     assert _repeats("Aye.", said) is None
+
+
+def test_card_shows_body_memory():
+    from body_harness.scene import Names, card
+    b = {"t": 100, "you": {"id": "e1", "name": "Pip", "state": {"memory": [{"t": 1, "text": f"note {i}"} for i in range(10)]}},
+         "here": {"name": "Hall"}}
+    c = card(b, Names(), "e1")
+    assert "You remember" in c and "note 9" in c and "note 1\n" not in c and "2 older" in c
