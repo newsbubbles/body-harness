@@ -313,7 +313,11 @@ class Mind:
                 return compact({"refused": w.get("reason"), "hint": w.get("hint"),
                                 "fix": "write the condition again (skill('waiting') has the grammar), then sleep"})
         elif isinstance(w, dict) and w.get("fired"):
-            if forced:
+            if forced and w.get("already"):
+                # the old watch is true now (a time that has passed): keeping it would wake the seat at once, every
+                # time; listen for words until the model sets a new one
+                until = "to_me()"
+            elif forced:
                 # the turn is over either way; what fired is the next wake's news, not lost
                 self.pending = ("it happened while you were deciding", w.get("events") or [])
             elif w.get("already"):
