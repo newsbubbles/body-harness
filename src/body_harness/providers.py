@@ -52,6 +52,7 @@ class Model:
     session: str = ""  # OpenRouter session_id: keeps a seat's calls on one provider, so its cache stays warm
     prices: dict[str, Any] | None = None
     extra: dict[str, Any] | None = None  # passed through in the request body (for example Ollama's options)
+    no_forced_choice: bool = False  # set when a provider refused a named tool_choice
 
     @classmethod
     def from_config(cls, spec: str, cfg: dict[str, Any] | None = None) -> "Model":
@@ -91,9 +92,7 @@ class Model:
         body: dict[str, Any] = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens}
         if tools:
             body["tools"] = tools
-            if tool_choice:
-                body["tool_choice"] = tool_choice
-            body["tool_choice"] = "auto"
+            body["tool_choice"] = tool_choice if tool_choice and not self.no_forced_choice else "auto"
         if self.temperature is not None:
             body["temperature"] = self.temperature
         if self.provider == "openrouter":
@@ -125,6 +124,13 @@ class Model:
             if r.status_code in (429, 500, 502, 503, 504):
                 last = f"{r.status_code} {r.text[:300]}"
                 await asyncio.sleep(2 ** attempt * 2)
+                continue
+            if r.status_code == 400 and body.get("tool_choice") not in (None, "auto"):
+                # some providers refuse a named tool_choice: fall back to auto for this model from now on (the loop
+                # still runs only sleep on a last step)
+                self.no_forced_choice = True
+                body["tool_choice"] = "auto"
+                last = f"{r.status_code} {r.text[:300]}"
                 continue
             if r.status_code != 200:
                 raise ModelError(f"{self.spec}: {r.status_code} {r.text[:500]}")

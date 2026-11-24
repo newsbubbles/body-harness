@@ -187,3 +187,15 @@ def test_wake_keeps_what_was_said_to_you():
     assert len(line) > 1000
     w = prompts.wake("time is up", "(scene)", "", "", "", ["asked about the Eye loading"], [line])
     assert w.index("Said to you lately") < w.index("Your last turns")
+
+
+def test_tool_choice_is_sent():
+    # the forced last-step sleep was overwritten with "auto" and never reached the model
+    from body_harness.providers import Model
+    m = Model("openrouter:x/y", "https://example.test", "", "x/y", "openrouter")
+    tools = [{"type": "function", "function": {"name": "sleep", "parameters": {}}}]
+    forced = {"type": "function", "function": {"name": "sleep"}}
+    assert m.body([{"role": "user", "content": "hi"}], tools, forced)["tool_choice"] == forced
+    assert m.body([{"role": "user", "content": "hi"}], tools)["tool_choice"] == "auto"
+    m.no_forced_choice = True
+    assert m.body([{"role": "user", "content": "hi"}], tools, forced)["tool_choice"] == "auto"

@@ -575,7 +575,11 @@ class Mind:
                     await self._sleep({"note": text[:400]} if not self.st.get("watch") else
                                       {"until": self.st["watch"]["until"], "note": text[:400]}, turn, forced=True)
                 break
-            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
+            # a thinking model's reasoning goes back with its tool calls: DeepSeek requires it, OpenRouter asks for
+            # reasoning_details unmodified; dropping it left the model to call tools without its own thread
+            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls,
+                             **{k: msg[k] for k in ("reasoning", "reasoning_details", "reasoning_content")
+                                if msg.get(k)}})
             for c in calls:
                 f = c.get("function") or {}
                 name = f.get("name", "")
