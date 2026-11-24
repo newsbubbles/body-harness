@@ -213,6 +213,8 @@ class Mind:
         ok = not (isinstance(r, dict) and r.get("ok") is False)
         if ok and name in DEEDS:
             turn["deeds"] += 1
+            if name != "say" and not (name == "act" and fixed.get("verb") == "talk"):
+                turn["done"] = turn.get("done", 0) + 1  # a deed that moves the world, not more words
         if ok and name in ("say", "act") and (fixed.get("to") or (name == "act" and fixed.get("verb") == "talk")):
             who = fixed.get("to") or fixed.get("target")
             if isinstance(who, str) and who:
@@ -485,6 +487,15 @@ class Mind:
                                   self.st.get("handbook") or [], self.cfg.get("extra_prompt", ""))
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
                             recent)
+        speakers = {self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and
+                    e.get("actor") not in (None, self.me)}
+        chat = self.st.get("chat") or {}
+        long_talk = [p for p in speakers if chat.get(p, 0) >= int(self.cfg.get("chat_turns", 4))]
+        if long_talk:
+            # two seats that wake on each other's words can trade lines forever with nothing happening
+            user += (f"\n\n(harness: you and {', '.join(long_talk)} have traded lines {chat[long_talk[0]]} turns in a "
+                     "row with nothing done between. Unless this line changes something, answer in a few words or "
+                     "not at all, and sleep on what would move things: a deed, someone arriving, the hour.)")
         if self.turns == 1 and not self.st.get("read_handbook"):
             guide = "mind" if self.role == "mind" else "player"
             user += (f"\n\nThis is your first turn in this seat: read skill('{guide}'), and the world's handbook for "
@@ -585,6 +596,8 @@ class Mind:
                               turn, forced=True)
         self.usage.add(tu)
         note = turn["note"] or "(no note)"
+        talkers = speakers if turn["deeds"] and not turn.get("done") else set()
+        self.st["chat"] = {p: (self.st.get("chat") or {}).get(p, 0) + 1 for p in talkers}
         self.st["recent"] = (self.st.get("recent", []) +
                              [f"t={float(b.get('t') or 0):.0f} woke ({reason[:80]}): {note}"])[-8:]
         append_jsonl(self.seat.p("ledger.jsonl"), {"ts": time.time(), "t": b.get("t"), "turn": self.turns,
