@@ -135,6 +135,29 @@ THINK = fn("think", "Think before you act, when a tool result or a line changes 
                     "it and nothing in the world changes. Do not use it to stall: act, say or sleep after.",
            {"thought": S}, ["thought"])
 
+# Imagination (imagine.py): a private embody world of the seat's own, offered when a seat's config says imagine=true
+# and the embody-engine extra is installed. The harness scores what it imagined against what really happened.
+IMAGINE = fn("imagine", "Try a plan in your imagination before you do it: a private world with the rules as you "
+                        "believe them, played many times with fresh dice. Nothing real happens and nobody sees it. "
+                        "rules= {verb: {check: 'return ctx.actor.state.hp > 4', apply: 'if ctx.rand.roll(\"1d20\") "
+                        "+ 3 >= ctx.target.state.ac: ctx.target.state.hp -= ctx.rand.roll(\"1d6\")'}}, named after "
+                        "your real verbs: check is when it can happen, apply what happens (a Python subset, no "
+                        "imports; dice from ctx.rand.roll). setup= {name: "
+                        "{hp, ac, atk, gold...}}: what you believe of someone. You are 'me', from your real card. "
+                        "Both are kept for next time. plan= steps [{actor, verb, target}], played in order `rounds` "
+                        "times, until a check says no. It answers how things came out over the trials. When you then "
+                        "really do the plan's first step, the harness compares what happens with what you imagined "
+                        "and tells you how surprised to be. With nothing given, it shows your rules and beliefs (and "
+                        "a starter).",
+             {"rules": {"type": "object"}, "setup": {"type": "object"},
+              "plan": {"type": "array", "items": {"type": "object"}}, "rounds": {"type": "integer"},
+              "trials": {"type": "integer"}})
+REFLECT = fn("reflect", "Look back on what you imagined against what really happened. With no id: your biggest "
+                        "surprises, how well your imagination did per kind of plan, and your lessons. With id, "
+                        "verdict (rule: a rule was wrong; belief: you misjudged someone; luck: the dice) and lesson "
+                        "(one line): what you learned, kept and shown on your next imaginings.",
+             {"id": S, "verdict": {"type": "string", "enum": ["rule", "belief", "luck"]}, "lesson": S})
+
 EXTRAS: dict[str, dict[str, Any]] = {
     "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
                                "in_minutes= real minutes from now; what= what to do then. op='list' shows what is "
@@ -220,6 +243,8 @@ class Registry:
 
     def tools(self, loaded: list[str]) -> list[dict[str, Any]]:
         core = CORE + [THINK] if self.m.cfg.get("think_tool") else CORE
+        if self.m.imagination is not None:
+            core = core + [IMAGINE, REFLECT]
         return core + [s for s in (self.schema(n) for n in loaded) if s]
 
 

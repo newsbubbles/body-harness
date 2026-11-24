@@ -2,7 +2,8 @@
 
 For any agent or person changing this code.
 
-- Python 3.11+, one dependency (httpx). `uv sync`, then `uv run --group dev pytest -q`.
+- Python 3.11+, one dependency (httpx). The `imagine` extra adds the embody engine (pure Python, no dependencies
+  of its own); without it the imagine tools are simply not offered. `uv sync`, then `uv run --group dev pytest -q`.
 - The harness talks to a world only through `POST <base>/op/<name>` (door.py). It never reads a world's files, and a
   seat's token never reaches the model, the logs or the sandbox.
 - Small on purpose. Before adding a module or a dependency, check whether the world already answers it (an op, a

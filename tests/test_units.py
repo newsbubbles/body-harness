@@ -363,3 +363,69 @@ def test_escalate_hands_the_turn_to_the_next_model(monkeypatch):
     assert CALL_TROUBLE.search("Not asleep yet: your note says")
     assert CALL_TROUBLE.search('{"refused": "until: syntax error: invalid syntax"}')
     assert not CALL_TROUBLE.search('{"refused": "the gangplank lifts itself out of reach"}')
+
+
+def test_imagination_predicts_then_scores_surprise(tmp_path):
+    import pytest
+    from body_harness import imagine
+    from body_harness.seat import Seat
+    if not imagine.available():
+        pytest.skip("the imagine extra (embody-engine) is not installed")
+    s = Seat(tmp_path, "x").create()
+    im = imagine.Imagination(s, {"imagine_trials": 30})
+    card = {"you": {"name": "Ssareth", "hp": "12/12"}, "holding": ["Coin x40", "Fishing spear"]}
+    assert imagine.body_state(card) == {"hp": 12, "max_hp": 12, "coin": 40, "fishing_spear": 1}
+    here = {**card, "people": [{"name": "Marlo", "hp": "9/10"}]}
+    first = im.imagine({}, here, "Ssareth", 1, {"spar", "rest"})
+    assert first["ok"] and list(first["starter"]["rules"]) == ["spar"]  # named after the seat's own verb
+    assert first["seen"] == {"Marlo": {"hp": 9, "max_hp": 10}}
+    gap = im.imagine({"rules": {"spar": imagine.STARTER["attack"]}}, here, "Ssareth", 1, {"spar"})
+    assert "has no value for yet" in " ".join(gap["notes"]) and "spar" in im.spec["rules"]  # a belief to set
+    unset = im.imagine({"plan": [{"verb": "spar", "target": "Marlo"}]}, here, "Ssareth", 1, {"spar"})
+    assert unset["ok"] is False and "setup" in unset["hint"]
+    few = im.imagine({"setup": {"Marlo": {"ac": 11, "atk": 2}, "me": {"ac": 12, "atk": 3}},
+                      "plan": [{"verb": "spar", "target": "Marlo"}], "trials": 3}, here, "Ssareth", 1, {"spar"})
+    assert few["trials"] == imagine.MIN_TRIALS
+    unreal = im.imagine({"plan": [{"verb": "spar", "target": "Marlo"}]}, here, "Ssareth", 1, {"punch"})
+    assert "not a verb you really have" in " ".join(unreal["notes"])
+    im.spec["open"] = []
+    bad = im.imagine({"rules": {"attack": "import os"}}, card, "Ssareth", 1)
+    assert "not kept" in " ".join(bad["notes"]) and "attack" not in im.spec["rules"]
+    r = im.imagine({"rules": imagine.STARTER, "setup": {"Marlo": {"hp": 10, "ac": 11, "atk": 2},
+                                                         "me": {"ac": 12, "atk": 3}},
+                    "plan": [{"actor": "me", "verb": "attack", "target": "Marlo"},
+                             {"actor": "Marlo", "verb": "attack", "target": "me"}], "rounds": 12}, card, "Ssareth", 1)
+    assert r["ok"] and r["trials"] == 30 and "Ssareth.hp" in r["came_out"]
+    lo, hi = r["came_out"]["Ssareth.hp"]["band"]
+    assert 0 < hi <= 12
+    assert im.bind("talk", "Marlo") is None  # not what was imagined
+    assert im.bind("attack", "Marlo (e227)") == r["id"]
+    # came out at the edge of nothing imagined: the seat lost everything
+    scored = im.score({"you": {"hp": "-9/12"}, "holding": []}, "Ssareth")
+    assert scored and scored[0]["scored"]["max_bits"] >= 4 and not all(scored[0]["scored"]["inside"].values())
+    text = im.wake_text(scored)
+    assert "SURPRISE" in text and "reflect(id='" + r["id"] in text and "attack" in text
+    assert im.reflect({"id": r["id"], "verdict": "belief", "lesson": "Marlo hits far harder than +2"})["ok"]
+    assert "[attack] Marlo hits far harder than +2" in im.imagine({}, card, "Ssareth", 2)["lessons"]
+    assert im.reflect({})["imaginings"][0]["reflected"] == "belief"
+    assert imagine.surprise([5] * 20, 5) == (0.0, True)
+    # the shape cheap models send: bodies with no def lines; a check given as one condition returns it
+    src, _ = imagine.rule_source({"check": "ctx.actor.state.hp > 4", "apply": "ctx.target.state.hp -= 2"})
+    assert "def check(ctx):\n    return ctx.actor.state.hp > 4" in src and "def apply(ctx):" in src
+    two, _ = imagine.rule_source({"apply": "if 1: ctx.target.state.hp -= 1; if 2: ctx.actor.state.hp -= 1"})
+    assert "    if 1: ctx.target.state.hp -= 1\n    if 2: ctx.actor.state.hp -= 1" in two
+    none = im.imagine({"rules": {"spar": {"check": "return True"}}}, card, "Ssareth", 3)
+    assert "needs an apply" in " ".join(none["notes"])
+    # a rule that crashes is refused when written, not counted as how fights end (Tamsin's ctx.result)
+    crash = im.imagine({"rules": {"jab": {"apply": "ctx.result.dealt = 1"}}}, here, "Ssareth", 3)
+    assert "jab not kept" in " ".join(crash["notes"]) and "jab" not in im.spec["rules"]
+    im.spec["rules"]["jab"] = {"source": "def apply(ctx):\n    ctx.result.dealt = 1", "doc": "", "id": "x"}
+    broke = im.imagine({"plan": [{"verb": "jab", "target": "Marlo"}]}, here, "Ssareth", 3)
+    assert broke["ok"] is False and "breaks" in broke["reason"] and not im.spec["open"]
+    del im.spec["rules"]["jab"]
+    # a rule that changes nothing still predicts: the seat's hp stays put in every trial, so a real blow surprises
+    im.imagine({"rules": {"wait": "ctx.actor.state.calm = 1"}}, here, "Ssareth", 3)
+    still = im.imagine({"plan": [{"verb": "wait"}]}, here, "Ssareth", 3)
+    assert im.bind("wait", None) == still["id"]
+    hit = im.score({"you": {"hp": "5/12"}}, "Ssareth")
+    assert hit and hit[0]["scored"]["bits"]["Ssareth.hp"] >= 4

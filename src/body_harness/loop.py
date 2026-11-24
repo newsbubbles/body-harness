@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from . import prompts, sandbox, scene
+from . import imagine, prompts, sandbox, scene
 from .door import Door, DoorError
 from .memory import Shelf, memo
 from .providers import Model, ModelError
@@ -88,6 +88,8 @@ class Mind:
         self.stop = False
         self._linted: set[str] = set()
         self.pending: tuple[str, list[dict[str, Any]]] | None = None
+        self.imagination = (imagine.Imagination(seat, self.cfg) if self.cfg.get("imagine") and imagine.available()
+                            else None)
 
     # ---------- state ----------
 
@@ -192,6 +194,13 @@ class Mind:
             return "(noted)"
         if name == "find_tools":
             return compact(self.registry.find(str(args.get("query", ""))))
+        if name in ("imagine", "reflect") and self.imagination is not None:
+            if name == "reflect":
+                return compact(self.imagination.reflect(args), 6000)
+            turn["imagined"] = turn.get("imagined", 0) + 1
+            # a few hundred small worlds: off the event loop, so the other seats in this process keep waiting
+            return compact(await asyncio.to_thread(self.imagination.imagine, args, self.bundle, self.my_name(),
+                                                   self.turns, self.verb_names()), 6000)
         if name == "tell":
             return compact(await self._tell(args))
         if name == "memo":
@@ -228,6 +237,12 @@ class Mind:
                             "hint": (f"did you mean {', '.join(near)}? " if near else "") +
                                     "find_tools(query) finds and loads tools; verbs go through act(verb, ...)"})
         fixed, notes = fix_args(name, args, self)
+        if name == "act" and self.imagination is not None and self.imagination.spec["bound"] and                 imagine._key(str(fixed.get("verb") or "")) not in self.imagination.bound_plans()[0]:
+            # a deed outside the plan ends its run: score it now, before (say) a rest heals what the plan cost.
+            # Tamsin sparred three times and rested in the same turn; read at the next wake, she was whole again
+            done = await self._score_imagined()
+            if done:
+                notes.append(done.strip())
         if name == "say":
             text = str(fixed.get("text", ""))
             # the same news to someone else is a report, not a repeat; a world hour is the window
@@ -272,6 +287,10 @@ class Mind:
                 turn["done"] = turn.get("done", 0) + 1  # a deed that moves the world, not more words
             if name == "act":
                 turn.setdefault("verbs", set()).add(str(fixed.get("verb") or ""))
+                if self.imagination is not None and self.imagination.bind(str(fixed.get("verb") or ""),
+                                                                          fixed.get("target")):
+                    notes.append("this is the first step of a plan you imagined: what comes of it will be compared "
+                                 "with what you imagined")
         if ok and name == "say":
             claim = self._deed_claim(str(fixed.get("text", "")), turn)
             if claim:
@@ -375,7 +394,32 @@ class Mind:
                         f"with a fixed condition, or the same one if you meant the word.")
         return None
 
+    async def _score_imagined(self) -> str:
+        """Read what the bound plans came to, with inspect (a read that leaves no trace, so "since I last looked"
+        stays where it was), and score what the seat imagined. Held things are not read here: only state numbers."""
+        im = self.imagination
+        if im is None or not im.spec["bound"]:
+            return ""
+        me = self.my_name()
+        card: dict[str, Any] = {"you": {}, "present": []}
+        for name in {me} | im.bound_plans()[1]:
+            eid = self.me if name == me else next((i for i, n in self.names.by_id.items() if n == name), name)
+            try:
+                r = await self.door.op("inspect", entity=eid)
+            except Exception:
+                continue
+            if not isinstance(r, dict) or r.get("ok") is False:
+                continue
+            if name == me:
+                card["you"] = r
+            else:
+                card["present"].append({**r, "name": name})
+        return im.wake_text(im.score(card, me))
+
     async def _sleep(self, a: dict[str, Any], turn: dict[str, Any], forced: bool = False) -> str:
+        if self.imagination is not None and self.imagination.spec["bound"]:
+            # the turn ends the plan's run: score it now, and the seat reads it when it wakes
+            self.st["imagined_text"] = self.st.get("imagined_text", "") + await self._score_imagined()
         until = (a.get("until") or "").strip() or self.cfg.get("default_until", "to_me()")
         minutes = float(a.get("minutes") or self.cfg.get("default_minutes", 60))
         minutes = max(1.0, min(minutes, float(self.cfg.get("max_minutes", 480))))
@@ -677,6 +721,8 @@ class Mind:
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
                             recent, heard, str(self.st.get("plan") or ""), told)
         user += self._companion_left(evs)
+        if self.imagination is not None:
+            user += self.st.pop("imagined_text", "") + self.imagination.wake_text(self.imagination.score(b, me_name))
         speakers = {self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and
                     e.get("actor") not in (None, self.me)}
         chat = self.st.get("chat") or {}
@@ -810,7 +856,8 @@ class Mind:
                                                    "reason": reason, "calls": turn["calls"], "note": note,
                                                    "watch": (self.st.get("watch") or {}).get("until"),
                                                    "usage": tu.to_dict(),
-                                                   **({"escalated": turn["escalated"]} if turn.get("escalated") else {})})
+                                                   **({"escalated": turn["escalated"]} if turn.get("escalated") else {}),
+                                                   **({"imagined": turn["imagined"]} if turn.get("imagined") else {})})
         _log(self.seat.name, f"turn {self.turns} ({reason[:60]}): {len(turn['calls'])} tool calls; {tu.line()}; "
                              f"{note[:120]}")
         self.save()

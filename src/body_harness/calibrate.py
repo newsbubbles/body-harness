@@ -93,7 +93,7 @@ def _copy_seat(src: Seat, root: Path, model: str, wake: dict[str, Any],
     for d in ("memory", "skills", "apps"):
         if src.p(d).is_dir():
             shutil.copytree(src.p(d), s.p(d), dirs_exist_ok=True)
-    for f in ("inbox.jsonl", "schedule.jsonl"):
+    for f in ("inbox.jsonl", "schedule.jsonl", "imagination.json"):
         if src.p(f).exists():
             shutil.copy2(src.p(f), s.p(f))
     door = read_json(src.p("door.json"), {})
