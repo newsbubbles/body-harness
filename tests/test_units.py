@@ -394,12 +394,13 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     r = im.imagine({"rules": imagine.STARTER, "setup": {"Marlo": {"hp": 10, "ac": 11, "atk": 2},
                                                          "me": {"ac": 12, "atk": 3}},
                     "plan": [{"actor": "me", "verb": "attack", "target": "Marlo"},
-                             {"actor": "Marlo", "verb": "attack", "target": "me"}], "rounds": 12}, card, "Ssareth", 1)
+                             {"actor": "Marlo", "verb": "attack", "target": "me"}], "rounds": 2}, card, "Ssareth", 1)
     assert r["ok"] and r["trials"] == 30 and "Ssareth.hp" in r["came_out"]
     lo, hi = r["came_out"]["Ssareth.hp"]["band"]
     assert 0 < hi <= 12
     assert im.bind("talk", "Marlo") is None  # not what was imagined
     assert im.bind("attack", "Marlo (e227)") == r["id"]
+    assert im.bind("attack", "Marlo") == r["id"] and len(im.spec["bound"]) == 1  # the same plan going on
     # came out at the edge of nothing imagined: the seat lost everything
     scored = im.score({"you": {"hp": "-9/12"}, "holding": []}, "Ssareth")
     assert scored and scored[0]["scored"]["max_bits"] >= 4 and not all(scored[0]["scored"]["inside"].values())
@@ -429,3 +430,7 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert im.bind("wait", None) == still["id"]
     hit = im.score({"you": {"hp": "5/12"}}, "Ssareth")
     assert hit and hit[0]["scored"]["bits"]["Ssareth.hp"] >= 4
+    # three of its own steps imagined, one done: a different plan, not scored
+    three = im.imagine({"plan": [{"verb": "wait"}], "rounds": 3}, here, "Ssareth", 4)
+    im.bind("wait", None)
+    assert im.score({"you": {"hp": "5/12"}}, "Ssareth") == [] and "Not scored (" + three["id"] in im.wake_text([])

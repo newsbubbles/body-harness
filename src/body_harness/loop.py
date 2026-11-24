@@ -289,8 +289,8 @@ class Mind:
                 turn.setdefault("verbs", set()).add(str(fixed.get("verb") or ""))
                 if self.imagination is not None and self.imagination.bind(str(fixed.get("verb") or ""),
                                                                           fixed.get("target")):
-                    notes.append("this is the first step of a plan you imagined: what comes of it will be compared "
-                                 "with what you imagined")
+                    notes.append("this is part of a plan you imagined: when the plan is done, what came of it is "
+                                 "compared with what you imagined")
         if ok and name == "say":
             claim = self._deed_claim(str(fixed.get("text", "")), turn)
             if claim:

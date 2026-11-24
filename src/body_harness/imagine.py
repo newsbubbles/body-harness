@@ -135,6 +135,12 @@ def rule_source(r: Any) -> tuple[str, str]:
     return s, ""
 
 
+def _my_steps(rec: dict[str, Any]) -> list[dict[str, Any]]:
+    """The steps of an imagined plan that are the seat's own deeds (the first step's actor is the seat)."""
+    who = (rec.get("first") or {}).get("actor")
+    return [s for s in rec.get("plan") or [] if who and s.get("actor") == who]
+
+
 def crashed(reason: str) -> bool:
     """A refusal that is the rule breaking (an error inside it), not the rule's own check saying no."""
     return bool(re.search(r"failed while|has no (apply|check)\(|is not allowed|has no attribute|is not defined|"
@@ -177,6 +183,7 @@ class Imagination:
         self.cfg = cfg
         self.path = seat.p("imagination.json")
         self.log = seat.p("predictions.jsonl")
+        self.partials: list[str] = []  # plans not scored on the last score(), because what was done differed
         self.spec: dict[str, Any] = read_json(self.path, {}) or {}
         for k, v in (("rules", {}), ("beliefs", {}), ("lessons", []), ("open", []), ("bound", [])):
             self.spec.setdefault(k, v)
@@ -417,6 +424,13 @@ class Imagination:
     def bind(self, verb: str, target: Any) -> str | None:
         """A real deed: if it is the first step of something imagined lately, that imagining is now a prediction."""
         now, v, t = time.time(), _key(verb), str(target or "").lower()
+        recs = self.records() if self.spec["bound"] else {}
+        for b in self.spec["bound"]:
+            # the plan going on, not a new one: Tamsin's second and third spars each bound an older imagining
+            if v in {s["verb"] for s in _my_steps(recs.get(b["id"]) or {})}:
+                b["steps"] = b.get("steps", 1) + 1
+                self.save()
+                return b["id"]
         for o in reversed(self.spec["open"]):
             if now - o["ts"] > OPEN_FOR or o["verb"] != v:
                 continue
@@ -424,7 +438,7 @@ class Imagination:
             if ot and t and not (ot in t or t in ot):
                 continue
             self.spec["open"].remove(o)
-            self.spec["bound"].append({"id": o["id"], "ts": now})
+            self.spec["bound"].append({"id": o["id"], "ts": now, "steps": 1})
             append_jsonl(self.log, {"kind": "bound", "id": o["id"], "ts": now, "verb": v, "target": target})
             self.save()
             return o["id"]
@@ -443,6 +457,7 @@ class Imagination:
         """Score every bound prediction against the seat's real card. Only what the card shows is scored: the seat's
         own numbers and what it holds, and the numbers it shows of others (often their hp). Returns the scored
         records."""
+        self.partials: list[str] = []
         if not self.spec["bound"]:
             return []
         recs, real, now, out = self.records(), observed(bundle, me), time.time(), []
@@ -450,6 +465,15 @@ class Imagination:
             self.spec["bound"].remove(b)
             r = recs.get(b["id"])
             if not r:
+                continue
+            planned, done = len(_my_steps(r)) * int(r.get("rounds") or 1), int(b.get("steps", 1))
+            if done != planned:
+                # three exchanges imagined, one done, then a rest: scored, that read 4.4 bits of surprise that was
+                # only a different plan. A different plan is not a wrong imagination
+                append_jsonl(self.log, {"kind": "partial", "id": b["id"], "ts": now, "done": done, "of": planned})
+                self.partials.append(f"Not scored ({b['id']}): you imagined {planned} of your own steps and did "
+                                     f"{done}. Imagine the plan you will really carry out, and the harness can "
+                                     f"compare it")
                 continue
             if now - b["ts"] > STALE_AFTER:
                 append_jsonl(self.log, {"kind": "stale", "id": b["id"], "ts": now})
@@ -484,10 +508,10 @@ class Imagination:
         return lines
 
     def wake_text(self, scored: list[dict[str, Any]]) -> str:
-        if not scored:
+        if not scored and not self.partials:
             return ""
         lim = float(self.cfg.get("surprise_bits", 4))
-        parts = []
+        parts = list(self.partials)
         for r in scored:
             s = r["scored"]
             what = f"{r['first']['verb']}" + (f" on {r['first']['target']}" if r["first"].get("target") else "")

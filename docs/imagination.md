@@ -64,6 +64,9 @@ own imagination is now handled:
   with a note to give it in `setup`.
 - **It rested in the same turn** after sparring, so a next-wake read saw it whole again. The plan is now scored the
   moment its run ends.
+- **Each later spar bound an older imagining**, and a plan of three spars was scored after one. A deed that continues
+  a bound plan now counts as its next step, and a plan is scored only when the seat did as many of its own steps as
+  it imagined; otherwise it is told the plan was not scored, and why. A different plan is not a wrong imagination.
 
 ## What is kept
 
