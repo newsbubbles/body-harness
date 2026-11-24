@@ -450,13 +450,15 @@ class Mind:
         max_steps = int(self.cfg.get("max_steps", 16))
         for step in range(max_steps):
             tools = self.registry.tools(self.loaded_tools())
+            choice = None
             if step == max_steps - 1:
                 # the last step offers only sleep: the turn ends on the model's own note and watch, not a forced one
                 tools = [t for t in tools if t["function"]["name"] == "sleep"]
+                choice = {"type": "function", "function": {"name": "sleep"}}
                 messages[-1]["content"] += ("\n(harness: last step of this turn. Sleep now, with a note of what you "
                                             "did and learned and a watch for what matters next.)")
             try:
-                msg, u = await self.model.chat(self.client, messages, tools)
+                msg, u = await self.model.chat(self.client, messages, tools, choice)
             except ModelError as e:
                 _log(self.seat.name, f"model error: {e}")
                 self.seat.outbox(f"model error: {e}", "error")
@@ -528,7 +530,8 @@ class Mind:
         _log(self.seat.name, f"joined as {(self.bundle.get('you') or {}).get('name')} ({self.role}) "
                              f"with {self.model.spec}")
         reason = ("you just took your seat in the world" if not self.turns else
-                  "your harness restarted; you are back in your seat (look before you act)")
+                  ("your harness restarted and you are back in your seat. Your last turns' notes and the scene "
+                   "below are where you left off: pick up from there, no need to read your history again"))
         events: list[dict[str, Any]] = []
         while not self.stop:
             try:

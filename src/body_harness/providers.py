@@ -80,7 +80,8 @@ class Model:
             return True
         return self.provider == "openrouter" and self.model.startswith(BREAKPOINT_MODELS)
 
-    def body(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    def body(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]],
+             tool_choice: Any = None) -> dict[str, Any]:
         if self._wants_breakpoints() and messages and messages[0]["role"] == "system":
             # one breakpoint at the end of the system prompt: the brief, the skills and the rules are the stable prefix
             text = messages[0]["content"]
@@ -89,6 +90,8 @@ class Model:
         body: dict[str, Any] = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens}
         if tools:
             body["tools"] = tools
+            if tool_choice:
+                body["tool_choice"] = tool_choice
             body["tool_choice"] = "auto"
         if self.temperature is not None:
             body["temperature"] = self.temperature
@@ -101,13 +104,13 @@ class Model:
         return body
 
     async def chat(self, client: httpx.AsyncClient, messages: list[dict[str, Any]],
-                   tools: list[dict[str, Any]]) -> tuple[dict[str, Any], Usage]:
+                   tools: list[dict[str, Any]], tool_choice: Any = None) -> tuple[dict[str, Any], Usage]:
         headers = {"content-type": "application/json"}
         if self.key:
             headers["Authorization"] = f"Bearer {self.key}"
         if self.provider == "openrouter":
             headers["X-Title"] = "body-harness"
-        body = self.body(messages, tools)
+        body = self.body(messages, tools, tool_choice)
         last = ""
         for attempt in range(4):
             t0 = time.monotonic()
