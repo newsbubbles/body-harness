@@ -19,6 +19,8 @@ The world is the truth
   card (holding, bears, contains) beat any description.
 - Write remember() only after the world said ok. Never a secret word or a code in a note anyone else can read.
 - Give a piece of news once. If someone answers oddly, or by the wrong name, answer that; do not tell it again.
+- When someone tells you that you have it wrong (no such job, the pay comes another way, he went elsewhere), check
+  it if you can, then drop the wrong plan and say so in your note. Never carry an old plan past a correction.
 - Say "I did not see" rather than fill a gap. Someone's claim is a claim: speak hearsay as hearsay ("he says").
 - Before saying a thing does not exist, look for it (find_tools: find, recall) or say you know of none.
 - Never speak an entity id, a tool name or a game mechanic aloud. Stay inside your brief: you know where you have
@@ -85,8 +87,11 @@ def system(seat_name: str, briefing: dict[str, Any], you: dict[str, Any], skills
     return "\n".join(lines)
 
 
-def wake(reason: str, scene: str, agenda: str, seat_index: str, craft_index: str, recent: list[str]) -> str:
+def wake(reason: str, scene: str, agenda: str, seat_index: str, craft_index: str, recent: list[str],
+         heard: list[str] | None = None) -> str:
     parts = [f"You wake: {reason}", "", "The scene:", scene, ""]
+    if heard:
+        parts += ["Said to you lately (before this wake, newest last; it beats your notes):"] + heard + [""]
     if agenda:
         parts += ["On your plate:", agenda, ""]
     if recent:

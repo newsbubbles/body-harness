@@ -62,8 +62,8 @@ CORE: list[dict[str, Any]] = [
                 "heard('water') (a word); me.get('hp', 9) < 3; t >= <a number>. Or them together: \"to_me() or "
                 "heard('', by='Brakka') or did('attack')\". Names are the names on your card, any part, any case. "
                 "The harness wakes you when it is true, when minutes pass, when your operator writes, or when "
-                "something you scheduled comes due. note= one or two lines for your next turn: what you just did "
-                "and what you are waiting for. Never a condition that is already true now.",
+                "something you scheduled comes due. note= one or two lines for your next turn: what you just did, "
+                "what you learned that changes the plan, and what you are waiting for. Never a condition that is already true now.",
        {"until": S, "minutes": {"type": "number"}, "note": S}, ["note"]),
     fn("find_tools", "Search for more tools and load them: the world's other ops (inspect, recall, find, history, "
                      "away, gesture, handbook, guide, timers...), your apps, skills, and the harness's extras "

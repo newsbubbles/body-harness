@@ -102,7 +102,8 @@ def event_line(e: dict[str, Any], me: str, names: Names) -> str | None:
     if k == "say":
         to = p.get("to")
         aim = " to you" if to == me else (f" to {names.name(to)}" if to else "")
-        return f"{who}{aim}: {str(p.get('text', ''))[:600]}{mark}"
+        # a friend's long line to you (a plan, a correction) is the part to keep whole
+        return f"{who}{aim}: {str(p.get('text', ''))[:1500 if to == me else 600]}{mark}"
     if k in ("gestured", "gesture"):
         return f"{who} ({p.get('text') or p.get('gesture') or ''}){mark}"
     if k == "talked":

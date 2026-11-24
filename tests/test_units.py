@@ -174,3 +174,16 @@ def test_hand_saved_files_read(tmp_path):
         c = tmp_path / f"config-{enc}.json"
         c.write_text('{"model": "ollama:x"}\r\n', encoding=enc)
         assert read_json(c, {}) == {"model": "ollama:x"}
+
+
+def test_wake_keeps_what_was_said_to_you():
+    # Corra's case: Brakka's correction reached her inside one talk result; by the next wake only her own notes,
+    # which still said "Eye loading", were left. A long line to the seat is kept whole, and it rides later wakes.
+    from body_harness import prompts, scene
+    names = scene.Names()
+    long = "Two gold is what you pay DeVito to ride. " * 30
+    e = {"seq": 7, "t": 100, "kind": "say", "actor": "e2", "payload": {"text": long, "to": "e1"}}
+    line = scene.event_line(e, "e1", names)
+    assert len(line) > 1000
+    w = prompts.wake("time is up", "(scene)", "", "", "", ["asked about the Eye loading"], [line])
+    assert w.index("Said to you lately") < w.index("Your last turns")

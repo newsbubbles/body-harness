@@ -120,6 +120,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `prices` | | `{"provider:model": [in, cached_in, out]}` dollars per million tokens, for providers that do not report cost |
 | `max_steps` | 16 | tool rounds in one turn |
 | `quiet_steps` | 8 | tool rounds when a watch timed out and nothing happened |
+| `heard_lines`, `heard_minutes` | 6, 60 | lines said to the seat that stay on its wakes, and for how long |
 | `chat_turns` | 4 | turns of only talk with the same person before the wake asks the seat to let it rest |
 | `repeat_window` | 900 | seconds in which a line that mostly repeats one said to the same listener is refused once |
 | `default_until` | `to_me()` | the watch when the model gives none |

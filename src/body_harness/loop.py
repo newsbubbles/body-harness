@@ -225,6 +225,7 @@ class Mind:
         if name in self.registry.world:
             self.load_tools([name])
         if isinstance(r, dict) and isinstance(r.get("events"), list):
+            self._keep_heard(r["events"])
             lines = scene.event_lines(r["events"], self.me, self.names, 12)
             r = {k: v for k, v in r.items() if k not in ("events", "cursor")}
             if lines:
@@ -474,6 +475,20 @@ class Mind:
                 lines.append(f"- scheduled [{i['id']}] at {when}: {i['what']}")
         return "\n".join(lines)
 
+    def _keep_heard(self, events: list[dict[str, Any]]) -> None:
+        keep = self.st.get("heard") or []
+        have = {h[0] for h in keep}
+        for e in events or []:
+            if e.get("kind") != "say" or e.get("actor") in (None, self.me) or e.get("seq") in have:
+                continue
+            if self.me not in ((e.get("payload") or {}).get("to"), e.get("target")):
+                continue
+            line = scene.event_line(e, self.me, self.names)
+            if line:
+                keep.append([e.get("seq"), time.time(), f"[t={float(e.get('t', 0)):.0f}] {line}"])
+                have.add(e.get("seq"))
+        self.st["heard"] = keep[-int(self.cfg.get("heard_lines", 6)):]
+
     async def turn(self, reason: str, events: list[dict[str, Any]]) -> None:
         self.turns += 1
         b = await self.perceive()
@@ -485,8 +500,14 @@ class Mind:
         recent = self.st.get("recent", [])[-6:]
         sys_text = prompts.system(self.seat.name, self.briefing, b.get("you") or {}, self.skills.index(),
                                   self.st.get("handbook") or [], self.cfg.get("extra_prompt", ""))
+        # lines said to this seat stay on its wakes for a while: a friend's correction that arrived inside one tool
+        # result was otherwise gone by the next turn, and the seat's own notes carried the old plan forward
+        now, cur = time.time(), {e.get("seq") for e in evs}
+        heard = [h[2] for h in self.st.get("heard") or []
+                 if h[0] not in cur and now - h[1] < float(self.cfg.get("heard_minutes", 60)) * 60]
+        self._keep_heard(evs)
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
-                            recent)
+                            recent, heard)
         speakers = {self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and
                     e.get("actor") not in (None, self.me)}
         chat = self.st.get("chat") or {}
@@ -613,8 +634,9 @@ class Mind:
         _log(self.seat.name, f"joined as {(self.bundle.get('you') or {}).get('name')} ({self.role}) "
                              f"with {self.model.spec}")
         reason = ("you just took your seat in the world" if not self.turns else
-                  ("your harness restarted and you are back in your seat. Your last turns' notes and the scene "
-                   "below are where you left off: pick up from there, no need to read your history again"))
+                  ("your harness restarted and you are back in your seat. The scene, what was said to you "
+                   "lately and your last turns' notes are where you left off: pick up from there, no need to read "
+                   "your history again"))
         events: list[dict[str, Any]] = []
         while not self.stop:
             try:
