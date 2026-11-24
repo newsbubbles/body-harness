@@ -205,7 +205,15 @@ class Mind:
                                         "same line again says it anyway"})
         if name == "away":
             self.st["away"] = fixed
+        fixed = self._drop_unsupported(name, fixed)
         r = await self.door.op(name, **fixed)
+        bad = re.search(r"unexpected keyword argument '(\w+)'", str(r)) if isinstance(r, dict) else None
+        if bad and bad.group(1) in fixed:
+            # an older engine has no such parameter (Klhyts Refuge's say takes no gesture): drop it for this seat
+            # from now on and send the call again, rather than spend the model's step on a refusal
+            self.st.setdefault("unsupported", {}).setdefault(name, []).append(bad.group(1))
+            fixed = self._drop_unsupported(name, fixed)
+            r = await self.door.op(name, **fixed)
         if isinstance(r, dict) and r.get("ok") is False and "join" in str(r.get("reason", "")).lower() \
                 and "seat" in str(r.get("reason", "")).lower():
             await self.join()
@@ -474,6 +482,15 @@ class Mind:
                     time.strftime("%H:%M", time.localtime(i["at_ts"]))
                 lines.append(f"- scheduled [{i['id']}] at {when}: {i['what']}")
         return "\n".join(lines)
+
+    def _drop_unsupported(self, op: str, args: dict[str, Any]) -> dict[str, Any]:
+        gone = set((self.st.get("unsupported") or {}).get(op) or [])
+        if not gone & set(args):
+            return args
+        out = {k: v for k, v in args.items() if k not in gone}
+        if op == "say" and "gesture" in gone and args.get("gesture"):
+            out["text"] = f"*{str(args['gesture']).strip('* ')}* {out.get('text', '')}".strip()
+        return out
 
     def _keep_heard(self, events: list[dict[str, Any]]) -> None:
         keep = self.st.get("heard") or []

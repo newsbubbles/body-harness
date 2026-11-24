@@ -199,3 +199,13 @@ def test_tool_choice_is_sent():
     assert m.body([{"role": "user", "content": "hi"}], tools)["tool_choice"] == "auto"
     m.no_forced_choice = True
     assert m.body([{"role": "user", "content": "hi"}], tools, forced)["tool_choice"] == "auto"
+
+
+def test_unsupported_param_is_dropped_and_gesture_folded():
+    # Klhyts Refuge's older engine refuses say(gesture=...): the harness folds it into the line for that seat
+    from body_harness.loop import Mind
+    m = Mind.__new__(Mind)
+    m.st = {"unsupported": {"say": ["gesture"]}}
+    out = m._drop_unsupported("say", {"text": "Morning.", "gesture": "nods", "to": "Brakka"})
+    assert out == {"text": "*nods* Morning.", "to": "Brakka"}
+    assert m._drop_unsupported("act", {"verb": "go"}) == {"verb": "go"}
