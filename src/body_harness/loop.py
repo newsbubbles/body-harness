@@ -453,6 +453,10 @@ class Mind:
             (e.get("target") == self.me or (e.get("payload") or {}).get("to") == self.me) for e in evs)
         tu = Usage()
         max_steps = int(self.cfg.get("max_steps", 16))
+        if reason.startswith("time is up") and not turn["spoken_to"] and \
+                not scene.event_lines(evs, self.me, self.names, 1):
+            # nothing happened: a look, a deed or a line of its own, and back to sleep
+            max_steps = min(max_steps, int(self.cfg.get("quiet_steps", 8)))
         for step in range(max_steps):
             tools = self.registry.tools(self.loaded_tools())
             choice = None
