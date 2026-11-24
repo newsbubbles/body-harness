@@ -213,6 +213,10 @@ class Mind:
         ok = not (isinstance(r, dict) and r.get("ok") is False)
         if ok and name in DEEDS:
             turn["deeds"] += 1
+        if ok and name in ("say", "act") and (fixed.get("to") or (name == "act" and fixed.get("verb") == "talk")):
+            who = fixed.get("to") or fixed.get("target")
+            if isinstance(who, str) and who:
+                turn.setdefault("partners", []).append(who)
         if ok and name == "say":
             self.st["said"] = (self.st.get("said", []) + [[time.time(), str(fixed.get("to") or ""),
                                                            str(fixed.get("text", ""))]])[-8:]
@@ -311,6 +315,10 @@ class Mind:
             warn = self._lint(until)
             if warn:
                 return "Not asleep yet: " + warn
+        partners = [p for p in dict.fromkeys(turn.get("partners") or []) if p.lower() not in until.lower()][:3]
+        if partners:
+            # someone you are talking with may answer the room, or call you by a nickname: to_me() misses both
+            until = f"({until}) or " + " or ".join(f"heard('', by={json.dumps(p)})" for p in partners)
         if self.cfg.get("always_to_me", True) and "to_me()" not in until.replace(" ", ""):
             # whatever else it waits for, a character always hears words aimed at it
             until = f"to_me() or ({until})"
@@ -481,6 +489,9 @@ class Mind:
             self.st["read_handbook"] = True
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
         turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": []}
+        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and
+                            e.get("actor") not in (None, self.me) and (e.get("target") == self.me or
+                                                                       (e.get("payload") or {}).get("to") == self.me)]
         turn["spoken_to"] = bool(b.get("owed")) or any(
             e.get("kind") in ("say", "talked") and e.get("actor") != self.me and
             (e.get("target") == self.me or (e.get("payload") or {}).get("to") == self.me) for e in evs)
