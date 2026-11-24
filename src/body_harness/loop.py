@@ -268,6 +268,12 @@ class Mind:
         minutes = float(a.get("minutes") or self.cfg.get("default_minutes", 60))
         minutes = max(1.0, min(minutes, float(self.cfg.get("max_minutes", 480))))
         if not forced:
+            if turn.get("spoken_to") and not turn["deeds"] and not turn.get("silence_checked"):
+                # a mind's note said "told the Traveler" over a turn with no say in it: words in a note are not deeds
+                turn["silence_checked"] = True
+                return ("Not asleep yet: you woke because someone spoke to you, and this turn you have not said or "
+                        "done anything; nobody heard an answer. If your character answers, say it now. If silence "
+                        "is the answer, sleep again.")
             warn = self._lint(until)
             if warn:
                 return "Not asleep yet: " + warn
@@ -436,6 +442,9 @@ class Mind:
             self.st["read_handbook"] = True
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
         turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": []}
+        turn["spoken_to"] = bool(b.get("owed")) or any(
+            e.get("kind") in ("say", "talked") and e.get("actor") != self.me and
+            (e.get("target") == self.me or (e.get("payload") or {}).get("to") == self.me) for e in evs)
         tu = Usage()
         max_steps = int(self.cfg.get("max_steps", 16))
         for step in range(max_steps):
@@ -452,6 +461,13 @@ class Mind:
             calls = msg.get("tool_calls") or []
             text = (msg.get("content") or "").strip() if isinstance(msg.get("content"), str) else ""
             if not calls:
+                if text and not turn.get("prose_nudged") and step < max_steps - 1:
+                    # prose outside a tool reaches nobody in the world: say so once, let the model put it right
+                    turn["prose_nudged"] = True
+                    messages += [{"role": "assistant", "content": text},
+                                 {"role": "user", "content": "(harness: text outside a tool reaches nobody in the "
+                                  "world. If your character speaks, call say; if it acts, call act. Then sleep.)"}]
+                    continue
                 if text:
                     turn["note"] = text[:400]
                 if step == 0 or not turn["slept"]:
