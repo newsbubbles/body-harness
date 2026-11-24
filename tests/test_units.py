@@ -139,3 +139,10 @@ def test_card_shows_body_memory():
          "here": {"name": "Hall"}}
     c = card(b, Names(), "e1")
     assert "You remember" in c and "note 9" in c and "note 1\n" not in c and "2 older" in c
+
+
+def test_cli_commands_without_a_seat(tmp_path, monkeypatch, capsys):
+    from body_harness.cli import main
+    monkeypatch.setenv("BH_HOME", str(tmp_path))
+    for cmd in (["usage"], ["status"], ["seats"]):
+        assert main(cmd) == 0

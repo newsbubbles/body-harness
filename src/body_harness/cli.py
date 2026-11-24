@@ -142,6 +142,14 @@ def main(argv: list[str] | None = None) -> int:
         for s in seats.all_seats(h):
             print(s.name)
         return 0
+    if args.cmd == "usage":
+        rows = fold([x.p("usage.jsonl") for x in seats.all_seats(h)], _since(args.since))
+        for name, u in sorted(rows.items(), key=lambda kv: kv[0] != "all"):
+            print(f"{name:14} {u.line()}")
+            for m, row in u.by_model.items():
+                if name == "all":
+                    print(f"{'':14}   {m}: {int(row['calls'])} calls, ${row['cost']:.4f}")
+        return 0
     s = seats.Seat(h, args.name)
     if not s.exists:
         print(f"no seat {args.name}", file=sys.stderr)
@@ -168,14 +176,6 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"    {c2['tool']}({json.dumps(c2.get('args'))[:140]}) -> {c2.get('out', '')[:160]}")
             print(f"    note: {r.get('note')}  | watch {r.get('watch')!r} | "
                   f"{u.get('input_tokens', 0)} in / {u.get('output_tokens', 0)} out, ${u.get('cost', 0):.4f}")
-        return 0
-    if args.cmd == "usage":
-        rows = fold([x.p("usage.jsonl") for x in seats.all_seats(h)], _since(args.since))
-        for name, u in sorted(rows.items(), key=lambda kv: kv[0] != "all"):
-            print(f"{name:14} {u.line()}")
-            for m, row in u.by_model.items():
-                if name == "all":
-                    print(f"{'':14}   {m}: {int(row['calls'])} calls, ${row['cost']:.4f}")
         return 0
     if args.cmd == "config":
         cfg = seats.read_json(s.p("config.json"), {})
