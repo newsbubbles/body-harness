@@ -1,0 +1,223 @@
+"""The tools a seat's model sees.
+
+A few are always loaded (CORE). Everything else, the world's other ops, the seat's apps, the harness's extras, is
+found with `find_tools` and stays loaded for a while after it is used, the way a deferred tool works in Claude Code.
+
+World ops go through wrappers that fix what minds got wrong most often: a short name where the engine wants the
+full one ("Taan" for "Elder Taan"), `target` where an op takes `entity`, a verb's params passed at the top level,
+a refusal read as noise. A wrapper never invents a deed: what it sends is what the model asked, made exact."""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .loop import Mind
+
+# Ops the harness does itself or that a seat never needs.
+HIDDEN_OPS = {"join", "use", "worlds", "wait", "perceive", "answer_ask", "leave"}
+# The ops a name in these params must resolve for.
+NAME_PARAMS = {"to", "target", "entity", "about", "who"}
+# Params minds kept sending under the wrong name, by op.
+ALIASES = {"inspect": {"target": "entity", "name": "entity", "id": "entity"},
+           "recall": {"who": "about", "target": "about", "entity": "about"},
+           "say": {"target": "to", "message": "text", "line": "text"},
+           "gesture": {"target": "to"},
+           "act": {"entity": "target", "object": "target"},
+           "handbook": {"name": "path", "page_name": "path"}}
+
+OWNER_KINDS = ("flaw", "vulnerability", "capability", "feature", "fix", "proposal", "quest", "help", "seat",
+               "testing", "other")
+
+
+def fn(name: str, desc: str, props: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
+    return {"type": "function", "function": {"name": name, "description": desc,
+                                             "parameters": {"type": "object", "properties": props,
+                                                            "required": required or []}}}
+
+
+S = {"type": "string"}
+CORE: list[dict[str, Any]] = [
+    fn("look", "See where you are now: a short scene card (hour, place, who is here, what you hold, exits, goals, "
+               "lines owed, what you can do, what happened). part= reads one piece of the last full view instead, "
+               "for example part='you.state.dialog', part='present', part='affordances' (refused verbs too, with "
+               "reasons).", {"part": S}),
+    fn("act", "Do something with your body: one verb from 'You can' on a target, with its params. The world decides "
+              "what happens; the answer says what did or why not.",
+       {"verb": S, "target": S, "params": {"type": "object"}}, ["verb"]),
+    fn("say", "Speak aloud in your place. to= one person here (a short name is fine; the harness finds the full "
+              "one). gesture= a sign with the line ('nods'). Words are not deeds: act first, then say what you did.",
+       {"text": S, "to": S, "gesture": S, "loud": {"type": "boolean"}, "low": {"type": "boolean"}}, ["text"]),
+    fn("remember", "Write a secret note on your character, kept by the world: what you learned, promised or decided. "
+                   "The next mind in this body reads it. Only after the world confirmed the thing happened.",
+       {"text": S}, ["text"]),
+    fn("intend", "Your character's goals, kept by the world and shown every look. New: text + why. Change one: id + "
+                 "status (active, done, dropped), why or priority.",
+       {"text": S, "why": S, "id": S, "status": S, "priority": {"type": "integer"}}),
+    fn("sleep", "End this turn and wait. until= a condition the world checks while you sleep (examples: "
+                "\"to_me()\", \"to_me() or arrived('Reeve')\", \"heard('water') or me.get('hp', 9) < 3\"); the "
+                "harness wakes you when it is true, when minutes pass, when your operator writes, or when something "
+                "you scheduled comes due. note= one or two lines for your next turn: what you just did and what you "
+                "are waiting for. Never a condition that is already true now.",
+       {"until": S, "minutes": {"type": "number"}, "note": S}, ["note"]),
+    fn("find_tools", "Search for more tools and load them: the world's other ops (inspect, recall, find, history, "
+                     "away, gesture, handbook, guide, timers...), your apps, skills, and the harness's extras "
+                     "(schedule, run_python, write_file). query= words for what you need. The tools it finds are "
+                     "loaded for your next calls.", {"query": S}, ["query"]),
+    fn("tell", "Speak outside the fiction. to='owner': the world's owner, the only way to reach them: kind is flaw "
+               "or vulnerability (a hole in the rules; keep it secret and leave it alone), capability or feature (a "
+               "verb the world lacks), fix (something broken), proposal (a change, with credit), quest (you need a "
+               "lead), help (you are stuck), seat, testing or other. to='operator': the human who runs this "
+               "harness (a question, a report, a problem). Never put either into the world as speech.",
+       {"to": {"type": "string", "enum": ["owner", "operator"]},
+        "kind": {"type": "string", "enum": list(OWNER_KINDS)},
+        "what": S, "why": S, "severity": {"type": "string", "enum": ["low", "medium", "high"]}, "credit": S},
+       ["to", "what"]),
+    fn("memo", "Your own notes outside the world (markdown files). shelf='seat' is this character's, 'craft' is "
+               "shared with every seat you run (lessons about playing well, never a character's secrets). "
+               "op: list, read, write (name, text, hook: one line for the index), append, search (query).",
+       {"op": {"type": "string", "enum": ["list", "read", "write", "append", "search"]}, "name": S, "text": S,
+        "hook": S, "shelf": {"type": "string", "enum": ["seat", "craft"]}, "query": S}, ["op"]),
+    fn("skill", "Read a skill from the index in your instructions (how to do something well). part= a file inside "
+                "it.", {"name": S, "part": S}, ["name"]),
+]
+CORE_NAMES = {t["function"]["name"] for t in CORE}
+
+EXTRAS: dict[str, dict[str, Any]] = {
+    "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
+                               "in_minutes= real minutes from now; what= what to do then. op='list' shows what is "
+                               "pending, op='drop' with id removes one.",
+                   {"op": {"type": "string", "enum": ["add", "list", "drop"]}, "at_t": {"type": "number"},
+                    "in_minutes": {"type": "number"}, "what": S, "id": S}),
+    "run_python": fn("run_python", "Run Python in your own sandbox (your workspace folder; no network, no other "
+                                   "processes). For your own sums, tallies and plans. workspace/scene.json is the "
+                                   "last full view of the world. Print what you want back.",
+                     {"code": S, "timeout": {"type": "number"}}, ["code"]),
+    "write_file": fn("write_file", "Write a file under workspace/ or apps/. An app is apps/<name>.py with TOOL = "
+                                   "{'description': ..., 'parameters': {JSON schema}} and def run(args): returning "
+                                   "text or JSON; it becomes a tool you can find. skill('apps') says how.",
+                     {"path": S, "text": S}, ["path", "text"]),
+    "agenda": fn("agenda", "What is on your plate: lines owed, your operator's messages, the owner's answers, your "
+                           "goals, what you scheduled, and your last turns.", {}),
+}
+
+
+class Registry:
+    def __init__(self, mind: "Mind"):
+        self.m = mind
+        self.world: dict[str, dict[str, Any]] = {}  # op -> {summary, description, schema}
+
+    async def load_world_ops(self) -> None:
+        try:
+            spec = await self.m.door.get(f"/openapi.json?role={self.m.role}")
+        except Exception:
+            spec = {}
+        allowed = set(self.m.ops or [])
+        for path, item in (spec.get("paths") or {}).items():
+            op = (item.get("post") or {})
+            name = op.get("operationId") or path.rsplit("/", 1)[-1]
+            if name in HIDDEN_OPS or name in CORE_NAMES or (allowed and name not in allowed):
+                continue
+            schema = (((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {}).get(
+                "schema") or {"type": "object", "properties": {}}
+            schema = {k: v for k, v in schema.items() if k in ("type", "properties", "required")}
+            schema.setdefault("type", "object")
+            schema.setdefault("properties", {})
+            desc = (op.get("description") or op.get("summary") or "").split("**Layer:**")[0].strip()
+            self.world[name] = {"summary": op.get("summary") or desc[:160], "description": desc[:1500],
+                                "schema": schema, "layer": op.get("x-layer", "")}
+
+    def catalog(self) -> list[tuple[str, str, str]]:
+        """(name, kind, one line) for every findable thing."""
+        out = [(n, "world op", w["summary"]) for n, w in self.world.items()]
+        out += [(n, "harness", t["function"]["description"][:160]) for n, t in EXTRAS.items()]
+        out += [(n, "app", s.get("description", "")[:160]) for n, s in self.m.apps().items()]
+        out += [(f"skill:{n}", "skill", d) for n, d in self.m.skills.desc.items()]
+        return out
+
+    def find(self, query: str) -> dict[str, Any]:
+        words = [w for w in query.lower().replace(",", " ").split() if len(w) > 1]
+        scored = []
+        for name, kind, line in self.catalog():
+            hay = f"{name} {line}".lower()
+            score = sum(3 if w in name.lower() else 1 for w in words if w in hay)
+            if query.strip().lower() == name.lower():
+                score += 10
+            if score:
+                scored.append((score, name, kind, line))
+        scored.sort(key=lambda x: -x[0])
+        top = scored[:6]
+        loaded = [n for _, n, k, _ in top if k != "skill"]
+        self.m.load_tools(loaded)
+        return {"loaded": loaded,
+                "found": [{"name": n, "kind": k, "what": ln} for _, n, k, ln in top],
+                "hint": "loaded tools are callable now; a skill is read with skill(name)" if top else
+                        "nothing matched; try other words, or look at 'You can' in look() for verbs"}
+
+    def schema(self, name: str) -> dict[str, Any] | None:
+        if name in EXTRAS:
+            return EXTRAS[name]
+        if name in self.world:
+            w = self.world[name]
+            return fn(name, w["description"][:900], w["schema"]["properties"], w["schema"].get("required"))
+        a = self.m.apps().get(name)
+        if a:
+            p = a.get("parameters") or {"type": "object", "properties": {}}
+            return fn(name, a.get("description", "")[:900], p.get("properties", {}), p.get("required"))
+        return None
+
+    def tools(self, loaded: list[str]) -> list[dict[str, Any]]:
+        return CORE + [s for s in (self.schema(n) for n in loaded) if s]
+
+
+def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any], list[str]]:
+    """Rename what minds send under the wrong name and resolve short names. Returns the args and what was changed."""
+    notes: list[str] = []
+    args = dict(args)
+    for wrong, right in ALIASES.get(op, {}).items():
+        if wrong in args and right not in args:
+            args[right] = args.pop(wrong)
+            notes.append(f"{wrong}= read as {right}=")
+    if op == "act":
+        sch = mind.registry.world.get("act", {}).get("schema", {}).get("properties", {})
+        stray = {k: v for k, v in args.items() if k not in ("verb", "target", "params") and k not in sch}
+        if stray:
+            args["params"] = {**(args.get("params") or {}), **stray}
+            for k in stray:
+                args.pop(k)
+            notes.append(f"{', '.join(stray)} moved into params")
+    for k in NAME_PARAMS & set(args):
+        v = args[k]
+        if not isinstance(v, str):
+            continue
+        full, cands = mind.names.resolve(v, mind.present_names())
+        if full and full != v:
+            args[k] = full
+            notes.append(f"{k}={v!r} is {full!r}")
+        elif not full and cands:
+            notes.append(f"{k}={v!r} could be: {', '.join(cands)}")
+    return args, notes
+
+
+def compact(result: Any, limit: int = 5000) -> str:
+    """A world answer for the model: refusals as reason, hint and what would work; big answers cut with a note."""
+    if isinstance(result, dict) and result.get("ok") is False:
+        r = {"refused": result.get("reason")}
+        if result.get("hint"):
+            r["hint"] = result["hint"]
+        if result.get("alternatives"):
+            r["instead"] = result["alternatives"]
+        for k in ("present", "names", "how", "kinds"):
+            if k in result:
+                r[k] = result[k]
+        return json.dumps(r, default=str)[:limit]
+    if isinstance(result, dict):
+        result = {k: v for k, v in result.items() if k not in ("cursor", "wall")}
+        if isinstance(result.get("events"), list) and len(result["events"]) > 12:
+            result["events"] = result["events"][-12:]
+            result["events_note"] = "older events cut; look() shows the scene"
+    s = result if isinstance(result, str) else json.dumps(result, default=str)
+    if len(s) > limit:
+        s = s[:limit] + f"... (cut at {limit} of {len(s)} characters; ask for less, or page it)"
+    return s
