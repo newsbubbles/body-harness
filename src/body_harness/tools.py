@@ -27,6 +27,44 @@ ALIASES = {"inspect": {"target": "entity", "name": "entity", "id": "entity"},
            "act": {"entity": "target", "object": "target"},
            "handbook": {"name": "path", "page_name": "path"}}
 
+# Tools minds invented, and what they meant: (tool, how). Corra called gesture(), Ssareth read(); more come from
+# each seat's invented.jsonl. A name that is one of the world's verbs goes to act before this list is read.
+TOOL_ROUTES = {"gesture": ("say", "gesture"), "emote": ("say", "gesture"), "nod": ("say", "gesture"),
+               "speak": ("say", ""), "reply": ("say", ""), "respond": ("say", ""), "talk_to": ("say", ""),
+               "tell_npc": ("say", ""), "whisper": ("say", "low"), "shout": ("say", "loud"), "yell": ("say", "loud"),
+               "call_out": ("say", "loud"), "walk": ("act", "go"), "move": ("act", "go"), "go_to": ("act", "go"),
+               "goto": ("act", "go"), "travel": ("act", "go"), "wait": ("sleep", ""), "end_turn": ("sleep", ""),
+               "observe": ("look", ""), "perceive": ("look", ""), "scene": ("look", "")}
+_TEXT_KEYS = ("text", "message", "line", "words", "content", "say", "speech")
+_PLACE_KEYS = ("target", "place", "to", "destination", "where", "exit")
+
+
+def route(name: str, args: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """An invented tool name read as the real tool it meant, or None."""
+    if name not in TOOL_ROUTES:
+        return None
+    tool, how = TOOL_ROUTES[name]
+    a = dict(args)
+    if tool == "say":
+        text = next((str(a.pop(k)) for k in _TEXT_KEYS if a.get(k)), "")
+        out: dict[str, Any] = {"text": text}
+        if how == "gesture":
+            g = a.pop("gesture", None) or a.pop("action", None) or a.pop("description", None) or (name if name == "nod" else "")
+            out["gesture"] = str(g or "")
+            out["text"] = text or f"*{str(g or name).strip('* ')}*"
+        elif how:
+            out[how] = True
+        for k in ("to", "target", "who"):
+            if a.get(k):
+                out["to"] = a[k]
+                break
+        return "say", out
+    if tool == "act":
+        place = next((a.pop(k) for k in _PLACE_KEYS if a.get(k)), None)
+        return "act", {"verb": how, "target": place, "params": {k: v for k, v in a.items() if k != "verb"}}
+    return tool, {k: v for k, v in a.items() if k in ("until", "minutes", "note", "plan", "part")}
+
+
 OWNER_KINDS = ("flaw", "vulnerability", "capability", "feature", "fix", "proposal", "quest", "help", "seat",
                "testing", "other")
 
@@ -63,8 +101,10 @@ CORE: list[dict[str, Any]] = [
                 "heard('', by='Brakka') or did('attack')\". Names are the names on your card, any part, any case. "
                 "The harness wakes you when it is true, when minutes pass, when your operator writes, or when "
                 "something you scheduled comes due. note= one or two lines for your next turn: what you just did, "
-                "what you learned that changes the plan, and what you are waiting for. Never a condition that is already true now.",
-       {"until": S, "minutes": {"type": "number"}, "note": S}, ["note"]),
+                "what you learned that changes the plan, and what you are waiting for. Never a condition that is already true now. "
+                "plan= (optional) what you now mean to do, in a line or two; it replaces your old plan, so write it "
+                "whenever someone corrects you or your aim changes.",
+       {"until": S, "minutes": {"type": "number"}, "note": S, "plan": S}, ["note"]),
     fn("find_tools", "Search for more tools and load them: the world's other ops (inspect, recall, find, history, "
                      "away, gesture, handbook, guide, timers...), your apps, skills, and the harness's extras "
                      "(schedule, run_python, write_file). query= words for what you need. The tools it finds are "

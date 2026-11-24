@@ -60,7 +60,7 @@ model turn. body-harness is built around those lessons:
 The wake message carries an agenda: lines owed to players first, then your messages, the owner's answers, scheduled
 items and the character's goals. `schedule` (found with find_tools) wakes the seat at a world time or after real
 minutes. Every turn is one line in `ledger.jsonl`: why it woke, each call and what the world said, the note, the
-watch it set, and what it cost.
+watch it set, and what it cost. A tool name the model made up is logged to `invented.jsonl` with how the harness read it (`speak` as `say`, `walk` as `act go`), so you can see which models guess names.
 
 ## Usage
 
@@ -116,12 +116,15 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `env_files` | | `.env` files to read a provider key from (it is never printed) |
 | `max_tokens` | 1200 | per model reply |
 | `temperature`, `reasoning` | | passed through (`reasoning` is OpenRouter's effort: low, medium, high) |
+| `extra` | | merged into every request body; on OpenRouter, `{"provider": {"order": ["<endpoint>"], "require_parameters": true}}` keeps a seat on the endpoints you chose |
 | `cache` | auto | breakpoints on OpenRouter models that need them; `on` or `off` to force |
 | `prices` | | `{"provider:model": [in, cached_in, out]}` dollars per million tokens, for providers that do not report cost |
 | `max_steps` | 16 | tool rounds in one turn |
 | `quiet_steps` | 8 | tool rounds when a watch timed out and nothing happened |
 | `heard_lines`, `heard_minutes` | 6, 60 | lines said to the seat that stay on its wakes, and for how long |
 | `chat_turns` | 4 | turns of only talk with the same person before the wake asks the seat to let it rest |
+| `chat_hard` | 8 | turns of only talk with the same person after which a line to them is held once, until something is done |
+| `recent_notes` | 5 | the seat's own last turn notes on each wake; its plan (from `sleep(plan=...)`) is shown apart and replaced, never added to |
 | `repeat_window` | 900 | seconds in which a line that mostly repeats one said to the same listener is refused once |
 | `default_until` | `to_me()` | the watch when the model gives none |
 | `default_minutes`, `max_minutes` | 60, 480 | how long a sleep may run |

@@ -248,11 +248,32 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     affs = affordance_lines(b.get("affordances") or []) or [str(v) for v in (b.get("verbs") or [])]
     if affs:
         lines.append("You can: " + " | ".join(affs))
-    evs = event_lines(events if events is not None else (b.get("events") or []), me, names)
+    allev = events if events is not None else (b.get("events") or [])
+    # what was said to you comes first and is never pushed out by a busy room's barks (models cannot tell addressed
+    # from overheard on their own; the world's to= and target fields can)
+    mine = [e for e in allev if to_me(e, me, you.get("name") or "")]
+    told = event_lines(mine, me, names, 10)
+    if told:
+        lines.append("Said to you:")
+        lines += ["  " + e for e in told]
+    evs = event_lines([e for e in allev if e not in mine], me, names)
     if evs:
         lines.append("Since you last looked:")
         lines += ["  " + e for e in evs]
     return "\n".join(lines)
+
+
+def to_me(e: dict[str, Any], me: str, my_name: str = "") -> bool:
+    """A line aimed at me: said or asked to me, or a room line that calls me by name."""
+    if e.get("kind") not in ("say", "talked") or not me or e.get("actor") == me:
+        return False
+    p = e.get("payload") or {}
+    if me in (p.get("to"), e.get("target")):
+        return True
+    words = [w for w in my_name.replace(",", " ").split() if w not in _TITLES]
+    first = words[0] if words else ""
+    return e.get("kind") == "say" and not p.get("to") and len(first) > 2 and \
+        bool(re.search(r"\b" + re.escape(first) + r"\b", str(p.get("text", "")), re.I))
 
 
 def wait_card(w: dict[str, Any], names: Names, me_id: str, day_seconds: float = DAY) -> str:

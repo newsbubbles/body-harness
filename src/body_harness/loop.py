@@ -11,6 +11,7 @@ standing orders are set again after every deed, and the door is retried with bac
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import re
 import time
@@ -27,12 +28,28 @@ from .memory import Shelf, memo
 from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_jsonl
 from .skills import Skills
-from .tools import EXTRAS, Registry, compact, fix_args
+from .tools import EXTRAS, Registry, compact, fix_args, route
 from .usage import Usage, append as usage_append
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
 KEEP_LOADED_TURNS = 5
 MAX_LOADED = 8
+
+
+# Words that claim a deed, what they claim, and the verbs that would do it (the first the world has is suggested)
+_CLAIMS = [
+    (r"\b(i take (it|the job|the work|your offer)|i('ll| will) take (it|the job|the work)|accept(ed)?\b.{0,40}\b(job|"
+     r"offer|work)|took\b.{0,30}\bjob|i('m| am) in for the job)\b", "took the job",
+     ("take_job", "accept", "hire")),
+    (r"\b(i give (you|him|her|them)|i('ve| have) given|gave (you|him|her|them)|here('s| is) (the|your) "
+     r"(coin|gold|silver|money))\b", "gave it", ("give", "pay")),
+    (r"\b(i bought|i('ve| have) bought|i('ll| will) buy (it|that|this) now|paid (you|him|her|the))\b", "paid",
+     ("buy", "pay", "give")),
+]
+
+
+def _brief(args: dict[str, Any]) -> str:
+    return ", ".join(f"{k}={v!r}" for k, v in args.items() if v not in (None, "", {}))[:160]
 
 
 def _log(seat: str, msg: str) -> None:
@@ -189,8 +206,17 @@ class Mind:
                 params = rest.pop("params", None) or {}
                 out = await self.call("act", {"verb": name, "target": target, "params": {**params, **rest}}, turn)
                 return f"(harness: {name} is a verb: read as act(verb='{name}', ...))\n" + out
-            return compact({"ok": False, "reason": f"no tool {name}", "hint": "find_tools(query) finds and loads "
-                                                                                "tools; verbs go through act(verb, ...)"})
+            meant = route(name, args)
+            append_jsonl(self.seat.p("invented.jsonl"), {"ts": time.time(), "model": self.model.spec, "tool": name,
+                                                         "args": sorted(args), "read_as": meant[0] if meant else None})
+            if meant and (meant[0] != "act" or meant[1]["verb"] in self.verb_names() or not self.verb_names()):
+                out = await self.call(meant[0], meant[1], turn)
+                return f"(harness: there is no tool {name}; read as {meant[0]}({_brief(meant[1])}))\n" + out
+            known = [t["function"]["name"] for t in self.registry.tools(self.loaded_tools())] + sorted(self.verb_names())
+            near = difflib.get_close_matches(name, known, n=3, cutoff=0.6)
+            return compact({"ok": False, "reason": f"no tool {name}",
+                            "hint": (f"did you mean {', '.join(near)}? " if near else "") +
+                                    "find_tools(query) finds and loads tools; verbs go through act(verb, ...)"})
         fixed, notes = fix_args(name, args, self)
         if name == "say":
             text = str(fixed.get("text", ""))
@@ -203,6 +229,17 @@ class Mind:
                 return compact({"ok": False, "reason": f"not said: you said nearly this a moment ago: {prev[:160]!r}",
                                 "hint": "answer what was said to you, add only what is new, or say nothing; the "
                                         "same line again says it anyway"})
+            # two seats that wake on each other's words traded questions for minutes with nothing done (Corra and
+            # Ssareth): past a hard count the line is held once, as AI Town ends a conversation after 8 messages
+            long = {p: n for p, n in (self.st.get("chat") or {}).items() if n >= int(self.cfg.get("chat_hard", 8))}
+            who = next((p for p in long if to and (to.lower() in p.lower() or p.lower() in to.lower())), None) or \
+                (next(iter(long)) if long and not to else None)
+            if who and not turn.get("chat_ok"):
+                turn["chat_ok"] = True
+                return compact({"ok": False, "reason": f"not said: you and {who} have only talked for {long[who]} "
+                                                       f"turns, with nothing done between",
+                                "hint": "do something (act), or let it rest and sleep on a change (someone arriving, "
+                                        "a deed, the hour). If this line truly moves things, say it again"})
         if name == "away":
             self.st["away"] = fixed
         fixed = self._drop_unsupported(name, fixed)
@@ -223,6 +260,13 @@ class Mind:
             turn["deeds"] += 1
             if name != "say" and not (name == "act" and fixed.get("verb") == "talk"):
                 turn["done"] = turn.get("done", 0) + 1  # a deed that moves the world, not more words
+            if name == "act":
+                turn.setdefault("verbs", set()).add(str(fixed.get("verb") or ""))
+        if ok and name == "say":
+            claim = self._deed_claim(str(fixed.get("text", "")), turn)
+            if claim:
+                notes.append(f"your words say you {claim[0]}, but no deed did it, and words do not move the world. "
+                             f"To do it: act(verb='{claim[1]}', ...)")
         if ok and name in ("say", "act") and (fixed.get("to") or (name == "act" and fixed.get("verb") == "talk")):
             who = fixed.get("to") or fixed.get("target")
             if isinstance(who, str) and who:
@@ -326,6 +370,12 @@ class Mind:
             warn = self._lint(until)
             if warn:
                 return "Not asleep yet: " + warn
+            claim = None if turn.get("claim_checked") else self._deed_claim(str(a.get("note") or ""), turn)
+            if claim:
+                turn["claim_checked"] = True
+                return (f"Not asleep yet: your note says you {claim[0]}, but no act did it this turn, so the world "
+                        f"does not know. Do it now (act(verb='{claim[1]}', ...)), or write the note as what you said, "
+                        f"not what you did, and sleep.")
         if "said_here()" in until:
             # the harness's shorthand: anyone but you said something here (heard('') would hear your own lines too)
             mine = json.dumps(str((self.bundle.get("you") or {}).get("name") or ""))
@@ -368,6 +418,9 @@ class Mind:
         note = str(a.get("note") or "").strip()
         turn["note"] = note
         turn["slept"] = True
+        if str(a.get("plan") or "").strip():
+            # the plan is replaced, never appended: an old belief cannot ride forward beside the new one
+            self.st["plan"] = str(a["plan"]).strip()[:500]
         return f"Asleep until {until!r} or {minutes:.0f} minutes."
 
     def _due(self, t_world: float | None) -> list[dict[str, Any]]:
@@ -483,6 +536,17 @@ class Mind:
                 lines.append(f"- scheduled [{i['id']}] at {when}: {i['what']}")
         return "\n".join(lines)
 
+    def _deed_claim(self, text: str, turn: dict[str, Any]) -> tuple[str, str] | None:
+        """(what the words claim, the verb that would do it) when a line or note claims a deed no act did this turn
+        and the world has the verb. Ssareth told Gog "I take it" and never ran take_job."""
+        verbs, done = self.verb_names(), turn.get("verbs") or set()
+        for pat, what, cands in _CLAIMS:
+            if re.search(pat, text, re.I):
+                verb = next((v for v in cands if v in verbs), None)
+                if verb and not (done & set(cands)):
+                    return what, verb
+        return None
+
     def _drop_unsupported(self, op: str, args: dict[str, Any]) -> dict[str, Any]:
         gone = set((self.st.get("unsupported") or {}).get(op) or [])
         if not gone & set(args):
@@ -496,15 +560,38 @@ class Mind:
         keep = self.st.get("heard") or []
         have = {h[0] for h in keep}
         for e in events or []:
-            if e.get("kind") != "say" or e.get("actor") in (None, self.me) or e.get("seq") in have:
-                continue
-            if self.me not in ((e.get("payload") or {}).get("to"), e.get("target")):
+            if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me, self.my_name()):
                 continue
             line = scene.event_line(e, self.me, self.names)
             if line:
-                keep.append([e.get("seq"), time.time(), f"[t={float(e.get('t', 0)):.0f}] {line}"])
+                keep.append([e.get("seq"), time.time(), f"[t={float(e.get('t', 0)):.0f}] {line}",
+                             self.names.name(e.get("actor"))])
                 have.add(e.get("seq"))
         self.st["heard"] = keep[-int(self.cfg.get("heard_lines", 6)):]
+
+    def my_name(self) -> str:
+        return str((self.bundle.get("you") or {}).get("name") or "")
+
+    def _companion_left(self, evs: list[dict[str, Any]]) -> str:
+        """One line when someone this seat was talking with walks out (Corra and Ssareth stayed on the dock when
+        Brakka went up to Gog, then lost each other in town)."""
+        now, hour = time.time(), 3600
+        mates = {str(x[1]).lower() for x in self.st.get("said") or [] if len(x) == 3 and x[1] and now - x[0] < hour}
+        mates |= {str(h[3]).lower() for h in self.st.get("heard") or [] if len(h) > 3 and now - h[1] < hour}
+        out = []
+        for e in evs:
+            mover = (e.get("payload") or {}).get("entity") or e.get("actor")
+            who = self.names.name(mover)
+            if e.get("kind") != "left" or mover == self.me or not who:
+                continue
+            if any(m and (m in who.lower() or who.lower() in m) for m in mates):
+                where = self.names.name((e.get("payload") or {}).get("to")) or "somewhere"
+                out.append(f"{who}, who you were talking with, left for {where}.")
+        if not out:
+            return ""
+        how = "act(verb='follow') while someone is still here, or go there" if "follow" in self.verb_names() \
+            else "go there"
+        return f"\n\n(harness: {' '.join(dict.fromkeys(out))} If you mean to stay with them, {how}.)"
 
     async def turn(self, reason: str, events: list[dict[str, Any]]) -> None:
         self.turns += 1
@@ -514,7 +601,7 @@ class Mind:
         card = scene.card(b, self.names, self.me, self.day_seconds, events=evs)
         agenda = self.agenda()
         self.st["inbox_seen"] = time.time()
-        recent = self.st.get("recent", [])[-6:]
+        recent = self.st.get("recent", [])[-int(self.cfg.get("recent_notes", 5)):]
         sys_text = prompts.system(self.seat.name, self.briefing, b.get("you") or {}, self.skills.index(),
                                   self.st.get("handbook") or [], self.cfg.get("extra_prompt", ""))
         # lines said to this seat stay on its wakes for a while: a friend's correction that arrived inside one tool
@@ -523,8 +610,11 @@ class Mind:
         heard = [h[2] for h in self.st.get("heard") or []
                  if h[0] not in cur and now - h[1] < float(self.cfg.get("heard_minutes", 60)) * 60]
         self._keep_heard(evs)
+        me_name = self.my_name()
+        told = bool(heard) or any(scene.to_me(e, self.me, me_name) for e in evs)
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
-                            recent, heard)
+                            recent, heard, str(self.st.get("plan") or ""), told)
+        user += self._companion_left(evs)
         speakers = {self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and
                     e.get("actor") not in (None, self.me)}
         chat = self.st.get("chat") or {}
@@ -543,12 +633,8 @@ class Mind:
             self.st["read_handbook"] = True
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
         turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": []}
-        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and
-                            e.get("actor") not in (None, self.me) and (e.get("target") == self.me or
-                                                                       (e.get("payload") or {}).get("to") == self.me)]
-        turn["spoken_to"] = bool(b.get("owed")) or any(
-            e.get("kind") in ("say", "talked") and e.get("actor") != self.me and
-            (e.get("target") == self.me or (e.get("payload") or {}).get("to") == self.me) for e in evs)
+        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me, me_name)]
+        turn["spoken_to"] = bool(b.get("owed")) or bool(turn["partners"])
         tu = Usage()
         max_steps = int(self.cfg.get("max_steps", 16))
         if reason.startswith("time is up") and not turn["spoken_to"] and \

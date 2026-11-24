@@ -88,14 +88,19 @@ def system(seat_name: str, briefing: dict[str, Any], you: dict[str, Any], skills
 
 
 def wake(reason: str, scene: str, agenda: str, seat_index: str, craft_index: str, recent: list[str],
-         heard: list[str] | None = None) -> str:
+         heard: list[str] | None = None, plan: str = "", told: bool = False) -> str:
     parts = [f"You wake: {reason}", "", "The scene:", scene, ""]
     if heard:
         parts += ["Said to you lately (before this wake, newest last; it beats your notes):"] + heard + [""]
     if agenda:
         parts += ["On your plate:", agenda, ""]
+    if plan:
+        parts += ["Your plan (you wrote it; sleep(plan=...) replaces it):", plan, ""]
     if recent:
         parts += ["Your last turns (your own notes):"] + [f"- {r}" for r in recent] + [""]
+    if told:
+        parts += ["Someone spoke to you. If what they said changes what you believe or mean to do (a correction, a "
+                  "new job, a friend leaving), rewrite your plan in sleep(plan=...) and drop the old one.", ""]
     # an index with no notes in it yet costs tokens every wake and says nothing
     if "](" in seat_index:
         parts += ["Your notebook (memo, shelf seat):", seat_index.strip(), ""]

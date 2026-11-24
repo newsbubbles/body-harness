@@ -209,3 +209,62 @@ def test_unsupported_param_is_dropped_and_gesture_folded():
     out = m._drop_unsupported("say", {"text": "Morning.", "gesture": "nods", "to": "Brakka"})
     assert out == {"text": "*nods* Morning.", "to": "Brakka"}
     assert m._drop_unsupported("act", {"verb": "go"}) == {"verb": "go"}
+
+
+def test_invented_tool_names_route_to_real_tools():
+    # cheap models call tools they know from elsewhere (speak, gesture, walk); PA-Tool: known names, fewer errors
+    from body_harness.tools import route
+    assert route("speak", {"message": "Hello.", "to": "Brakka"}) == ("say", {"text": "Hello.", "to": "Brakka"})
+    assert route("whisper", {"text": "Quiet."}) == ("say", {"text": "Quiet.", "low": True})
+    tool, a = route("gesture", {"gesture": "nods"})
+    assert tool == "say" and a["gesture"] == "nods" and a["text"]
+    assert route("walk", {"destination": "Docks"})[:1] == ("act",)
+    assert route("walk", {"destination": "Docks"})[1]["verb"] == "go"
+    assert route("wait", {"note": "n", "bogus": 1}) == ("sleep", {"note": "n"})
+    assert route("fly", {}) is None
+
+
+def test_words_that_claim_a_deed_get_caught():
+    # Ssareth told Gog "I take it" and never ran take_job; the world never knew he had the job
+    from body_harness.loop import Mind
+    m = Mind.__new__(Mind)
+    m.bundle = {"affordances": [{"verb": "take_job"}, {"verb": "give"}]}
+    assert m._deed_claim("Aye, I take the job.", {"verbs": set()}) == ("took the job", "take_job")
+    assert m._deed_claim("Aye, I take the job.", {"verbs": {"take_job"}}) is None
+    assert m._deed_claim("Where is the dock?", {"verbs": set()}) is None
+    m.bundle = {"affordances": [{"verb": "give"}]}
+    assert m._deed_claim("I take the job.", {"verbs": set()}) is None  # no verb does it: not the harness's call
+
+
+def test_to_me_reads_target_to_and_first_name():
+    me = "e1"
+    say = lambda text, **k: {"kind": "say", "actor": "e2", "payload": {"text": text, **k}}
+    assert scene.to_me(say("Hi.", to="e1"), me, "Corra Venn")
+    assert scene.to_me(say("Corra, wait for me."), me, "Corra Venn")
+    assert not scene.to_me(say("Corral the goats."), me, "Corra Venn")
+    assert not scene.to_me(say("Corra, wait.", to="e3"), me, "Corra Venn")
+    assert not scene.to_me({"kind": "say", "actor": "e1", "payload": {"text": "Corra here."}}, me, "Corra Venn")
+    assert scene.to_me(say("Reeve, a word."), me, "The Reeve") is False  # titles alone never count
+
+
+def test_plan_shows_on_the_wake_and_told_asks_for_a_rewrite():
+    from body_harness import prompts
+    w = prompts.wake("someone spoke", "(scene)", "", "", "", ["note"], None, "Ask about the Eye job", True)
+    assert "Your plan" in w and "Ask about the Eye job" in w and "sleep(plan=...)" in w
+    assert w.index("Your plan") < w.index("Your last turns")
+    assert "rewrite your plan" not in prompts.wake("time", "(scene)", "", "", "", [], None, "", False)
+
+
+def test_companion_left_gets_a_line():
+    # Corra and Ssareth stayed on the dock when Brakka walked up to Gog's, then lost him in town
+    import time
+    from body_harness.loop import Mind
+    m = Mind.__new__(Mind)
+    m.me, m.bundle = "e1", {"affordances": [{"verb": "follow"}]}
+    m.names = scene.Names({"e2": "Brakka Bomber", "e3": "Gog's Hall", "e4": "Wick"})
+    m.st = {"said": [[time.time(), "Brakka", "ok"]], "heard": []}
+    left = {"kind": "left", "actor": "e2", "payload": {"entity": "e2", "to": "e3"}}
+    line = m._companion_left([left])
+    assert "Brakka Bomber" in line and "Gog's Hall" in line and "follow" in line
+    stranger = {"kind": "left", "actor": "e4", "payload": {"entity": "e4", "to": "e3"}}
+    assert m._companion_left([stranger]) == ""
