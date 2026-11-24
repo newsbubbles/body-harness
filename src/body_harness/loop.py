@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import traceback
 import uuid
@@ -61,6 +62,8 @@ class Mind:
         self.turns = int(self.st.get("turns", 0))
         self.day_seconds = float(self.cfg.get("day_seconds", scene.DAY))
         self.stop = False
+        self._linted: set[str] = set()
+        self.pending: tuple[str, list[dict[str, Any]]] | None = None
 
     # ---------- state ----------
 
@@ -240,25 +243,59 @@ class Mind:
 
     # ---------- sleep and wake ----------
 
-    async def _sleep(self, a: dict[str, Any], turn: dict[str, Any]) -> str:
+    def _lint(self, until: str) -> str | None:
+        """Catch the watch traps minds fell into, once per condition: heard('<a name>') waits for the word, not
+        the person; heard('<your own name>') wakes on your own lines."""
+        if until in self._linted:
+            return None
+        self._linted.add(until)
+        me = str((self.bundle.get("you") or {}).get("name") or "").lower()
+        known = [n.lower() for n in self.names.by_id.values()]
+        for m in re.finditer(r"heard\(\s*['\"]([^'\"]+)['\"]\s*\)", until):
+            w = m.group(1).strip().lower()
+            if me and (w == me or w in me.split()):
+                return (f"heard('{m.group(1)}') wakes on your own lines too (your name is in them). to_me() already "
+                        f"wakes you when someone addresses you. Sleep again with a fixed condition, or the same one "
+                        f"if you meant it.")
+            if any(w == n or w in n.split() for n in known):
+                return (f"heard('{m.group(1)}') wakes on any line with the word '{m.group(1)}' in it, not on what "
+                        f"{m.group(1)} says. To wake when they speak: heard('', by='{m.group(1)}'). Sleep again "
+                        f"with a fixed condition, or the same one if you meant the word.")
+        return None
+
+    async def _sleep(self, a: dict[str, Any], turn: dict[str, Any], forced: bool = False) -> str:
         until = (a.get("until") or "").strip() or self.cfg.get("default_until", "to_me()")
         minutes = float(a.get("minutes") or self.cfg.get("default_minutes", 60))
         minutes = max(1.0, min(minutes, float(self.cfg.get("max_minutes", 480))))
+        if not forced:
+            warn = self._lint(until)
+            if warn:
+                return "Not asleep yet: " + warn
+        if self.cfg.get("always_to_me", True) and "to_me()" not in until.replace(" ", ""):
+            # whatever else it waits for, a character always hears words aimed at it
+            until = f"to_me() or ({until})"
         if turn["deeds"] and self.st.get("away"):
             # a deed ends the standing orders; set them again before sleeping
             await self.door.op("away", **self.st["away"])
         # arm it once, briefly: the engine checks the grammar, and anything that happened while we decided comes now
         w = await self.door.wait(until, 1)
         if isinstance(w, dict) and w.get("ok") is False:
-            return compact({"refused": w.get("reason"), "hint": w.get("hint"),
-                            "fix": "write the condition again (skill('waiting') has the grammar), then sleep"})
-        if isinstance(w, dict) and w.get("fired"):
-            if w.get("already"):
+            if forced:
+                until = "to_me()"
+            else:
+                return compact({"refused": w.get("reason"), "hint": w.get("hint"),
+                                "fix": "write the condition again (skill('waiting') has the grammar), then sleep"})
+        elif isinstance(w, dict) and w.get("fired"):
+            if forced:
+                # the turn is over either way; what fired is the next wake's news, not lost
+                self.pending = ("it happened while you were deciding", w.get("events") or [])
+            elif w.get("already"):
                 return ("Not asleep: that condition is already true now, so it would wake you at once. Pick one "
                         "that is false now (a change you are waiting for), then sleep.")
-            lines = scene.event_lines(w.get("events") or [], self.me, self.names)
-            return ("Not asleep: while you were deciding, it happened:\n" + "\n".join(lines) +
-                    "\nAnswer it if it needs you, then sleep again.")
+            else:
+                lines = scene.event_lines(w.get("events") or [], self.me, self.names)
+                return ("Not asleep: while you were deciding, it happened:\n" + "\n".join(lines) +
+                        "\nAnswer it if it needs you, then sleep again.")
         self.st["watch"] = {"until": until, "deadline": time.time() + minutes * 60, "armed": time.time()}
         note = str(a.get("note") or "").strip()
         turn["note"] = note
@@ -289,6 +326,9 @@ class Mind:
 
     async def wait_for_wake(self) -> tuple[str, list[dict[str, Any]]]:
         """Wait on the world with no model in the loop. Returns (why, events)."""
+        if self.pending:
+            p, self.pending = self.pending, None
+            return p
         watch = self.st.get("watch") or {"until": "to_me()", "deadline": time.time() + 3600}
         until = watch["until"]
         last_look = time.time()
@@ -417,7 +457,7 @@ class Mind:
                 if step == 0 or not turn["slept"]:
                     # the model answered in prose instead of sleeping: keep the last watch and sleep
                     await self._sleep({"note": text[:400]} if not self.st.get("watch") else
-                                      {"until": self.st["watch"]["until"], "note": text[:400]}, turn)
+                                      {"until": self.st["watch"]["until"], "note": text[:400]}, turn, forced=True)
                 break
             messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
             for c in calls:
@@ -441,9 +481,14 @@ class Mind:
                 messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": out})
             if turn["slept"]:
                 break
+            left = max_steps - step - 1
+            if left == 3 and messages[-1]["role"] == "tool":
+                # a beat is a few calls; a long turn is a mind playing ahead of the world
+                messages[-1]["content"] += (f"\n(harness: {left} steps left in this turn. Finish this beat and "
+                                            "sleep; the world will wake you for the next one.)")
         if not turn["slept"]:
             await self._sleep({"until": (self.st.get("watch") or {}).get("until"),
-                               "note": turn["note"] or "(the turn ran out of steps)"}, turn)
+                               "note": turn["note"] or "(the turn ran out of steps)"}, turn, forced=True)
         self.usage.add(tu)
         note = turn["note"] or "(no note)"
         self.st["recent"] = (self.st.get("recent", []) +
@@ -460,7 +505,9 @@ class Mind:
         await self.start()
         _log(self.seat.name, f"joined as {(self.bundle.get('you') or {}).get('name')} ({self.role}) "
                              f"with {self.model.spec}")
-        reason, events = "you just took your seat in the world", []
+        reason = ("you just took your seat in the world" if not self.turns else
+                  "your harness restarted; you are back in your seat (look before you act)")
+        events: list[dict[str, Any]] = []
         while not self.stop:
             try:
                 await self.turn(reason, events)
