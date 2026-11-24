@@ -7,10 +7,14 @@ writes ("Taan") resolves to the full one the engine wants ("Elder Taan")."""
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 NOISE = {"opinion", "moved", "patched", "tick", "embodied", "released", "remembered", "intended", "cursor"}
 DAY = 86400.0
+
+
+_TITLES = {"The", "Old", "Young", "Captain", "Reeve", "Elder", "Sir", "Lady", "Master", "Mistress", "Brother", "Sister"}
 
 
 class Names:
@@ -18,6 +22,7 @@ class Names:
 
     def __init__(self, known: dict[str, str] | None = None):
         self.by_id: dict[str, str] = dict(known or {})
+        self.people: set[str] = set()  # ids seen acting in an event: someone, not something
 
     def learn(self, bundle: Any) -> None:
         def walk(x: Any) -> None:
@@ -25,6 +30,8 @@ class Names:
                 i, n = x.get("id") or x.get("who") or x.get("to"), x.get("name")
                 if isinstance(i, str) and isinstance(n, str) and i[:1] == "e" and i[1:].isdigit():
                     self.by_id[i] = n
+                if isinstance(x.get("kind"), str) and isinstance(x.get("actor"), str):
+                    self.people.add(x["actor"])
                 if isinstance(x.get("target"), str) and isinstance(x.get("target_name"), str):
                     self.by_id[x["target"]] = x["target_name"]
                 for v in x.values():
@@ -39,6 +46,19 @@ class Names:
         if not isinstance(i, str):
             return "?" if i is None else str(i)
         return self.by_id.get(i, i)
+
+    def absent_named(self, text: str, present: list[str], me: str = "") -> list[str]:
+        """People this seat knows who are named in `text` but are not here: a line said to them reaches nobody."""
+        here = {n.lower() for n in present}
+        out = []
+        for i in self.people:
+            n = self.by_id.get(i)
+            if not n or i == me or n.lower() in here:
+                continue
+            keys = [w for w in n.replace(",", " ").split() if len(w) >= 3 and w not in _TITLES] or [n]
+            if any(re.search(r"\b" + re.escape(k) + r"\b", text) for k in keys):
+                out.append(n)
+        return sorted(set(out))
 
     def resolve(self, text: str, among: list[str] | None = None) -> tuple[str | None, list[str]]:
         """A name the model wrote -> the one full name it means, or None and the candidates. Exact (any case) wins,

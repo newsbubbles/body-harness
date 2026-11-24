@@ -108,3 +108,16 @@ def test_every_module_imports():
     for m in ("cli", "door", "loop", "memory", "prompts", "providers", "sandbox", "scene", "seat", "skills", "tools",
               "usage"):
         importlib.import_module(f"body_harness.{m}")
+
+
+def test_absent_named():
+    from body_harness.scene import Names
+    n = Names()
+    n.learn({"events": [{"kind": "say", "actor": "e13", "target": "e2"}, {"kind": "say", "actor": "e20"},
+                        {"kind": "say", "actor": "e7"}],
+             "present": [{"id": "e13", "name": "Hob"}, {"id": "e20", "name": "Old Tam"}, {"id": "e7", "name": "Mara"},
+                         {"id": "e4", "name": "The Reeds"}]})
+    assert n.absent_named("Morning, Hob. Boys back?", ["Mara"], "e7") == ["Hob"]
+    assert n.absent_named("Tam's drunk in the reeds", ["Mara"], "e7") == ["Old Tam"]
+    assert n.absent_named("Morning, Hob.", ["Hob", "Mara"], "e7") == []
+    assert n.absent_named("Mara here, and the reeds", [], "e7") == []

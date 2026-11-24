@@ -194,6 +194,11 @@ class Mind:
             r = {k: v for k, v in r.items() if k not in ("events", "cursor")}
             if lines:
                 r["what happened"] = lines
+        if ok and name == "say" and not fixed.get("to"):
+            gone = self.names.absent_named(str(fixed.get("text", "")), self.present_names(), self.me)
+            if gone:
+                notes.append(f"{', '.join(gone)} {'is' if len(gone) == 1 else 'are'} not here; only who is here "
+                             f"heard that. To reach them, go where they are")
         out = compact(r)
         if notes:
             out = f"(harness: {'; '.join(notes)})\n" + out
@@ -469,12 +474,14 @@ class Mind:
             calls = msg.get("tool_calls") or []
             text = (msg.get("content") or "").strip() if isinstance(msg.get("content"), str) else ""
             if not calls:
-                if text and not turn.get("prose_nudged") and step < max_steps - 1:
-                    # prose outside a tool reaches nobody in the world: say so once, let the model put it right
+                if not turn.get("prose_nudged") and step < max_steps - 1:
+                    # prose outside a tool reaches nobody in the world, and an empty reply leaves no note: say so
+                    # once, let the model put it right
                     turn["prose_nudged"] = True
-                    messages += [{"role": "assistant", "content": text},
+                    messages += [{"role": "assistant", "content": text or "(nothing)"},
                                  {"role": "user", "content": "(harness: text outside a tool reaches nobody in the "
-                                  "world. If your character speaks, call say; if it acts, call act. Then sleep.)"}]
+                                  "world. If your character speaks, call say; if it acts, call act. Then sleep, "
+                                  "with a note of what you did and learned.)"}]
                     continue
                 if text:
                     turn["note"] = text[:400]
