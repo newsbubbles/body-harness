@@ -177,6 +177,14 @@ class Mind:
             return compact({"ok": False, "reason": f"no tool {name}", "hint": "find_tools(query) finds and loads "
                                                                                 "tools; verbs go through act(verb, ...)"})
         fixed, notes = fix_args(name, args, self)
+        if name == "say":
+            text = str(fixed.get("text", ""))
+            prev = _repeats(text, [x[1] for x in self.st.get("said", [])], self.names.by_id.values())
+            if prev and turn.get("repeat_ok") != text:
+                turn["repeat_ok"] = text  # the same line again goes through: the model meant it
+                return compact({"ok": False, "reason": f"not said: you said nearly this a moment ago: {prev[:160]!r}",
+                                "hint": "answer what was said to you, add only what is new, or say nothing; the "
+                                        "same line again says it anyway"})
         if name == "away":
             self.st["away"] = fixed
         r = await self.door.op(name, **fixed)
@@ -187,6 +195,8 @@ class Mind:
         ok = not (isinstance(r, dict) and r.get("ok") is False)
         if ok and name in DEEDS:
             turn["deeds"] += 1
+        if ok and name == "say":
+            self.st["said"] = (self.st.get("said", []) + [[time.time(), str(fixed.get("text", ""))]])[-8:]
         if name in self.registry.world:
             self.load_tools([name])
         if isinstance(r, dict) and isinstance(r.get("events"), list):
@@ -570,6 +580,28 @@ class Mind:
                 self.seat.outbox(f"harness error: {e}", "error")
                 await asyncio.sleep(60)
                 reason, events = "the harness recovered from an error; look before you act", []
+
+
+def _words(text: str, skip: set[str]) -> set[str]:
+    out = set()
+    for w in re.findall(r"[a-z']+", text.lower()):
+        w = w.strip("'").removesuffix("'s")
+        if len(w) > 3 and w not in skip:
+            out.add(w)
+    return out
+
+
+def _repeats(text: str, said: list[str], names: Any = ()) -> str | None:
+    """A line this seat already said that `text` mostly repeats (content words, names left out), or None."""
+    skip = {w.lower() for n in names for w in str(n).split()}
+    mine = _words(text, skip)
+    if len(mine) < 4:
+        return None
+    for old in reversed(said):
+        theirs = _words(old, skip)
+        if len(theirs) >= 4 and len(mine & theirs) / min(len(mine), len(theirs)) >= 0.5:
+            return old
+    return None
 
 
 def _short(args: dict[str, Any]) -> dict[str, Any]:

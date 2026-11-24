@@ -121,3 +121,13 @@ def test_absent_named():
     assert n.absent_named("Tam's drunk in the reeds", ["Mara"], "e7") == ["Old Tam"]
     assert n.absent_named("Morning, Hob.", ["Hob", "Mara"], "e7") == []
     assert n.absent_named("Mara here, and the reeds", [], "e7") == []
+
+
+def test_repeats():
+    from body_harness.loop import _repeats
+    said = ["Captain. Back on my feet, drank from the jars, read the notice about the riders on the south road."]
+    assert _repeats("Captain, just reporting: drank at the jars, read the notice, riders on the south road.", said,
+                    ["Captain Ruhl"])
+    assert _repeats("Yes, Captain. I'll sleep by the wall and count the horses when they come.", said,
+                    ["Captain Ruhl"]) is None
+    assert _repeats("Aye.", said) is None
