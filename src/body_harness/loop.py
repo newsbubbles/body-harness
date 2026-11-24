@@ -274,6 +274,15 @@ class Mind:
         if ok and name == "say":
             self.st["said"] = (self.st.get("said", []) + [[time.time(), str(fixed.get("to") or ""),
                                                            str(fixed.get("text", ""))]])[-8:]
+            to = str(fixed.get("to") or "").lower()
+            if to:
+                # Ssareth asked Wick where Pepe Papa was five turns running and never heard a word back
+                asked = self.st.setdefault("unanswered", {})
+                asked[to] = asked.get(to, 0) + 1
+                if asked[to] >= int(self.cfg.get("unanswered", 3)):
+                    notes.append(f"{fixed['to']} has not answered your last {asked[to]} lines to them. Some bodies "
+                                 f"have no mind behind them and never answer: ask someone else, look for another "
+                                 f"way, or stop waiting on them")
         if name in self.registry.world:
             self.load_tools([name])
         if isinstance(r, dict) and isinstance(r.get("events"), list):
@@ -559,7 +568,10 @@ class Mind:
     def _keep_heard(self, events: list[dict[str, Any]]) -> None:
         keep = self.st.get("heard") or []
         have = {h[0] for h in keep}
+        asked = self.st.get("unanswered") or {}
         for e in events or []:
+            if e.get("kind") in ("say", "talked") and e.get("actor") not in (None, self.me):
+                asked.pop(str(self.names.name(e.get("actor"))).lower(), None)  # they spoke: no longer unanswered
             if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me, self.my_name()):
                 continue
             line = scene.event_line(e, self.me, self.names)

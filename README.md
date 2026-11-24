@@ -129,6 +129,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `chat_turns` | 4 | turns of only talk with the same person before the wake asks the seat to let it rest |
 | `chat_hard` | 8 | turns of only talk with the same person after which a line to them is held once, until something is done |
 | `recent_notes` | 5 | the seat's own last turn notes on each wake; its plan (from `sleep(plan=...)`) is shown apart and replaced, never added to |
+| `unanswered` | 3 | lines to one person with no word back from them before the say result says they may never answer |
 | `repeat_window` | 900 | seconds in which a line that mostly repeats one said to the same listener is refused once |
 | `default_until` | `to_me()` | the watch when the model gives none |
 | `default_minutes`, `max_minutes` | 60, 480 | how long a sleep may run |

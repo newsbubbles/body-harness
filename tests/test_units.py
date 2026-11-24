@@ -328,3 +328,14 @@ def test_a_reply_cut_off_in_its_thinking_gets_room():
     msg, u = asyncio.run(m.chat(c, [{"role": "user", "content": "hi"}], []))
     assert c.sent == [1000, 3000] and msg["tool_calls"] and m.max_tokens == 3000
     assert u.calls == 2 and u.output_tokens == 2200
+
+
+def test_unanswered_lines_reset_when_they_speak():
+    # Ssareth asked Wick where Pepe Papa was five turns running and never heard a word back
+    from body_harness.loop import Mind
+    m = Mind.__new__(Mind)
+    m.me, m.bundle, m.cfg = "e1", {"you": {"name": "Ssareth"}}, {}
+    m.names = scene.Names({"e4": "Wick"})
+    m.st = {"unanswered": {"wick": 3}, "heard": []}
+    m._keep_heard([{"kind": "say", "actor": "e4", "seq": 9, "payload": {"text": "Dunno."}}])
+    assert "wick" not in m.st["unanswered"]
