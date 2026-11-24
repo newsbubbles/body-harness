@@ -101,3 +101,10 @@ def test_op_passes_name_argument():
 
     assert asyncio.run(go()) == {"ok": True}
     assert seen["path"] == "/op/find" and json.loads(seen["body"])["name"] == "landing"
+
+
+def test_every_module_imports():
+    import importlib
+    for m in ("cli", "door", "loop", "memory", "prompts", "providers", "sandbox", "scene", "seat", "skills", "tools",
+              "usage"):
+        importlib.import_module(f"body_harness.{m}")

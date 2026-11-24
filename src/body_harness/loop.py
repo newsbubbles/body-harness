@@ -453,8 +453,7 @@ class Mind:
             if step == max_steps - 1:
                 # the last step offers only sleep: the turn ends on the model's own note and watch, not a forced one
                 tools = [t for t in tools if t["function"]["name"] == "sleep"]
-                messages[-1]["content"] += ("
-(harness: last step of this turn. Sleep now, with a note of what you "
+                messages[-1]["content"] += ("\n(harness: last step of this turn. Sleep now, with a note of what you "
                                             "did and learned and a watch for what matters next.)")
             try:
                 msg, u = await self.model.chat(self.client, messages, tools)
