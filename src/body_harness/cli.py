@@ -74,7 +74,7 @@ async def _join(args: argparse.Namespace, h: Path) -> int:
                 for x in o.get("templates") or []:
                     print(f"  template {x.get('template')!r}: {x.get('doc')}", file=sys.stderr)
                 print(f"  then: bh join - --name {args.name} --entity NAME, or --template T --as NAME "
-                      f"--description '...'", file=sys.stderr)
+                      f'--description "..."', file=sys.stderr)
             return 1
         b = j.get("briefing") or {}
         print(f"seat {args.name}: {b.get('you') or (j.get('you') or {}).get('name')} in {b.get('world')} "

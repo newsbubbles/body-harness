@@ -14,6 +14,8 @@ from typing import Any
 
 import httpx
 
+from .seat import read_text
+
 
 class DoorError(RuntimeError):
     """The door itself refused or went away (not a refusal inside the world)."""
@@ -41,7 +43,7 @@ async def open_invite(client: httpx.AsyncClient, link_or_text: str) -> tuple[str
     text = link_or_text
     p = Path(link_or_text)
     if len(link_or_text) < 400 and p.exists():
-        text = p.read_text(encoding="utf-8")
+        text = read_text(p)
     m = re.search(r"https?://\S+/i/[A-Za-z0-9_\-]+", text)
     if m and "Bearer" not in text:
         r = await client.get(m.group(0), headers={"accept": "text/plain", "user-agent": "body-harness"}, timeout=30)
@@ -62,7 +64,7 @@ class Door:
 
     @classmethod
     def load(cls, path: Path, client: httpx.AsyncClient) -> "Door":
-        d = json.loads(path.read_text(encoding="utf-8"))
+        d = json.loads(read_text(path))
         return cls(d["base"], d["token"], client, float(d.get("wait_cap", 90)))
 
     def save(self, path: Path) -> None:

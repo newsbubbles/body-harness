@@ -15,6 +15,7 @@ from typing import Any
 
 import httpx
 
+from .seat import read_text
 from .usage import Usage
 
 PROVIDERS: dict[str, dict[str, Any]] = {
@@ -144,7 +145,7 @@ def _key_from_env_files(name: str, files: list[str]) -> str:
         p = Path(f).expanduser()
         if not p.exists():
             continue
-        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+        for line in read_text(p).splitlines():
             k, _, v = line.strip().partition("=")
             if k.strip().removeprefix("export ").strip() == name:
                 return v.strip().strip('"').strip("'")

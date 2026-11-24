@@ -41,9 +41,17 @@ def home(override: str | None = None) -> Path:
     return h
 
 
+def read_text(p: Path) -> str:
+    """A file a person may have saved by hand: Notepad's BOM and PowerShell 5's UTF-16 read as well as plain UTF-8."""
+    b = p.read_bytes()
+    if b[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return b.decode("utf-16")
+    return b.decode("utf-8-sig", errors="replace")
+
+
 def read_json(p: Path, default: Any) -> Any:
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        return json.loads(read_text(p))
     except (OSError, ValueError):
         return default
 
@@ -51,7 +59,15 @@ def read_json(p: Path, default: Any) -> Any:
 def write_json(p: Path, data: Any) -> None:
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=1, default=str), encoding="utf-8")
-    tmp.replace(p)
+    for i in range(10):
+        try:
+            tmp.replace(p)
+            return
+        except PermissionError:
+            # Windows refuses the swap while another process (bh status, a virus scanner) has the file open
+            if i == 9:
+                raise
+            time.sleep(0.05 * (i + 1))
 
 
 def append_jsonl(p: Path, row: dict[str, Any]) -> None:

@@ -161,3 +161,16 @@ def test_card_reads_brief_perceive():
     c = card(b, Names(), "e9")
     assert "Here: Brakka Bomber, Ssark (bears Gutting knife)" in c and "Water butt" in c
     assert "Coin x60" in c and "Exits: Harbour Street" in c and "go: Harbour Street" in c
+
+
+def test_hand_saved_files_read(tmp_path):
+    # Notepad writes a BOM; PowerShell 5's `>` writes UTF-16: config and invite files saved either way still read
+    from body_harness.seat import read_json, read_text
+    link = "https://example.test/i/abc123"
+    for enc in ("utf-8", "utf-8-sig", "utf-16"):
+        p = tmp_path / f"invite-{enc}.txt"
+        p.write_text(link + "\r\n", encoding=enc)
+        assert read_text(p).strip() == link
+        c = tmp_path / f"config-{enc}.json"
+        c.write_text('{"model": "ollama:x"}\r\n', encoding=enc)
+        assert read_json(c, {}) == {"model": "ollama:x"}
