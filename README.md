@@ -124,6 +124,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `prices` | | `{"provider:model": [in, cached_in, out]}` dollars per million tokens, for providers that do not report cost |
 | `max_room` | 4000 | how far `max_tokens` grows when a thinking model's reply is cut off before it says anything |
 | `escalate`, `escalate_after` | , 2 | `provider:model` list, in order; after that many calls in one turn that the model got wrong (bad arguments, made-up tools, a watch that does not parse, an empty reply, a model error), the rest of the turn goes to the next one on the list, with the same messages. The next turn starts on `model` again. A world refusing by its rules never escalates |
+| `escalate_reads` | 8 | reads (look, find_tools, inspect, history...) in one turn with no deed before it escalates: floundering |
 | `max_steps` | 16 | tool rounds in one turn |
 | `quiet_steps` | 8 | tool rounds when a watch timed out and nothing happened |
 | `heard_lines`, `heard_minutes` | 6, 60 | lines said to the seat that stay on its wakes, and for how long |
