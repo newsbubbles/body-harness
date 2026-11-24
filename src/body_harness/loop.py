@@ -179,7 +179,10 @@ class Mind:
         fixed, notes = fix_args(name, args, self)
         if name == "say":
             text = str(fixed.get("text", ""))
-            prev = _repeats(text, [x[1] for x in self.st.get("said", [])], self.names.by_id.values())
+            # the same news to someone else is a report, not a repeat; a world hour is the window
+            to, now, window = str(fixed.get("to") or ""), time.time(), float(self.cfg.get("repeat_window", 900))
+            prev = _repeats(text, [x[2] for x in self.st.get("said", []) if len(x) == 3 and x[1] == to and
+                                   now - x[0] < window], self.names.by_id.values())
             if prev and turn.get("repeat_ok") != text:
                 turn["repeat_ok"] = text  # the same line again goes through: the model meant it
                 return compact({"ok": False, "reason": f"not said: you said nearly this a moment ago: {prev[:160]!r}",
@@ -196,7 +199,8 @@ class Mind:
         if ok and name in DEEDS:
             turn["deeds"] += 1
         if ok and name == "say":
-            self.st["said"] = (self.st.get("said", []) + [[time.time(), str(fixed.get("text", ""))]])[-8:]
+            self.st["said"] = (self.st.get("said", []) + [[time.time(), str(fixed.get("to") or ""),
+                                                           str(fixed.get("text", ""))]])[-8:]
         if name in self.registry.world:
             self.load_tools([name])
         if isinstance(r, dict) and isinstance(r.get("events"), list):
