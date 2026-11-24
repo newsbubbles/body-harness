@@ -26,7 +26,7 @@ from . import prompts, sandbox, scene
 from .door import Door, DoorError
 from .memory import Shelf, memo
 from .providers import Model, ModelError
-from .seat import Seat, append_jsonl, read_jsonl
+from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 from .skills import Skills
 from .tools import EXTRAS, Registry, compact, fix_args, route
 from .usage import Usage, append as usage_append
@@ -593,9 +593,22 @@ class Mind:
             else "go there"
         return f"\n\n(harness: {' '.join(dict.fromkeys(out))} If you mean to stay with them, {how}.)"
 
+    def _keep_wake(self, reason: str, events: list[dict[str, Any]], st: dict[str, Any], b: dict[str, Any]) -> None:
+        """The last few wakes as they arrived, for bh calibrate to replay offline: a calibration that perceived
+        through the seat's own grant would move its "since I last looked" and steal the live seat's events."""
+        p = self.seat.p("cache", "wakes.json")
+        ring = read_json(p, [])
+        ring = (ring if isinstance(ring, list) else [])[-(int(self.cfg.get("keep_wakes", 5)) - 1):]
+        ring.append({"ts": time.time(), "turn": self.turns, "reason": reason, "events": events or [], "state": st,
+                     "bundle": b})
+        write_json(p, ring)
+
     async def turn(self, reason: str, events: list[dict[str, Any]]) -> None:
+        st0 = json.loads(json.dumps(self.st, default=str))
         self.turns += 1
         b = await self.perceive()
+        if int(self.cfg.get("keep_wakes", 5)) > 0:
+            self._keep_wake(reason, events, st0, b)
         evs = (events or []) + [e for e in (b.get("events") or []) if e.get("seq") not in
                                 {x.get("seq") for x in events or []}]
         card = scene.card(b, self.names, self.me, self.day_seconds, events=evs)

@@ -268,3 +268,63 @@ def test_companion_left_gets_a_line():
     assert "Brakka Bomber" in line and "Gog's Hall" in line and "follow" in line
     stranger = {"kind": "left", "actor": "e4", "payload": {"entity": "e4", "to": "e3"}}
     assert m._companion_left([stranger]) == ""
+
+
+def test_calibration_never_writes_to_the_world(tmp_path):
+    # a calibration perceive through the seat's own grant would move its cursor and steal the live seat's events
+    import asyncio
+    from body_harness.calibrate import DryDoor, score
+    from body_harness.seat import Seat, append_jsonl
+
+    class Real:
+        wait_cap = 90.0
+        def __init__(self): self.ops = []
+        async def op(self, name, /, **kw): self.ops.append(name); return {"ok": True}
+        async def get(self, path): return {}
+
+    real = Real()
+    bundle = {"you": {"id": "e1"}, "affordances": [{"verb": "give"}]}
+    d = DryDoor(real, bundle)
+    run = asyncio.run
+    assert run(d.op("perceive", events=40)) == bundle and run(d.op("join"))["you"]["id"] == "e1"
+    assert run(d.op("say", text="hi")) == {"ok": True} and run(d.op("act", verb="give")) == {"ok": True}
+    assert run(d.op("act", verb="steal"))["ok"] is False
+    assert run(d.wait("to_me()", 30))["ok"]
+    run(d.op("handbook"))
+    assert real.ops == ["handbook"]
+
+    s = Seat(tmp_path, "x").create()
+    append_jsonl(s.p("calls.jsonl"), {"tool": "speak", "args": {}, "out": '{"ok": false, "reason": "no tool"}'})
+    append_jsonl(s.p("calls.jsonl"), {"tool": "say", "args": {"text": "Aye."}, "out": "ok"})
+    append_jsonl(s.p("invented.jsonl"), {"tool": "speak"})
+    append_jsonl(s.p("ledger.jsonl"), {"note": "answered Brakka", "usage": {"cost": 0.001}})
+    wake = {"state": {"me": "e1"}, "events": [{"kind": "say", "actor": "e2", "payload": {"to": "e1"}}]}
+    r = score(s, wake, 2.0)
+    assert (r["calls"], r["invented"], r["refused"], r["slept"], r["owed"], r["answered"]) == (2, 1, 1, True, True, True)
+
+
+def test_a_reply_cut_off_in_its_thinking_gets_room():
+    # glm, hy4 and minimax spent the whole 1000-token reply on reasoning, said nothing and never slept
+    import asyncio
+    from body_harness.providers import Model
+
+    class R:
+        status_code = 200
+        def __init__(self, d): self.d = d
+        def json(self): return self.d
+
+    class Client:
+        def __init__(self): self.sent = []
+        async def post(self, url, json, headers, timeout):
+            self.sent.append(json["max_tokens"])
+            if json["max_tokens"] < 3000:
+                return R({"choices": [{"finish_reason": "length", "message": {"content": ""}}],
+                          "usage": {"prompt_tokens": 10, "completion_tokens": 1000}})
+            return R({"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [{"id": "1"}]}}],
+                      "usage": {"prompt_tokens": 10, "completion_tokens": 1200}})
+
+    m = Model("openrouter:x/y", "https://example.test", "", "x/y", "openrouter", max_tokens=1000)
+    c = Client()
+    msg, u = asyncio.run(m.chat(c, [{"role": "user", "content": "hi"}], []))
+    assert c.sent == [1000, 3000] and msg["tool_calls"] and m.max_tokens == 3000
+    assert u.calls == 2 and u.output_tokens == 2200

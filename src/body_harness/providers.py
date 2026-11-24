@@ -53,6 +53,7 @@ class Model:
     prices: dict[str, Any] | None = None
     extra: dict[str, Any] | None = None  # passed through in the request body (for example Ollama's options)
     no_forced_choice: bool = False  # set when a provider refused a named tool_choice
+    max_room: int = 4000  # how far max_tokens may grow when a thinking model's reply is cut off before it says anything
 
     @classmethod
     def from_config(cls, spec: str, cfg: dict[str, Any] | None = None) -> "Model":
@@ -73,7 +74,8 @@ class Model:
                              f"env_files")
         return cls(spec, p["base"].rstrip("/"), key, model, provider, bool(p.get("local")),
                    cfg.get("temperature"), int(cfg.get("max_tokens", 1200)), cfg.get("reasoning", ""),
-                   cfg.get("cache", "auto"), cfg.get("session", ""), cfg.get("prices"), cfg.get("extra"))
+                   cfg.get("cache", "auto"), cfg.get("session", ""), cfg.get("prices"), cfg.get("extra"),
+                   max_room=int(cfg.get("max_room", 4000)))
 
     def _wants_breakpoints(self) -> bool:
         if self.cache == "off":
@@ -112,6 +114,7 @@ class Model:
             headers["X-Title"] = "body-harness"
         body = self.body(messages, tools, tool_choice)
         last = ""
+        spent = Usage()
         for attempt in range(4):
             t0 = time.monotonic()
             try:
@@ -141,7 +144,16 @@ class Model:
             if not choices:
                 raise ModelError(f"{self.spec}: no choices in the answer: {str(data)[:300]}")
             usage = Usage.from_response(data.get("usage"), self.spec, secs, self.prices, self.local)
-            return choices[0].get("message") or {}, usage
+            msg = choices[0].get("message") or {}
+            if choices[0].get("finish_reason") == "length" and not msg.get("tool_calls") and                     int(body.get("max_tokens") or 0) < self.max_room:
+                # a thinking model spent the whole reply on reasoning and said nothing, so the turn ended with no
+                # call and no note (glm, hy4, minimax, deepseek-v4.1 in calibration, 11-24): give it room, and
+                # keep that room for this model from now on
+                self.max_tokens = body["max_tokens"] = min(self.max_room, int(body["max_tokens"]) * 3)
+                spent.add(usage)
+                last = "cut off at max_tokens"
+                continue
+            return msg, spent.add(usage) if spent.calls else usage
         raise ModelError(f"{self.spec}: gave up after retries: {last}")
 
 

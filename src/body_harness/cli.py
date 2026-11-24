@@ -105,6 +105,30 @@ def _status(h: Path) -> int:
     return 0
 
 
+def _calibrate(args: argparse.Namespace, s: seats.Seat) -> int:
+    from . import calibrate as cal
+    if args.list:
+        for i, w in enumerate(cal.wakes(s)):
+            print(f"{i - len(cal.wakes(s))}: {time.strftime('%m-%d %H:%M', time.localtime(w.get('ts', 0)))} "
+                  f"turn {w.get('turn')}: {str(w.get('reason'))[:100]}")
+        return 0
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    if args.sets:
+        sets = cal.model_sets(Path(args.sets))
+        for name in args.set_names or list(sets):
+            models += sets.get(name, [])
+    if not models:
+        print("name the models: --models a,b or --sets file.toml [--set name]", file=sys.stderr)
+        return 2
+    try:
+        rows = asyncio.run(cal.calibrate(s, list(dict.fromkeys(models)), args.wake, args.runs))
+    except (ValueError, IndexError) as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    print(json.dumps(rows, indent=1, ensure_ascii=False) if args.json else cal.table(rows))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -143,6 +167,15 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("config", help="show or set a seat's settings: key=value (JSON values work)")
     c.add_argument("name")
     c.add_argument("pairs", nargs="*")
+    c = sub.add_parser("calibrate", help="replay one of a seat's wakes through several models, offline, scored")
+    c.add_argument("name")
+    c.add_argument("--models", default="", help="provider:model,provider:model,...")
+    c.add_argument("--sets", help="a .toml or .json file of named model lists")
+    c.add_argument("--set", dest="set_names", action="append", help="which named list (default: every one)")
+    c.add_argument("--wake", type=int, default=-1, help="which saved wake, -1 the last (--list shows them)")
+    c.add_argument("--runs", type=int, default=1, help="runs per model (models are not deterministic)")
+    c.add_argument("--list", action="store_true", help="list the saved wakes")
+    c.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     h = seats.home(args.home)
 
@@ -178,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
     if not s.exists:
         print(f"no seat {args.name}", file=sys.stderr)
         return 2
+    if args.cmd == "calibrate":
+        return _calibrate(args, s)
     if args.cmd == "tell":
         s.tell(args.text)
         print(f"told {args.name}; it wakes for it within a minute or two")
