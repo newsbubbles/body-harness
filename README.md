@@ -119,6 +119,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `default_until` | `to_me()` | the watch when the model gives none |
 | `default_minutes`, `max_minutes` | 60, 480 | how long a sleep may run |
 | `look_every` | 600 | seconds between quiet looks (no model) for owed lines, rule changes and owner answers |
+| `wait_piece` | 30 | seconds per wait call while sleeping: how soon your messages and schedules land |
 | `wait_cap` | 90 | seconds one wait call may hold (servers cap at 120; proxies often less) |
 | `day_seconds` | 86400 | the world's day, for "day N" on the card |
 | `entity` | | which body, when a grant names several |

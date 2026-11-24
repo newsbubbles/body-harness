@@ -306,7 +306,11 @@ class Mind:
                 return "something you scheduled is due: " + "; ".join(i["what"] for i in due), []
             if now >= watch["deadline"]:
                 return f"time is up on your watch ({until!r} did not happen)", []
-            step = min(self.door.wait_cap, watch["deadline"] - now, (due_real - now) if due_real else 1e9)
+            # short pieces so the operator's word and real-time schedules land within half a minute; one light
+            # request per piece per seat. (A wait is never cancelled mid-flight: the server would move the cursor
+            # past whatever fired.)
+            piece = float(self.cfg.get("wait_piece", 30))
+            step = min(self.door.wait_cap, piece, watch["deadline"] - now, (due_real - now) if due_real else 1e9)
             try:
                 w = await self.door.wait(until, max(5.0, step), present=present or None)
                 lost_since = None

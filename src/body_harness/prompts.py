@@ -87,9 +87,10 @@ def wake(reason: str, scene: str, agenda: str, seat_index: str, craft_index: str
         parts += ["On your plate:", agenda, ""]
     if recent:
         parts += ["Your last turns (your own notes):"] + [f"- {r}" for r in recent] + [""]
-    if seat_index.strip():
+    # an index with no notes in it yet costs tokens every wake and says nothing
+    if "](" in seat_index:
         parts += ["Your notebook (memo, shelf seat):", seat_index.strip(), ""]
-    if craft_index.strip():
+    if "](" in craft_index:
         parts += ["Shared craft notes (memo, shelf craft):", craft_index.strip(), ""]
     parts.append("Decide and act as your character, then sleep(until=..., note=...).")
     return "\n".join(parts)
