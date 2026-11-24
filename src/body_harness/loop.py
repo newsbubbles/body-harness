@@ -621,11 +621,11 @@ def _repeats(text: str, said: list[str], names: Any = ()) -> str | None:
     """A line this seat already said that `text` mostly repeats (content words, names left out), or None."""
     skip = {w.lower() for n in names for w in str(n).split()}
     mine = _words(text, skip)
-    if len(mine) < 4:
+    if len(mine) < 6:  # a greeting or a short question is never news told twice
         return None
     for old in reversed(said):
-        theirs = _words(old, skip)
-        if len(theirs) >= 4 and len(mine & theirs) / min(len(mine), len(theirs)) >= 0.5:
+        both = mine & _words(old, skip)
+        if len(both) >= 5 and len(both) / len(mine) >= 0.6:
             return old
     return None
 

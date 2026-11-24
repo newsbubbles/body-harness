@@ -131,6 +131,9 @@ def test_repeats():
     assert _repeats("Yes, Captain. I'll sleep by the wall and count the horses when they come.", said,
                     ["Captain Ruhl"]) is None
     assert _repeats("Aye.", said) is None
+    long = ["Captain. Night's quiet. Nobody came or went since sundown. The jars have seven left and I'm fit for a "
+            "run if you need anything running."]
+    assert _repeats("Morning, Captain. Anything need running?", long, ["Captain Ruhl"]) is None
 
 
 def test_card_shows_body_memory():
