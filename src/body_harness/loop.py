@@ -500,7 +500,12 @@ class Mind:
                         else (f.get("arguments") or {})
                     if not isinstance(args, dict):
                         raise ValueError("arguments are not an object")
-                    out = await self.call(name, args, turn)
+                    if choice and name != "sleep":
+                        # some models call a tool they were not offered; the last step runs only sleep
+                        turn["cut"] = f"{name}({_short(args)})"[:160]
+                        out = "(harness: not run; the turn is over)"
+                    else:
+                        out = await self.call(name, args, turn)
                 except (ValueError, TypeError) as e:
                     out = compact({"ok": False, "reason": f"bad arguments for {name}: {e}"})
                 except DoorError as e:
@@ -519,7 +524,9 @@ class Mind:
                                             "sleep; the world will wake you for the next one.)")
         if not turn["slept"]:
             await self._sleep({"until": (self.st.get("watch") or {}).get("until"),
-                               "note": turn["note"] or "(the turn ran out of steps)"}, turn, forced=True)
+                               "note": turn["note"] or ("(the turn ran out of steps" +
+                                                        (f"; not run: {turn['cut']})" if turn.get("cut") else ")"))},
+                              turn, forced=True)
         self.usage.add(tu)
         note = turn["note"] or "(no note)"
         self.st["recent"] = (self.st.get("recent", []) +
