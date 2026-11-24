@@ -82,3 +82,22 @@ def test_apps_are_read_without_running(tmp_path: Path):
     specs = app_specs(tmp_path / "apps")
     assert "app_mood" in specs and specs["app_mood"]["file"] == "mood.py"
     assert write_file(tmp_path, "../door.json", "x")["ok"] is False
+
+
+def test_op_passes_name_argument():
+    import asyncio
+    import json
+    import httpx
+    from body_harness.door import Door
+    seen = {}
+
+    def handler(req):
+        seen["path"], seen["body"] = req.url.path, req.content
+        return httpx.Response(200, json={"ok": True})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await Door("http://w", "t", c).op("find", name="landing", limit=3)
+
+    assert asyncio.run(go()) == {"ok": True}
+    assert seen["path"] == "/op/find" and json.loads(seen["body"])["name"] == "landing"

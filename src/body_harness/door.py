@@ -73,16 +73,16 @@ class Door:
         return {"Authorization": f"Bearer {self._token}", "content-type": "application/json",
                 "user-agent": "body-harness"}
 
-    async def op(self, name: str, _http: float = 60.0, _retries: int = 6, **args: Any) -> Any:
-        """Call one op. A refusal inside the world comes back as {ok: false, reason, hint, alternatives}; only the door
-        failing raises. Network trouble and 5xx retry with backoff and jitter, so many seats never hammer a server
+    async def op(self, _op: str, /, _http: float = 60.0, _retries: int = 6, **args: Any) -> Any:
+        """Call one op. The op is positional-only so an op's own `name` argument passes through (find(name=)).
+        A refusal inside the world comes back as {ok: false, reason, hint, alternatives}; only the door failing raises. Network trouble and 5xx retry with backoff and jitter, so many seats never hammer a server
         that is coming back up."""
         args = {k: v for k, v in args.items() if v is not None}
         delay = 2.0
         last = ""
         for _ in range(_retries):
             try:
-                r = await self.client.post(f"{self.base}/op/{name}", json=args, headers=self._headers(),
+                r = await self.client.post(f"{self.base}/op/{_op}", json=args, headers=self._headers(),
                                            timeout=_http)
             except httpx.HTTPError as e:
                 last = f"{type(e).__name__}"
@@ -96,11 +96,11 @@ class Door:
                     try:
                         return r.json()
                     except ValueError:
-                        return {"ok": False, "reason": f"{name}: {r.status_code} {r.text[:300]}"}
+                        return {"ok": False, "reason": f"{_op}: {r.status_code} {r.text[:300]}"}
                 last = f"{r.status_code}"
             await asyncio.sleep(delay + random.uniform(0, delay))
             delay = min(delay * 2, 60)
-        raise DoorError(f"{name}: the server did not answer ({last})", 0)
+        raise DoorError(f"{_op}: the server did not answer ({last})", 0)
 
     async def get(self, path: str) -> Any:
         r = await self.client.get(f"{self.base}{path}", headers=self._headers(), timeout=30)
