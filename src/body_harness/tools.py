@@ -128,6 +128,13 @@ CORE: list[dict[str, Any]] = [
 ]
 CORE_NAMES = {t["function"]["name"] for t in CORE}
 
+# Anthropic's think tool: a place to reason between tool results, for models that do not reason on their own. It
+# reaches nobody and changes nothing. Off unless a seat's config says think_tool=true (measure it with bh calibrate).
+THINK = fn("think", "Think before you act, when a tool result or a line changes things: check what you believe "
+                    "against what the world just said, what was asked of you, and what you mean to do. Nobody sees "
+                    "it and nothing in the world changes. Do not use it to stall: act, say or sleep after.",
+           {"thought": S}, ["thought"])
+
 EXTRAS: dict[str, dict[str, Any]] = {
     "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
                                "in_minutes= real minutes from now; what= what to do then. op='list' shows what is "
@@ -212,7 +219,8 @@ class Registry:
         return None
 
     def tools(self, loaded: list[str]) -> list[dict[str, Any]]:
-        return CORE + [s for s in (self.schema(n) for n in loaded) if s]
+        core = CORE + [THINK] if self.m.cfg.get("think_tool") else CORE
+        return core + [s for s in (self.schema(n) for n in loaded) if s]
 
 
 def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any], list[str]]:

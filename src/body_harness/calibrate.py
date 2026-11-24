@@ -79,7 +79,8 @@ def model_sets(path: Path) -> dict[str, list[str]]:
     return {str(k): [str(m) for m in v] for k, v in data.items() if isinstance(v, list)}
 
 
-def _copy_seat(src: Seat, root: Path, model: str, wake: dict[str, Any]) -> Seat:
+def _copy_seat(src: Seat, root: Path, model: str, wake: dict[str, Any],
+               cfg: dict[str, Any] | None = None) -> Seat:
     """A seat under root with src's notes and settings, the wake's state, the model given and no token."""
     root.mkdir(parents=True, exist_ok=True)
     for name in ("config.json",):
@@ -97,7 +98,7 @@ def _copy_seat(src: Seat, root: Path, model: str, wake: dict[str, Any]) -> Seat:
             shutil.copy2(src.p(f), s.p(f))
     door = read_json(src.p("door.json"), {})
     write_json(s.p("door.json"), {"base": door.get("base", ""), "token": "", "wait_cap": door.get("wait_cap", 90)})
-    write_json(s.p("config.json"), {**read_json(src.p("config.json"), {}), "model": model})
+    write_json(s.p("config.json"), {**read_json(src.p("config.json"), {}), **(cfg or {}), "model": model})
     write_json(s.p("state.json"), wake.get("state") or {})
     return s
 
@@ -137,11 +138,11 @@ def score(s: Seat, wake: dict[str, Any], seconds: float) -> dict[str, Any]:
 
 
 async def _one(src: Seat, model: str, wake: dict[str, Any], root: Path, client: httpx.AsyncClient,
-               gate: asyncio.Semaphore) -> dict[str, Any]:
+               gate: asyncio.Semaphore, cfg: dict[str, Any] | None = None, label: str = "") -> dict[str, Any]:
     from .loop import Mind
     async with gate:
-        s = _copy_seat(src, root, model, wake)
-        row: dict[str, Any] = {"model": model, "dir": str(s.dir)}
+        s = _copy_seat(src, root, model, wake, cfg)
+        row: dict[str, Any] = {"model": model, "dir": str(s.dir), "variant": label}
         t0 = time.time()
         try:
             m = Mind(s, client)
@@ -154,8 +155,9 @@ async def _one(src: Seat, model: str, wake: dict[str, Any], root: Path, client: 
         return row
 
 
-async def calibrate(src: Seat, models: list[str], wake_index: int = -1, runs: int = 1,
-                    parallel: int = 4) -> list[dict[str, Any]]:
+async def calibrate(src: Seat, models: list[str], wake_index: int = -1, runs: int = 1, parallel: int = 4,
+                    variants: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """variants: {label: config overrides}, each run for every model: the model held still, the harness changed."""
     ring = wakes(src)
     if not ring:
         raise ValueError(f"{src.name} has no saved wakes yet: it keeps the last few as it plays (keep_wakes)")
@@ -163,8 +165,10 @@ async def calibrate(src: Seat, models: list[str], wake_index: int = -1, runs: in
     stamp = time.strftime("%Y%m%d-%H%M%S")
     gate = asyncio.Semaphore(max(1, parallel))
     async with httpx.AsyncClient() as client:
-        jobs = [_one(src, m, wake, src.home / "calibrate" / f"{src.name}-{stamp}" / f"{i:02d}", client, gate)
-                for i, (m, _) in enumerate((m, r) for m in models for r in range(runs))]
+        combos = [(m, label, cfg) for m in models for label, cfg in (variants or {"": {}}).items()
+                  for _ in range(runs)]
+        jobs = [_one(src, m, wake, src.home / "calibrate" / f"{src.name}-{stamp}" / f"{i:02d}", client, gate, cfg,
+                     label) for i, (m, label, cfg) in enumerate(combos)]
         rows = await asyncio.gather(*jobs)
     for r in rows:
         r["wake"] = {"turn": wake.get("turn"), "reason": str(wake.get("reason") or "")[:120]}
@@ -175,10 +179,11 @@ def table(rows: list[dict[str, Any]]) -> str:
     lines = [f"{'model':44} calls inv bad ref nudge slept answered   cost     s",]
     for r in rows:
         if r.get("error"):
-            lines.append(f"{r['model'][:44]:44} error: {r['error']}")
+            lines.append(f"{r['model'][-44:]:44} error: {r['error']}")
             continue
         ans = "-" if r["answered"] is None else ("yes" if r["answered"] else "NO")
-        lines.append(f"{r['model'][:44]:44} {r['calls']:5} {r['invented']:3} {r['bad_args']:3} {r['refused']:3} "
+        name = f"{r['model']} [{r['variant']}]" if r.get("variant") else r["model"]
+        lines.append(f"{name[-44:]:44} {r['calls']:5} {r['invented']:3} {r['bad_args']:3} {r['refused']:3} "
                      f"{r['nudged']:5} {'yes' if r['slept'] else 'NO':5} {ans:8} ${r['cost']:.4f} {r['seconds']:5}")
         if r.get("escalated"):
             lines.append(f"{'':44}   escalated to: {', '.join(r['escalated'])}")

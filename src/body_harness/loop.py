@@ -187,6 +187,9 @@ class Mind:
             return scene.card(b, self.names, self.me, self.day_seconds)
         if name == "sleep":
             return await self._sleep(args, turn)
+        if name == "think" and self.cfg.get("think_tool"):
+            turn["thoughts"] = turn.get("thoughts", 0) + 1
+            return "(noted)"
         if name == "find_tools":
             return compact(self.registry.find(str(args.get("query", ""))))
         if name == "tell":

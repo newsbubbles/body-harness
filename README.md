@@ -102,7 +102,7 @@ bh outbox N                                what the seat told you
 bh log N [-n 5] [--calls | --full]         its last turns; --full has everything the world answered
 bh usage [--since 24h]                     spend by seat and model
 bh config N key=value ...                  show or set a seat's settings
-bh calibrate N --models a,b | --sets F.toml [--set S] [--runs 2] [--wake -1] [--list] [--json]
+bh calibrate N --models a,b | --sets F.toml [--set S] [--cfg L:k=v] [--runs 2] [--wake -1] [--json]
                                            replay one of the seat's saved wakes through each model,
                                            offline, and score them side by side
 ```
@@ -140,6 +140,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `wait_cap` | 90 | seconds one wait call may hold (servers cap at 120; proxies often less) |
 | `day_seconds` | 86400 | the world's day, for "day N" on the card |
 | `entity` | | which body, when a grant names several |
+| `think_tool` | false | offer a `think(thought)` tool that reaches nobody (Anthropic's think tool). On deepseek-v4-flash it was used in 2 of 9 calibration runs and changed nothing measurable |
 | `keep_wakes` | 5 | wakes kept in `cache/wakes.json` for `bh calibrate` (0 keeps none) |
 | `extra_prompt` | | your own words to this seat, appended to its instructions |
 
@@ -160,7 +161,7 @@ cheap = ["openrouter:deepseek/deepseek-v4.1-flash", "openrouter:openai/gpt-6-lun
 other = ["openrouter:z-ai/glm-5.3-flashx", "openrouter:xiaomi/mimo-v2.6-flash"]
 ```
 
-Models are not deterministic: use `--runs 2` or more before reading much into one row.
+Models are not deterministic: use `--runs 2` or more before reading much into one row. To hold the model still and change the harness instead, give variants: `--cfg off:think_tool=false --cfg on:think_tool=true` runs every model under each.
 
 ## Rules every seat keeps
 

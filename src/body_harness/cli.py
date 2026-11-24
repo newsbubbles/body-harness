@@ -121,7 +121,18 @@ def _calibrate(args: argparse.Namespace, s: seats.Seat) -> int:
         print("name the models: --models a,b or --sets file.toml [--set name]", file=sys.stderr)
         return 2
     try:
-        rows = asyncio.run(cal.calibrate(s, list(dict.fromkeys(models)), args.wake, args.runs))
+        variants: dict[str, dict] = {}
+        for v in args.cfg:
+            label, _, pairs = v.partition(":")
+            cfg = variants.setdefault(label, {})
+            for pair in filter(None, pairs.split(",")):
+                k, _, val = pair.partition("=")
+                try:
+                    cfg[k] = json.loads(val)
+                except ValueError:
+                    cfg[k] = val
+        rows = asyncio.run(cal.calibrate(s, list(dict.fromkeys(models)), args.wake, args.runs,
+                                         variants=variants or None))
     except (ValueError, IndexError) as e:
         print(str(e), file=sys.stderr)
         return 2
@@ -175,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--wake", type=int, default=-1, help="which saved wake, -1 the last (--list shows them)")
     c.add_argument("--runs", type=int, default=1, help="runs per model (models are not deterministic)")
     c.add_argument("--list", action="store_true", help="list the saved wakes")
+    c.add_argument("--cfg", action="append", default=[],
+                   help="a harness variant: label:key=value[,key=value] (repeat to compare; JSON values work)")
     c.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     h = seats.home(args.home)
