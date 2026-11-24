@@ -99,7 +99,7 @@ bh run N [N ...] | --all                   run seats until stopped
 bh status                                  every seat: who, model, last turn, watch, spend, unread reports
 bh tell N "text"                           a message from you; wakes the seat
 bh outbox N                                what the seat told you
-bh log N [-n 5] [--calls]                  its last turns
+bh log N [-n 5] [--calls | --full]         its last turns; --full has everything the world answered
 bh usage [--since 24h]                     spend by seat and model
 bh config N key=value ...                  show or set a seat's settings
 ```

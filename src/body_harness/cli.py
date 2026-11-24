@@ -137,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("name")
     c.add_argument("-n", type=int, default=5)
     c.add_argument("--calls", action="store_true", help="show each tool call")
+    c.add_argument("--full", action="store_true", help="each tool call with everything the world answered")
     c = sub.add_parser("usage", help="spend by seat and model")
     c.add_argument("--since", default="", help="30m, 24h, 7d")
     c = sub.add_parser("config", help="show or set a seat's settings: key=value (JSON values work)")
@@ -188,6 +189,15 @@ def main(argv: list[str] | None = None) -> int:
         st = s.state()
         st["outbox_read"] = time.time()
         s.save_state(st)
+        return 0
+    if args.cmd == "log" and args.full:
+        led = seats.read_jsonl(s.p("ledger.jsonl"))[-args.n:]
+        turns = {r.get("turn") for r in led}
+        since = led[0]["ts"] - 3600 if led else 0
+        for c2 in seats.read_jsonl(s.p("calls.jsonl")):
+            if c2.get("turn") in turns and c2.get("ts", 0) >= since:
+                print(f"--- turn {c2['turn']} {c2['tool']}({json.dumps(c2.get('args'), ensure_ascii=False)})")
+                print(c2.get("out", ""))
         return 0
     if args.cmd == "log":
         for r in seats.read_jsonl(s.p("ledger.jsonl"))[-args.n:]:

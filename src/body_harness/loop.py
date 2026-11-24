@@ -86,6 +86,12 @@ class Mind:
     def apps(self) -> dict[str, dict[str, Any]]:
         return sandbox.app_specs(self.seat.p("apps"))
 
+    def verb_names(self) -> set[str]:
+        b = self.bundle
+        out = {str(a.get("verb")) for a in (b.get("affordances") or []) if isinstance(a, dict) and a.get("verb")}
+        out |= {str(v).split(":")[0].strip() for v in (b.get("verbs") or [])}
+        return out - {""}
+
     def present_names(self) -> list[str]:
         b = self.bundle
         names: list[Any] = []
@@ -176,6 +182,13 @@ class Mind:
             return compact(await sandbox.run_app(self.seat.home, self.seat.dir, spec["file"], args), 6000)
         # a world op
         if name not in ("act", "say", "remember", "intend") and name not in self.registry.world:
+            if name in self.verb_names():
+                # read(target=...) for act(verb='read', target=...): a verb called as if it were a tool
+                rest = dict(args)
+                target = rest.pop("target", None) or rest.pop("entity", None)
+                params = rest.pop("params", None) or {}
+                out = await self.call("act", {"verb": name, "target": target, "params": {**params, **rest}}, turn)
+                return f"(harness: {name} is a verb: read as act(verb='{name}', ...))\n" + out
             return compact({"ok": False, "reason": f"no tool {name}", "hint": "find_tools(query) finds and loads "
                                                                                 "tools; verbs go through act(verb, ...)"})
         fixed, notes = fix_args(name, args, self)
@@ -538,6 +551,9 @@ class Mind:
                     out = compact({"ok": False, "reason": f"the server did not answer: {e}; try again or sleep"})
                 turn["calls"].append({"tool": name, "args": _short(args if isinstance(args, dict) else {}),
                                       "out": out[:240]})
+                # the whole of what the world said, for checking a character's claims later (bh log --full)
+                append_jsonl(self.seat.p("calls.jsonl"), {"ts": time.time(), "turn": self.turns, "tool": name,
+                                                          "args": args if isinstance(args, dict) else {}, "out": out})
                 messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": out})
             if turn["slept"]:
                 break
