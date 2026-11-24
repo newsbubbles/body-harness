@@ -88,10 +88,11 @@ class Mind:
 
     def present_names(self) -> list[str]:
         b = self.bundle
-        names = [x.get("name") for x in (b.get("present") or []) if isinstance(x, dict)]
-        names += [x.get("name") for x in (b.get("holding") or []) if isinstance(x, dict)]
-        names += [x.get("name") for x in (b.get("exits") or []) if isinstance(x, dict)]
-        return [n for n in names if isinstance(n, str)]
+        names: list[Any] = []
+        # a full perceive has present/affordances; a brief one (newer engines) people/things, exits as plain names
+        for key in ("present", "people", "things", "holding", "exits"):
+            names += [x.get("name") if isinstance(x, dict) else scene.bare(x) for x in (b.get(key) or [])]
+        return [n for n in names if isinstance(n, str) and n]
 
     # ---------- the world ----------
 
@@ -149,7 +150,8 @@ class Mind:
         if name == "look":
             if args.get("part"):
                 if args["part"].strip().lower() in ("affordances", "you can", "verbs"):
-                    return "\n".join(scene.affordance_lines(self.bundle.get("affordances") or [], True))
+                    return "\n".join(scene.affordance_lines(self.bundle.get("affordances") or [], True)
+                                     or [str(v) for v in (self.bundle.get("verbs") or [])])
                 return compact(scene.part(self.bundle, args["part"]), 8000)
             b = await self.perceive()
             return scene.card(b, self.names, self.me, self.day_seconds)

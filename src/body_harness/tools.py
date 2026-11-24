@@ -187,6 +187,15 @@ def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any
             for k in stray:
                 args.pop(k)
             notes.append(f"{', '.join(stray)} moved into params")
+        if not args.get("target") and isinstance(args.get("params"), dict):
+            # act(verb='go', params={'go': 'Harbour Street'}): a param whose value names something here is the target
+            here = {n.lower(): n for n in mind.present_names()}
+            for k, v in list(args["params"].items()):
+                if isinstance(v, str) and v.strip().lower() in here:
+                    args["target"] = here[v.strip().lower()]
+                    args["params"].pop(k)
+                    notes.append(f"params.{k}={v!r} read as target=")
+                    break
     for k in NAME_PARAMS & set(args):
         v = args[k]
         if not isinstance(v, str):

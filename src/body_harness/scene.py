@@ -143,6 +143,11 @@ def event_lines(events: list[dict[str, Any]], me: str, names: Names, limit: int 
     return [f"[t={s:.0f}] {ln}" + (f" (x{n}, last shown)" if n > 1 else "") for s, ln, n in rows][-limit:]
 
 
+def bare(x: Any) -> str:
+    """'Coin x60' -> 'Coin': a brief perceive's holding lines carry counts."""
+    return re.sub(r" x\d+$", "", str(x))
+
+
 def _names(items: list[Any], names: Names) -> list[str]:
     out = []
     for x in items or []:
@@ -156,6 +161,8 @@ def _names(items: list[Any], names: Names) -> list[str]:
                 bits.append("asleep")
             if st.get("hp") is not None and st.get("max_hp"):
                 bits.append(f"hp {st['hp']}/{st['max_hp']}")
+            if x.get("bears"):
+                bits.append("bears " + ", ".join(map(str, x["bears"])))
             out.append(n + (f" ({', '.join(bits)})" if bits else ""))
         else:
             out.append(str(x))
@@ -205,13 +212,17 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     hold = _names(b.get("holding"), names)
     if hold:
         lines.append("Holding: " + ", ".join(hold))
-    people = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") not in ("thing", "sign")
-              and x.get("id") != me]
-    things = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") in ("thing", "sign")]
+    if "people" in b or "things" in b:  # a brief perceive splits them already
+        people = [x for x in (b.get("people") or []) if not (isinstance(x, dict) and x.get("id") == me)]
+        things = list(b.get("things") or [])
+    else:
+        people = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") not in ("thing", "sign")
+                  and x.get("id") != me]
+        things = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") in ("thing", "sign")]
     lines.append("Here: " + (", ".join(_names(people, names)) or "nobody else"))
     if things:
         lines.append("Things: " + ", ".join(_names(things, names)))
-    ex = [x.get("name") or names.name(x.get("to")) for x in (b.get("exits") or []) if isinstance(x, dict)]
+    ex = [(x.get("name") or names.name(x.get("to"))) if isinstance(x, dict) else str(x) for x in (b.get("exits") or [])]
     if ex:
         lines.append("Exits: " + ", ".join(ex))
     goals = [g for g in (b.get("goals") or []) if g.get("status", "active") == "active"]
@@ -233,7 +244,7 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
         lines.append("RULES CHANGED: " + str(b["rules_notice"]))
     if b.get("reclaim"):
         lines.append("You may take back: " + json.dumps(b["reclaim"], default=str)[:300])
-    affs = affordance_lines(b.get("affordances") or [])
+    affs = affordance_lines(b.get("affordances") or []) or [str(v) for v in (b.get("verbs") or [])]
     if affs:
         lines.append("You can: " + " | ".join(affs))
     evs = event_lines(events if events is not None else (b.get("events") or []), me, names)

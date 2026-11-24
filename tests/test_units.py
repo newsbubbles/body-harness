@@ -146,3 +146,15 @@ def test_cli_commands_without_a_seat(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("BH_HOME", str(tmp_path))
     for cmd in (["usage"], ["status"], ["seats"]):
         assert main(cmd) == 0
+
+
+def test_card_reads_brief_perceive():
+    from body_harness.scene import Names, card
+    b = {"t": 100, "you": {"id": "e9", "name": "Corra"}, "here": {"id": "e4", "name": "The Docks"},
+         "people": [{"id": "e299", "name": "Brakka Bomber", "looks": "a huge orc"},
+                    {"id": "e48", "name": "Ssark", "bears": ["Gutting knife"]}],
+         "things": [{"id": "e128", "name": "Water butt"}], "exits": ["Harbour Street"],
+         "holding": ["Coin x60", "Shortsword"], "verbs": ["go: Harbour Street", "talk: anyone here"]}
+    c = card(b, Names(), "e9")
+    assert "Here: Brakka Bomber, Ssark (bears Gutting knife)" in c and "Water butt" in c
+    assert "Coin x60" in c and "Exits: Harbour Street" in c and "go: Harbour Street" in c
