@@ -92,6 +92,9 @@ handbook costs nothing until a page is needed.
 
 ```
 bh join <link|file> --name N --model P:M   take an invite into a new seat (the link opens once)
+bh join - --name N --template T --as NAME --description '...'
+                                           make a new character, when a world asks who you are;
+                                           a refused join lists the open seats and templates
 bh run N [N ...] | --all                   run seats until stopped
 bh status                                  every seat: who, model, last turn, watch, spend, unread reports
 bh tell N "text"                           a message from you; wakes the seat

@@ -36,15 +36,22 @@ def _since(text: str) -> float:
 
 async def _join(args: argparse.Namespace, h: Path) -> int:
     s = seats.Seat(h, args.name)
-    if s.exists and not args.force:
+    # a seat that already has a door joins again through it (an invite link opens once): to pick a character
+    # after a refusal, for instance
+    again = s.exists and s.p("door.json").exists() and not args.force
+    if s.exists and not again and not args.force:
         print(f"seat {args.name} already exists (pass --force to take a new invite into it)", file=sys.stderr)
         return 2
     s.create()
     async with httpx.AsyncClient() as client:
-        base, token, page = await open_invite(client, args.invite)
-        door = Door(base, token, client)
-        door.save(s.p("door.json"))
-        s.p("invite.md").write_text(page, encoding="utf-8")
+        if again:
+            door = Door.load(s.p("door.json"), client)
+            print(f"seat {args.name} exists: joining again through its saved door")
+        else:
+            base, token, page = await open_invite(client, args.invite)
+            door = Door(base, token, client)
+            door.save(s.p("door.json"))
+            s.p("invite.md").write_text(page, encoding="utf-8")
         cfg = seats.read_json(s.p("config.json"), {})
         cfg.update({"model": args.model or cfg.get("model") or seats.read_json(h / "config.json", {}).get("model", ""),
                     "joined": time.strftime("%Y-%m-%d %H:%M")})
@@ -53,9 +60,21 @@ async def _join(args: argparse.Namespace, h: Path) -> int:
         if args.env_file:
             cfg["env_files"] = [str(Path(f).resolve()) for f in args.env_file]
         seats.write_json(s.p("config.json"), cfg)
-        j = await door.op("join", entity=args.entity) if args.entity else await door.op("join")
+        made = {"template": args.template, "name": args.char_name, "description": args.description}
+        j = await door.op("join", entity=args.entity, **{k: v for k, v in made.items() if v})
         if isinstance(j, dict) and j.get("ok") is False:
             print(f"saved the seat, but join was refused: {j.get('reason')}", file=sys.stderr)
+            if j.get("hint"):
+                print(f"  hint: {j['hint']}", file=sys.stderr)
+            o = await door.op("seats")
+            if isinstance(o, dict) and (o.get("seats") or o.get("templates")):
+                for x in o.get("seats") or []:
+                    print(f"  seat {x.get('name')!r} at {x.get('place')}: {'open' if x.get('open') else 'taken'}",
+                          file=sys.stderr)
+                for x in o.get("templates") or []:
+                    print(f"  template {x.get('template')!r}: {x.get('doc')}", file=sys.stderr)
+                print(f"  then: bh join - --name {args.name} --entity NAME, or --template T --as NAME "
+                      f"--description '...'", file=sys.stderr)
             return 1
         b = j.get("briefing") or {}
         print(f"seat {args.name}: {b.get('you') or (j.get('you') or {}).get('name')} in {b.get('world')} "
@@ -87,8 +106,9 @@ def _status(h: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="bh", description="Run minds and players in embody worlds.")
     ap.add_argument("--home", help="where seats live (default $BH_HOME or ~/.body-harness)")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -96,7 +116,10 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("invite", help="the invite link, or a file holding the link or the page")
     c.add_argument("--name", required=True, help="the seat's name here (lowercase)")
     c.add_argument("--model", default="", help="provider:model, for example openrouter:deepseek/deepseek-chat-v3.1")
-    c.add_argument("--entity", help="which body, when the grant names several")
+    c.add_argument("--entity", help="which body, when the grant names several or the world has open seats")
+    c.add_argument("--template", help="make a new character from one of the world's templates")
+    c.add_argument("--as", dest="char_name", help="the new character's name (with --template)")
+    c.add_argument("--description", help="how the new character looks to others (with --template; set once)")
     c.add_argument("--env-file", action="append", help="a .env file to read the provider key from (never printed)")
     c.add_argument("--force", action="store_true")
     c = sub.add_parser("run", help="run seats until stopped")
