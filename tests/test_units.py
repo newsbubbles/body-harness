@@ -339,3 +339,27 @@ def test_unanswered_lines_reset_when_they_speak():
     m.st = {"unanswered": {"wick": 3}, "heard": []}
     m._keep_heard([{"kind": "say", "actor": "e4", "seq": 9, "payload": {"text": "Dunno."}}])
     assert "wick" not in m.st["unanswered"]
+
+
+def test_escalate_hands_the_turn_to_the_next_model(monkeypatch):
+    # Nate 11-24: "give the same context to a different model after say a couple of retries"
+    from body_harness.loop import CALL_TROUBLE, Mind
+    from body_harness.providers import Model
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
+    m = Mind.__new__(Mind)
+    m.seat = type("S", (), {"name": "x"})()
+    m.turns = 3
+    m.model = m.base_model = Model("openrouter:a/cheap", "https://example.test", "", "a/cheap", "openrouter")
+    m.rungs = {}
+    m.cfg = {"escalate": ["openrouter:a/cheap", "openrouter:b/better"]}
+    turn = {"trouble": 2}
+    messages = [{"role": "assistant", "content": "", "reasoning_details": [{"x": 1}]}]
+    assert m._escalate(turn, messages, "test")
+    assert m.model.spec == "openrouter:b/better" and turn["escalated"] == ["openrouter:b/better"]
+    assert turn["trouble"] == 0 and "reasoning_details" not in messages[0]
+    assert not m._escalate(turn, messages, "test")  # nothing above it
+
+    assert CALL_TROUBLE.search('{"ok": false, "reason": "bad arguments for say: x"}')
+    assert CALL_TROUBLE.search("Not asleep yet: your note says")
+    assert CALL_TROUBLE.search('{"refused": "until: syntax error: invalid syntax"}')
+    assert not CALL_TROUBLE.search('{"refused": "the gangplank lifts itself out of reach"}')

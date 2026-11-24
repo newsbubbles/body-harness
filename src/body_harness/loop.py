@@ -32,6 +32,11 @@ from .tools import EXTRAS, Registry, compact, fix_args, route
 from .usage import Usage, append as usage_append
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
+# a call the model got wrong, not a world that said no: these move a turn up the escalate list (a rule refusal, like
+# a gangplank that will not take an elf, is the game and never escalates). The engine's layer="call" says it outright.
+CALL_TROUBLE = re.compile(r"bad arguments|there is no tool|\bno tool \w|unexpected keyword argument|missing \d+ "
+                          r"required|syntax error|Not asleep yet|no verb '|\"layer\": \"call\"")
+READS = {"look", "find_tools", "inspect", "find", "history", "guide", "handbook", "recall", "skill", "owed", "agenda"}
 KEEP_LOADED_TURNS = 5
 MAX_LOADED = 8
 
@@ -65,6 +70,8 @@ class Mind:
         self.door.wait_cap = float(self.cfg.get("wait_cap", self.door.wait_cap))
         self.model = Model.from_config(self.cfg.get("model", ""), {**self.cfg, "session": self.cfg.get("session") or
                                        f"bh-{seat.name}-{uuid.uuid4().hex[:6]}"})
+        self.base_model = self.model
+        self.rungs: dict[str, Model] = {}  # escalation models, kept so a raised max_tokens or a fallback sticks
         self.st: dict[str, Any] = seat.state()
         self.names = scene.Names(self.st.get("names"))
         self.skills = Skills(seat.home / "skills", seat.p("skills"))
@@ -615,6 +622,33 @@ class Mind:
                      "bundle": b})
         write_json(p, ring)
 
+    def _escalate(self, turn: dict[str, Any], messages: list[dict[str, Any]], why: str) -> bool:
+        """Hand the rest of this turn, with the same messages, to the next model in the config's escalate list."""
+        ladder = [str(x) for x in self.cfg.get("escalate") or [] if x]
+        i = int(turn.get("rung", 0))
+        while i < len(ladder):
+            spec = ladder[i]
+            i += 1
+            if spec == self.model.spec:
+                continue
+            try:
+                self.model = self.rungs.get(spec) or Model.from_config(
+                    spec, {**self.cfg, "session": self.base_model.session})
+            except ModelError as e:
+                _log(self.seat.name, f"cannot escalate to {spec}: {e}")
+                continue
+            self.rungs[spec] = self.model
+            turn["rung"], turn["trouble"] = i, 0
+            turn.setdefault("escalated", []).append(spec)
+            for m in messages:
+                # one provider's reasoning blocks mean nothing to another, and some refuse them
+                for k in ("reasoning", "reasoning_details", "reasoning_content"):
+                    m.pop(k, None)
+            _log(self.seat.name, f"turn {self.turns}: escalated to {spec} ({why})")
+            return True
+        turn["rung"] = i
+        return False
+
     async def turn(self, reason: str, events: list[dict[str, Any]]) -> None:
         st0 = json.loads(json.dumps(self.st, default=str))
         self.turns += 1
@@ -679,6 +713,8 @@ class Mind:
                 msg, u = await self.model.chat(self.client, messages, tools, choice)
             except ModelError as e:
                 _log(self.seat.name, f"model error: {e}")
+                if self._escalate(turn, messages, f"model error: {str(e)[:80]}"):
+                    continue
                 self.seat.outbox(f"model error: {e}", "error")
                 turn["note"] = turn["note"] or f"(the model failed: {str(e)[:120]})"
                 break
@@ -691,6 +727,7 @@ class Mind:
                     # prose outside a tool reaches nobody in the world, and an empty reply leaves no note: say so
                     # once, let the model put it right
                     turn["prose_nudged"] = True
+                    turn["trouble"] = turn.get("trouble", 0) + 1
                     messages += [{"role": "assistant", "content": text or "(nothing)"},
                                  {"role": "user", "content": "(harness: text outside a tool reaches nobody in the "
                                   "world. If your character speaks, call say; if it acts, call act. Then sleep, "
@@ -735,8 +772,20 @@ class Mind:
                 append_jsonl(self.seat.p("calls.jsonl"), {"ts": time.time(), "turn": self.turns, "tool": name,
                                                           "args": args if isinstance(args, dict) else {}, "out": out})
                 messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": out})
+                if CALL_TROUBLE.search(out[:600]):
+                    turn["trouble"] = turn.get("trouble", 0) + 1
             if turn["slept"]:
                 break
+            reads = sum(c["tool"] in READS for c in turn["calls"])
+            if step < max_steps - 2 and self.cfg.get("escalate"):
+                if turn.get("trouble", 0) >= int(self.cfg.get("escalate_after", 2)):
+                    self._escalate(turn, messages, f"{turn['trouble']} calls it got wrong")
+                elif not turn["deeds"] and reads >= int(self.cfg.get("escalate_reads", 8)) and \
+                        not turn.get("reads_escalated"):
+                    # floundering is the other failure: hy4 ran 6 find_tools, 2 looks and a history read in
+                    # calibration, never acted and ran out of steps, with no single call wrong
+                    turn["reads_escalated"] = True
+                    self._escalate(turn, messages, f"{reads} reads and no deed")
             left = max_steps - step - 1
             if left == 3 and messages[-1]["role"] == "tool":
                 # a beat is a few calls; a long turn is a mind playing ahead of the world
@@ -748,6 +797,7 @@ class Mind:
                                                         (f"; not run: {turn['cut']})" if turn.get("cut") else ")"))},
                               turn, forced=True)
         self.usage.add(tu)
+        self.model = self.base_model  # every turn starts on the seat's own model
         note = turn["note"] or "(no note)"
         talkers = speakers if turn["deeds"] and not turn.get("done") else set()
         self.st["chat"] = {p: (self.st.get("chat") or {}).get(p, 0) + 1 for p in talkers}
@@ -756,7 +806,8 @@ class Mind:
         append_jsonl(self.seat.p("ledger.jsonl"), {"ts": time.time(), "t": b.get("t"), "turn": self.turns,
                                                    "reason": reason, "calls": turn["calls"], "note": note,
                                                    "watch": (self.st.get("watch") or {}).get("until"),
-                                                   "usage": tu.to_dict()})
+                                                   "usage": tu.to_dict(),
+                                                   **({"escalated": turn["escalated"]} if turn.get("escalated") else {})})
         _log(self.seat.name, f"turn {self.turns} ({reason[:60]}): {len(turn['calls'])} tool calls; {tu.line()}; "
                              f"{note[:120]}")
         self.save()

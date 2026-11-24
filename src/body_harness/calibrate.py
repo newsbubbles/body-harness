@@ -113,7 +113,8 @@ def score(s: Seat, wake: dict[str, Any], seconds: float) -> dict[str, Any]:
         me in ((e.get("payload") or {}).get("to"), e.get("target")) for e in wake.get("events") or [])
     note = str(led.get("note") or "")
     u = led.get("usage") or {}
-    says = [str((c.get("args") or {}).get("text", "")) for c in calls if c.get("tool") == "say"]
+    says = [str((c.get("args") or {}).get("text", "")) for c in calls if c.get("tool") == "say" or
+            (c.get("tool") == "act" and (c.get("args") or {}).get("verb") in ("talk", "ask", "tell"))]
     return {
         "calls": len(calls),
         "tools": [c.get("tool") for c in calls],
@@ -127,6 +128,7 @@ def score(s: Seat, wake: dict[str, Any], seconds: float) -> dict[str, Any]:
         "said": says[:3],
         "note": note[:300],
         "watch": led.get("watch"),
+        "escalated": led.get("escalated") or [],
         "model_calls": int(u.get("calls", 0)),
         "in": int(u.get("input_tokens", 0)), "cached": int(u.get("cached_tokens", 0)),
         "out": int(u.get("output_tokens", 0)), "cost": float(u.get("cost", 0) or 0),
@@ -178,6 +180,8 @@ def table(rows: list[dict[str, Any]]) -> str:
         ans = "-" if r["answered"] is None else ("yes" if r["answered"] else "NO")
         lines.append(f"{r['model'][:44]:44} {r['calls']:5} {r['invented']:3} {r['bad_args']:3} {r['refused']:3} "
                      f"{r['nudged']:5} {'yes' if r['slept'] else 'NO':5} {ans:8} ${r['cost']:.4f} {r['seconds']:5}")
+        if r.get("escalated"):
+            lines.append(f"{'':44}   escalated to: {', '.join(r['escalated'])}")
         if r["said"]:
             lines.append(f"{'':44}   said: {r['said'][0][:110]!r}")
         lines.append(f"{'':44}   note: {r['note'][:110]}")
