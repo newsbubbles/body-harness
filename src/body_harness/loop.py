@@ -321,6 +321,10 @@ class Mind:
                                  f"way, or stop waiting on them")
         if name in self.registry.world:
             self.load_tools([name])
+        if isinstance(r, dict) and isinstance(r.get("more"), dict) and r["more"].get("handle") \
+                and "more" in self.registry.world:
+            # a cut answer says to call more(handle): the tool comes with it, or the next call is a "no tool" refusal
+            self.load_tools(["more"])
         if isinstance(r, dict) and isinstance(r.get("events"), list):
             self._keep_heard(r["events"])
             lines = scene.event_lines(r["events"], self.me, self.names, 12)
