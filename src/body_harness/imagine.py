@@ -438,6 +438,8 @@ class Imagination:
             # the plan going on, not a new one: Tamsin's second and third spars each bound an older imagining
             if v in {s["verb"] for s in _my_steps(recs.get(b["id"]) or {})}:
                 b["steps"] = b.get("steps", 1) + 1
+                # each deed as done, so a re-living replays what really happened, not the plan
+                append_jsonl(self.log, {"kind": "step", "id": b["id"], "ts": now, "verb": v, "target": target})
                 self.save()
                 return b["id"]
         for o in reversed(self.spec["open"]):
@@ -458,6 +460,8 @@ class Imagination:
         for r in read_jsonl(self.log):
             if r.get("kind") == "imagined":
                 out[r["id"]] = dict(r)
+            elif r.get("kind") == "step" and r.get("id") in out:
+                out[r["id"]].setdefault("steps", []).append(r)
             elif r.get("id") in out:
                 out[r["id"]].setdefault(r["kind"], r)
         return out
@@ -584,6 +588,131 @@ class Imagination:
         cal = self.calibration()
         return "\n\n(imagination) " + "\n".join(parts) + (
             "\nYour imagination so far: " + " | ".join(cal) if cal else "")
+
+    # re-living ------------------------------------------------------------------------------------------------
+
+    def relive(self, a: dict[str, Any], me: str) -> dict[str, Any]:
+        """Live a past moment again in imagination: the numbers the seat saw then, its own deeds as it really did
+        them, played through the rules and beliefs it has now. With no id, every moment it lived is re-lived and the
+        answer is how many its imagination would see coming now against then: a learning curve the harness measures.
+        With instead=, the replay turns into imagination at the cutoff: what if it had done something else."""
+        recs = self.records()
+        lived = [r for r in recs.values() if r.get("start") and (r.get("scored") or r.get("partial") or {}).get("real")]
+        pid = str(a.get("id") or "").strip()
+        if pid and pid != "all":
+            r = recs.get(pid)
+            if r not in lived:
+                return {"ok": False, "reason": f"{pid!r} is not a moment you lived: re-live an imagining you acted on",
+                        "hint": "relive() with no id re-lives them all"}
+            return self._relive_one(r, me, a.get("after"), a.get("instead"))
+        if not lived:
+            return {"ok": False, "reason": "nothing lived yet: imagine a plan, then do it, and it can be re-lived"}
+        rows, t0 = [], time.time()
+        for r in reversed(lived[-40:]):
+            x = self._relive_one(r, me)
+            if x.get("ok"):
+                rows.append(x)
+            if time.time() - t0 > 2 * BUDGET_S:
+                break
+        if not rows:
+            return {"ok": False, "reason": "no past moment could be re-lived with your rules now",
+                    "hint": "a rule a moment used may be gone: imagine() shows your rules"}
+        rows.reverse()
+        line = (f"re-lived {len(rows)} moments with your imagination now: {sum(x['now_inside'] for x in rows)} of "
+                f"{len(rows)} came out inside your imagined 80% band, mean surprise "
+                f"{statistics.mean(x['now_bits'] for x in rows):.1f} bits")
+        then = [x for x in rows if x["then_inside"] is not None]
+        if then:
+            line += (f". Of the {len(then)} scored when you lived them: then {sum(x['then_inside'] for x in then)} "
+                     f"inside at {statistics.mean(x['then_bits'] for x in then):.1f} bits, now "
+                     f"{sum(x['now_inside'] for x in then)} at {statistics.mean(x['now_bits'] for x in then):.1f}")
+        worst = sorted(rows, key=lambda x: -x["now_bits"])[:5]
+        return {"ok": True, "summary": line, "worst_now": worst,
+                "next": "relive(id, after=N, instead=[{actor, verb, target}]): from a moment, after N of your real "
+                        "steps, imagine another way"}
+
+    def _relive_one(self, r: dict[str, Any], me: str, after: Any = None, instead: Any = None) -> dict[str, Any]:
+        got = r.get("scored") or r.get("partial")
+        then_me = r.get("me") or me
+        mine: dict[str, Any] = {}
+        seen: dict[str, dict[str, Any]] = {}
+        for k, v in r["start"].items():
+            n, f = k.split(".", 1)
+            (mine if n == then_me else seen.setdefault(n, {}))[f] = v
+        plan = [(s["actor"], s["verb"], s.get("target")) for s in r.get("plan") or []]
+        own = [s for s in plan if s[0] == (r.get("first") or {}).get("actor")]
+        done = max(1, int(got.get("done") or len(own) * int(r.get("rounds") or 1)))
+        # the deeds as really done: the binding one and each logged after it; older records logged only a count, and
+        # their plan stands in for the rest
+        deeds = [(_key(str(d.get("verb") or "")), d.get("target")) for d in [r.get("bound") or {}, *r.get("steps", [])]
+                 if d.get("verb")][:done]
+        for i in range(len(deeds), done):
+            deeds.append(own[i % len(own)][1:] if own else ("", None))
+        cut = done if after is None else max(0, min(int(after), done))
+        branch = []
+        for s in (instead if isinstance(instead, list) else [instead] if isinstance(instead, dict) else []):
+            if isinstance(s, dict):
+                branch.append((s.get("actor") or "me", _key(str(s.get("verb") or "")), s.get("target")))
+        missing = sorted({v for v in [*(s[1] for s in plan), *(d[0] for d in deeds[:cut]), *(b[1] for b in branch)]
+                          if v not in self.spec["rules"]})
+        if missing:
+            return {"ok": False, "id": r["id"], "reason": f"no rule now for {', '.join(missing)}",
+                    "hint": "write it with imagine(rules=...) first"}
+        values: dict[str, list[float]] = {}
+        for seed in range(MIN_TRIALS):
+            w, ids = self._build(5000 + seed, then_me, mine, seen)
+            try:
+                # the plan's order with the real deeds in the seat's places; the others' steps after the last deed
+                # still happen, as they did before the card was read
+                k, i = 0, 0
+                while plan and k <= cut:
+                    actor, verb, target = plan[i % len(plan)]
+                    i += 1
+                    if actor == then_me or (own and actor == own[0][0]):
+                        if k == cut:
+                            break
+                        verb, real_t = deeds[k]
+                        target = self._who(real_t, then_me, ids) or target
+                        k += 1
+                    w.act(ids[actor], verb, ids.get(target) if target else None, {})
+                    if i > 4 * len(plan) * (done + 1):
+                        break
+                for actor, verb, target in branch:
+                    a_ = self._who(actor, then_me, ids)
+                    t_ = self._who(target, then_me, ids) if target else None
+                    if a_ is None or (target and t_ is None):
+                        return {"ok": False, "id": r["id"],
+                                "reason": f"nobody called {actor if a_ is None else target!r} was there"}
+                    w.act(ids[a_], verb, ids[t_] if t_ else None, {})
+            except Rejected as e:
+                if crashed(e.reason):
+                    return {"ok": False, "id": r["id"], "reason": f"a rule breaks: {e.reason}",
+                            "hint": "fix it with imagine(rules=...)"}
+            except (ScriptError, KeyError) as e:
+                return {"ok": False, "id": r["id"], "reason": f"could not re-live it: {e}"}
+            for n, i_ in ids.items():
+                for f, v in ((w.get(i_) or {}).get("state") or {}).items():
+                    if _num(v):
+                        values.setdefault(f"{n}.{f}", []).append(v)
+        real = got["real"]
+        moment = (f"turn {r.get('turn')}: " + ", ".join(d[0] for d in deeds) + " from " +
+                  ", ".join(f"{k} {v}" for k, v in r["start"].items() if k in real))
+        if branch:
+            return {"ok": True, "id": r["id"], "moment": moment,
+                    "replayed": f"{cut} of your {done} real steps, then what you gave instead (imagined, not scored)",
+                    "came_out": {k: spread(v) for k, v in values.items() if k in real}, "really": real}
+        now = {}
+        for k, v in real.items():
+            if k in values:
+                bits, inside = surprise(values[k], v)
+                now[k] = {"imagined": spread(values[k])["band"], "real": v, "bits": bits, "inside": inside}
+        if not now:
+            return {"ok": False, "id": r["id"], "reason": "none of the numbers seen then came out of the re-living"}
+        s = r.get("scored")
+        return {"ok": True, "id": r["id"], "moment": moment, "now": now,
+                "now_inside": all(x["inside"] for x in now.values()), "now_bits": max(x["bits"] for x in now.values()),
+                "then_inside": all(s["inside"].get(k, True) for k in now) if s else None,
+                "then_bits": max(s["bits"].get(k, 0) for k in now) if s else None}
 
     def reflect(self, a: dict[str, Any]) -> dict[str, Any]:
         recs = self.records()

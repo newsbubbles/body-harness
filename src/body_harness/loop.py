@@ -194,9 +194,11 @@ class Mind:
             return "(noted)"
         if name == "find_tools":
             return compact(self.registry.find(str(args.get("query", ""))))
-        if name in ("imagine", "reflect") and self.imagination is not None:
+        if name in ("imagine", "reflect", "relive") and self.imagination is not None:
             if name == "reflect":
                 return compact(self.imagination.reflect(args), 6000)
+            if name == "relive":
+                return compact(await asyncio.to_thread(self.imagination.relive, args, self.my_name()), 6000)
             turn["imagined"] = turn.get("imagined", 0) + 1
             # a few hundred small worlds: off the event loop, so the other seats in this process keep waiting
             return compact(await asyncio.to_thread(self.imagination.imagine, args, self.bundle, self.my_name(),

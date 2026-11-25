@@ -159,6 +159,12 @@ REFLECT = fn("reflect", "Look back on what you imagined against what really happ
                         "in your rule could produce), or luck (one result your dice allow). Change the belief or rule "
                         "with imagine() too; the lesson is shown on your next imaginings.",
              {"id": S, "verdict": {"type": "string", "enum": ["belief", "rule", "luck"]}, "lesson": S})
+RELIVE = fn("relive", "Live a past moment again in your imagination: the numbers you saw then and what you really "
+                      "did, played through the rules and beliefs you have now. With no id, every moment you lived "
+                      "is re-lived: how many your imagination now sees coming, against when you lived them. With "
+                      "id (a plan you imagined and then did), after=N of your real steps and instead=[{actor, verb, "
+                      "target}], imagine what would have happened had you done something else from there.",
+            {"id": S, "after": {"type": "integer"}, "instead": {"type": "array", "items": {"type": "object"}}})
 
 EXTRAS: dict[str, dict[str, Any]] = {
     "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
@@ -246,7 +252,7 @@ class Registry:
     def tools(self, loaded: list[str]) -> list[dict[str, Any]]:
         core = CORE + [THINK] if self.m.cfg.get("think_tool") else CORE
         if self.m.imagination is not None:
-            core = core + [IMAGINE, REFLECT]
+            core = core + [IMAGINE, REFLECT, RELIVE]
         return core + [s for s in (self.schema(n) for n in loaded) if s]
 
 

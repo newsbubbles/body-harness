@@ -421,6 +421,18 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert sum(x.startswith("[attack]") for x in im.spec["lessons"]) <= 4
     assert "[attack] Marlo hits far harder than +2" in im.imagine({}, card, "Ssareth", 2)["lessons"]
     assert im.reflect({})["imaginings"][0]["reflected"] == "belief"
+    # re-living: the moment from the numbers seen then, both real blows (the bound one and the logged step), through
+    # the beliefs held now
+    assert len(im.records()[r["id"]]["steps"]) == 1
+    again = im.relive({"id": r["id"]}, "Ssareth")
+    assert again["ok"] and again["moment"].startswith("turn 1: attack, attack from")
+    assert again["now"]["Ssareth.hp"]["real"] == -9 and again["then_inside"] is False
+    every = im.relive({}, "Ssareth")
+    assert every["ok"] and every["summary"].startswith("re-lived 1 moments") and "Of the 1 scored" in every["summary"]
+    branch = im.relive({"id": r["id"], "after": 1, "instead": [{"verb": "attack", "target": "Marlo"}]}, "Ssareth")
+    assert branch["ok"] and "1 of your 2 real steps" in branch["replayed"] and "Ssareth.hp" in branch["came_out"]
+    assert im.relive({"id": "nope"}, "Ssareth")["ok"] is False
+    assert not im.relive({"id": r["id"], "instead": [{"verb": "fly"}]}, "Ssareth")["ok"]  # no rule for it now
     assert imagine.surprise([5] * 20, 5) == (0.0, True)
     # the shape cheap models send: bodies with no def lines; a check given as one condition returns it
     src, _ = imagine.rule_source({"check": "ctx.actor.state.hp > 4", "apply": "ctx.target.state.hp -= 2"})
