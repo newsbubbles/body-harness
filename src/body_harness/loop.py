@@ -316,7 +316,10 @@ class Mind:
             b = await self.perceive()
             return scene.card(b, self.names, self.me, self.day_seconds)
         if name == "sleep":
-            return await self._sleep(args, turn)
+            # on the turn's last step no call is left to put a refusal right: the model's own sleep stands (its note,
+            # plan and watch), and what arrived meanwhile is the next wake's news. Refused there, 29 of a pilot's
+            # turns ended on "(the turn ran out of steps)" and lost their note (Niiro Cradle, 25 Nov)
+            return await self._sleep(args, turn, forced=bool(turn.get("last_step")))
         if name == "think" and self.cfg.get("think_tool"):
             turn["thoughts"] = turn.get("thoughts", 0) + 1
             return "(noted)"
@@ -463,6 +466,7 @@ class Mind:
                 asked = self.st.setdefault("unanswered", {})
                 asked[to] = asked.get(to, 0) + 1
                 if asked[to] >= int(self.cfg.get("unanswered", 3)):
+                    turn.setdefault("nudges", []).append(f"unanswered: {fixed['to']} ({asked[to]} lines)")
                     # no "mind" here: seats copied "X has no mind" into notes, and from notes it can reach speech
                     notes.append(f"{fixed['to']} has not answered your last {asked[to]} lines to them. Some people "
                                  f"keep to themselves and may not answer: ask someone else, look for another way, "
@@ -1038,7 +1042,11 @@ class Mind:
                     e.get("actor") not in (None, self.me)}
         chat = self.st.get("chat") or {}
         long_talk = [p for p in speakers if chat.get(p, 0) >= int(self.cfg.get("chat_turns", 4))]
+        # every nudge the harness gives goes in the ledger too: a pilot could not tell from the log whether the chat
+        # guard fired over 20 talk-only turns (Niiro Cradle, 25 Nov)
+        nudges: list[str] = []
         if long_talk:
+            nudges.append(f"chat_turns: {', '.join(long_talk)} ({chat[long_talk[0]]} turns)")
             # two seats that wake on each other's words can trade lines forever with nothing happening
             user += (f"\n\n(harness: you and {', '.join(long_talk)} have traded lines {chat[long_talk[0]]} turns in a "
                      "row with nothing done between. Unless this line changes something, answer in a few words or "
@@ -1051,7 +1059,7 @@ class Mind:
                      "learned, then act or sleep.")
             self.st["read_handbook"] = True
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
-        turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": []}
+        turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": [], "nudges": nudges}
         turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me, me_name)]
         turn["spoken_to"] = bool(b.get("owed")) or bool(turn["partners"])
         tu = Usage()
@@ -1067,6 +1075,8 @@ class Mind:
                 # the last step offers only sleep: the turn ends on the model's own note and watch, not a forced one
                 tools = [t for t in tools if t["function"]["name"] == "sleep"]
                 choice = {"type": "function", "function": {"name": "sleep"}}
+                turn["last_step"] = True
+                nudges.append(f"last_step: step {step + 1}, only sleep offered")
                 messages[-1]["content"] += ("\n(harness: last step of this turn. Sleep now, with a note of what you "
                                             "did and learned and a watch for what matters next.)")
             try:
@@ -1087,6 +1097,7 @@ class Mind:
                     # prose outside a tool reaches nobody in the world, and an empty reply leaves no note: say so
                     # once, let the model put it right
                     turn["prose_nudged"] = True
+                    nudges.append(f"prose: step {step + 1}, text outside a tool")
                     turn["trouble"] = turn.get("trouble", 0) + 1
                     messages += [{"role": "assistant", "content": text or "(nothing)"},
                                  {"role": "user", "content": "(harness: text outside a tool reaches nobody in the "
@@ -1162,6 +1173,7 @@ class Mind:
                     self._escalate(turn, messages, f"{reads} reads and no deed")
             left = max_steps - step - 1
             if left == 3 and messages[-1]["role"] == "tool":
+                nudges.append(f"steps_left: {left}")
                 # a beat is a few calls; a long turn is a mind playing ahead of the world
                 messages[-1]["content"] += (f"\n(harness: {left} steps left in this turn. Finish this beat and "
                                             "sleep; the world will wake you for the next one.)")
@@ -1182,6 +1194,7 @@ class Mind:
                                                    "watch": (self.st.get("watch") or {}).get("until"),
                                                    "usage": tu.to_dict(),
                                                    **({"escalated": turn["escalated"]} if turn.get("escalated") else {}),
+                                                   **({"nudges": nudges} if nudges else {}),
                                                    **({"imagined": turn["imagined"]} if turn.get("imagined") else {})})
         _log(self.seat.name, f"turn {self.turns} ({reason[:60]}): {len(turn['calls'])} tool calls; {tu.line()}; "
                              f"{note[:120]}")

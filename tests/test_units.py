@@ -958,3 +958,18 @@ def test_the_supervisor_counts_only_outside_runs_of_its_own_home(tmp_path: Path,
     assert same_home(parse_run("bh run guard")[0], main)  # no --home: the default home
     assert same_home(parse_run(f"bh --home={main} run --all")[0], main)
     assert parse_run(f"bh --home {main} service run") is None and parse_run("python other.py run") is None
+
+
+def test_params_sent_as_a_json_string_are_read_as_the_object():
+    # Ongo sent read(params='{"ledger": "all"}') and act(params='{...}'); the server got a string and answered 500
+    from body_harness.loop import Mind
+    from body_harness.tools import fix_args
+    m = Mind.__new__(Mind)
+    m.registry = type("R", (), {"world": {"read": {"schema": {"properties": {"params": {"type": "object"}}}}}})()
+    m.names = scene.Names({})
+    m.present_names = lambda: []
+    args, notes = fix_args("read", {"params": '{"ledger": "all"}'}, m)
+    assert args["params"] == {"ledger": "all"} and "string of JSON" in notes[0]
+    args, _ = fix_args("act", {"verb": "spool_card", "params": "{'answer': 'yes',}"}, m)
+    assert args["params"] == {"answer": "yes"}
+    assert fix_args("say", {"text": "{not json, just words"}, m)[0]["text"] == "{not json, just words"

@@ -438,8 +438,11 @@ def main(argv: list[str] | None = None) -> int:
         led = seats.read_jsonl(s.p("ledger.jsonl"))[-args.n:]
         turns = {r.get("turn") for r in led}
         since = led[0]["ts"] - 3600 if led else 0
+        nudged = {r.get("turn"): r["nudges"] for r in led if r.get("nudges")}
         for c2 in seats.read_jsonl(s.p("calls.jsonl")):
             if c2.get("turn") in turns and c2.get("ts", 0) >= since:
+                for n in nudged.pop(c2["turn"], []):
+                    print(f"--- turn {c2['turn']} harness nudge: {n}")
                 print(f"--- turn {c2['turn']} {c2['tool']}({json.dumps(c2.get('args'), ensure_ascii=False)})")
                 print(c2.get("out", ""))
         return 0
@@ -451,6 +454,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.calls:
                 for c2 in r.get("calls", []):
                     print(f"    {c2['tool']}({json.dumps(c2.get('args'))[:140]}) -> {c2.get('out', '')[:160]}")
+            if r.get("nudges"):
+                print(f"    harness nudged: {'; '.join(r['nudges'])}")
             print(f"    note: {r.get('note')}  | watch {r.get('watch')!r} | "
                   f"{u.get('input_tokens', 0)} in / {u.get('output_tokens', 0)} out, ${u.get('cost', 0):.4f}")
         return 0

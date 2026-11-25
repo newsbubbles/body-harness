@@ -353,6 +353,15 @@ def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any
     """Rename what minds send under the wrong name and resolve short names. Returns the args and what was changed."""
     notes: list[str] = []
     args = dict(args)
+    props = mind.registry.world.get(op, {}).get("schema", {}).get("properties", {})
+    for k, v in list(args.items()):
+        # params='{"ledger": "all"}': an object sent as a JSON string reached the server as a string and got a 500
+        # (Ongo's read and act, Niiro Cradle, 25 Nov). Read it as the object it was meant to be
+        if isinstance(v, str) and v.lstrip().startswith("{") and (k == "params" or props.get(k, {}).get("type") == "object"):
+            got, _, _ = parse_args(v)
+            if isinstance(got, dict):
+                args[k] = got
+                notes.append(f"{k} was sent as a string of JSON; read as the object")
     for wrong, right in ALIASES.get(op, {}).items():
         if wrong in args and right not in args:
             args[right] = args.pop(wrong)
