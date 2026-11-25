@@ -178,6 +178,19 @@ RELIVE = fn("relive", "Live a past moment again in your imagination: the numbers
                       "target}], imagine what would have happened had you done something else from there.",
             {"id": S, "after": {"type": "integer"}, "instead": {"type": "array", "items": {"type": "object"}}})
 
+PAST = fn("past", "Search what you really did and what came of it: every deed (act, say) you did, with its result, "
+                  "lined up so you can see patterns across many moments. verb= 'strike' or 'strike|throw'. where= "
+                  "fields of the result: {'they': 'guard', 'took': '>0'} (=, !=, >, <, >=, <= for numbers; 'a|b' "
+                  "for either). match= a regex over the whole moment. seq= a run of your verbs in a row, ['strike', "
+                  "'strike']: matches the deed that ends it. count= a field to tally over every match, 'they'; "
+                  "'next.they' tallies the deed after each match. before=/after= deeds of context around each match "
+                  "(up to 5). last= only your last N deeds. limit= how many matches to show (12, up to 40). With "
+                  "nothing given: your last 12 deeds. Example: what does Oren do after I strike twice? "
+                  "past(seq=['strike', 'strike'], count='next.they').",
+          {"verb": S, "where": {"type": "object"}, "match": S, "seq": {"type": "array", "items": S},
+           "count": S, "before": {"type": "integer"}, "after": {"type": "integer"}, "last": {"type": "integer"},
+           "limit": {"type": "integer"}})
+
 EXTRAS: dict[str, dict[str, Any]] = {
     "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
                                "in_minutes= real minutes from now; what= what to do then. op='list' shows what is "
@@ -265,6 +278,8 @@ class Registry:
         core = CORE + [THINK] if self.m.cfg.get("think_tool") else CORE
         if self.m.imagination is not None:
             core = core + [IMAGINE, REFLECT, RELIVE]
+        if self.m.cfg.get("past"):
+            core = core + [PAST]
         return core + [s for s in (self.schema(n) for n in loaded) if s]
 
 

@@ -75,6 +75,33 @@ def test_memory_shelf(tmp_path: Path):
     assert memo({"seat": s}, "write", name="../x", text="t")["ok"] is False
 
 
+def test_past_lines_up_deeds(tmp_path: Path):
+    from body_harness.past import past
+    p = tmp_path / "calls.jsonl"
+    # a Dojo-like log: Oren guards whenever the student struck twice running, else throws
+    rows, last = [], []
+    for i, mv in enumerate(["strike", "strike", "strike", "throw", "strike", "strike", "strike", "rest", "guard"]):
+        they = "guard" if mv != "rest" and last[-2:] == ["strike", "strike"] and mv == "strike" else "throw"
+        res = {"ok": True, "verb": mv, "result": None if mv == "rest" else
+               {"you": mv, "they": they, "dealt": 0 if they == "guard" else 3, "took": 3 if they == "guard" else 0}}
+        rows.append({"ts": i, "turn": i, "tool": "act", "args": {"verb": mv, "target": "Oren"},
+                     "out": "(harness: a note)\n" + json.dumps(res)})
+        last = [] if mv == "rest" else last + [mv]
+    rows.append({"ts": 9, "turn": 9, "tool": "look", "args": {}, "out": "a card"})
+    rows.append({"ts": 10, "turn": 9, "tool": "act", "args": {"verb": "special", "target": "Oren"},
+                 "out": json.dumps({"ok": False, "reason": "your special is not ready"})})
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    out = past(p, {"seq": ["strike", "strike"], "count": "next.they"})
+    assert "count next.they: guard 2/4, throw 1/4, - 1/4" in out and "#2 t1 strike Oren" in out
+    assert "count they: throw 4/6, guard 2/6" in past(p, {"verb": "strike", "count": "they"})
+    out = past(p, {"where": {"took": ">0"}, "before": 1})
+    assert "2 of your 10 deeds" in out and ">> #3" in out and "   #2" in out
+    assert "REFUSED: your special is not ready" in past(p, {"match": "not ready"})
+    assert json.loads(past(p, {"where": {"theyy": "x"}}))["reason"].startswith("no field 'theyy'")
+    assert "does not compile" in past(p, {"match": "(("})
+    assert "nothing yet" in past(tmp_path / "none.jsonl", {})
+
+
 def test_apps_are_read_without_running(tmp_path: Path):
     (tmp_path / "apps").mkdir()
     write_file(tmp_path, "apps/mood.py", "TOOL = {'description': 'my mood', 'parameters': {'type': 'object', "

@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from . import imagine, prompts, sandbox, scene
+from . import imagine, past, prompts, sandbox, scene
 from .door import Door, DoorError
 from .memory import Shelf, memo
 from .providers import Model, ModelError
@@ -36,7 +36,8 @@ DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
 # a gangplank that will not take an elf, is the game and never escalates). The engine's layer="call" says it outright.
 CALL_TROUBLE = re.compile(r"bad arguments|there is no tool|\bno tool \w|unexpected keyword argument|missing \d+ "
                           r"required|syntax error|Not asleep yet|no verb '|\"layer\": \"call\"")
-READS = {"look", "find_tools", "inspect", "find", "history", "guide", "handbook", "recall", "skill", "owed", "agenda"}
+READS = {"look", "find_tools", "inspect", "find", "history", "guide", "handbook", "recall", "skill", "owed", "agenda",
+         "past"}
 KEEP_LOADED_TURNS = 5
 MAX_LOADED = 8
 
@@ -194,6 +195,8 @@ class Mind:
             return "(noted)"
         if name == "find_tools":
             return compact(self.registry.find(str(args.get("query", ""))))
+        if name == "past" and self.cfg.get("past"):
+            return compact(await asyncio.to_thread(past.past, self.seat.p("calls.jsonl"), args), 6000)
         if name in ("imagine", "reflect", "relive") and self.imagination is not None:
             if name == "reflect":
                 return compact(self.imagination.reflect(args), 6000)

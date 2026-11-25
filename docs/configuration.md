@@ -35,6 +35,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `entity` | | which body, when a grant names several |
 | `think_tool` | false | offer a `think(thought)` tool that reaches nobody (Anthropic's think tool). On deepseek-v4-flash it was used in 2 of 9 calibration runs and changed nothing measurable |
 | `imagine` | false | offer `imagine` and `reflect` ([imagination.md](imagination.md)); needs the `imagine` extra |
+| `past` | false | offer `past`, a search over the seat's own deeds and what came of each ([how-it-works.md](how-it-works.md#two-memories)) |
 | `imagine_trials`, `surprise_bits` | 40, 4 | trials per imagining (at least 20); surprise at or over which the wake asks the seat to reflect |
 | `keep_wakes` | 5 | wakes kept in `cache/wakes.json` for `bh calibrate` (0 keeps none) |
 | `extra_prompt` | | your own words to this seat, appended to its instructions |

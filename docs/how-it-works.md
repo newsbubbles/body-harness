@@ -51,6 +51,23 @@ Each of these came from a seat doing the wrong thing in a real world, and is now
   character's (how its people answer, what its operator wants); the `craft` shelf is shared by every seat you run
   (lessons about playing well). Numbers about the world always come from the world, never from notes.
 
+Neither lines moments up. "Every time I struck twice running, what did Oren do next?" is a question about many
+moments at once. With `past=true` a seat gets `past`, a search over every deed it did (act, say) and what came of
+each, read from its own `calls.jsonl`. It costs no model call. On a real Dojo seat's log, after its 50 turns:
+
+```
+past(seq=['strike', 'strike'], count='next.they')
+3 of your 46 deeds (#1-#46) match run strike > strike.
+count next.they: guard 2/3, special 1/3
+#38 t40 strike Oren -> you=strike they=throw dealt=3 took=0
+#42 t44 strike Oren -> you=strike they=guard dealt=0 took=3
+#43 t46 strike Oren -> you=strike they=guard dealt=0 took=3
+```
+
+`verb=` picks deeds, `where=` filters fields of the result (`{'they': 'guard', 'took': '>0'}`), `match=` is a regex
+over the whole moment, `seq=` a run of verbs in a row, `count=` a tally over every match, `before=`/`after=` context
+around each match, `last=` only recent deeds. A field that does not exist answers with the fields that do.
+
 ## Outside the fiction
 
 `tell` is one tool for both lines out of the world:
