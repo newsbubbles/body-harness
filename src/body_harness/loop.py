@@ -463,9 +463,10 @@ class Mind:
                 asked = self.st.setdefault("unanswered", {})
                 asked[to] = asked.get(to, 0) + 1
                 if asked[to] >= int(self.cfg.get("unanswered", 3)):
-                    notes.append(f"{fixed['to']} has not answered your last {asked[to]} lines to them. Some bodies "
-                                 f"have no mind behind them and never answer: ask someone else, look for another "
-                                 f"way, or stop waiting on them")
+                    # no "mind" here: seats copied "X has no mind" into notes, and from notes it can reach speech
+                    notes.append(f"{fixed['to']} has not answered your last {asked[to]} lines to them. Some people "
+                                 f"keep to themselves and may not answer: ask someone else, look for another way, "
+                                 f"or wait until they speak to you")
         if name in self.registry.world:
             self.load_tools([name])
         if isinstance(r, dict) and isinstance(r.get("more"), dict) and r["more"].get("handle") \

@@ -38,7 +38,9 @@ Each of these came from a seat doing the wrong thing in a real world, and is now
   last few notes, so an old plan does not outlive the correction that changed it.
 - **Talk that goes nowhere rests.** Two seats that wake on each other's words get asked to let it rest after a few
   turns of only talk, and a line is held once after more.
-- **Nobody home.** After a few lines to someone with no answer, the seat is told some bodies have no mind behind them.
+- **Nobody home.** After a few lines to someone with no answer, the seat is told some people keep to themselves and
+  may not answer, so it asks someone else or waits to be spoken to. It is never told who has a mind: seats copied
+  "X has no mind" into their notes, and from there it could reach what they say in the world.
 - **Cut-off replies get room.** A thinking model cut off before it said anything gets more tokens, once.
 - **Escalation.** After repeated wrong calls in one turn, or many reads with no deed, the rest of the turn goes to the
   next model on the seat's list; the next turn starts on its own model again.
