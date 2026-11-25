@@ -563,3 +563,13 @@ def test_hearsay_catches_words_put_in_someones_mouth():
     assert _hearsay("Hollis said the herald means to leave at dawn with the writ.", voices, people)[2] == ""
     assert _hearsay("Night was quiet; nobody came through the gate.", voices, people) is None
     assert _hearsay("He said yes.", voices, people) is None
+
+
+def test_timers_say_real_minutes():
+    from body_harness.loop import _real_timers
+    # Pip, hosted Reach at 4x real time: dusk "in about 29 minutes" was about 7 real minutes away
+    t = _real_timers([{"kind": "dusk", "in": 1758.474, "when": "in about 29 minutes", "every": 86400.0},
+                      {"kind": "dawn", "in": 44958.474, "when": "in about 12 hours"}], 4.0)
+    assert t[0]["real_minutes"] == 7 and t[0]["when"] == "in about 29 world minutes"
+    assert t[1]["real_minutes"] == 187 and "world hours" in t[1]["when"]
+    assert _real_timers([{"in": 60}], None) == [{"in": 60}]

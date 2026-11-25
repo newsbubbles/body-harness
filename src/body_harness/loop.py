@@ -358,6 +358,8 @@ class Mind:
             r = {k: v for k, v in r.items() if k not in ("events", "cursor")}
             if lines:
                 r["what happened"] = lines
+        if name == "timers":
+            r = _real_timers(r, self._rate())
         if ok and name == "say" and not fixed.get("to"):
             gone = self.names.absent_named(str(fixed.get("text", "")), self.present_names(), self.me)
             if gone:
@@ -687,6 +689,11 @@ class Mind:
                 have.add(e.get("seq"))
         self.st["heard"] = keep[-int(self.cfg.get("heard_lines", 6)):]
 
+    def _rate(self) -> float | None:
+        """World seconds per real second, from the briefing's pace line ("the clock runs at 4x real time")."""
+        m = re.search(r"(\d+(?:\.\d+)?)x real time", str(self.briefing.get("pace") or ""))
+        return float(m.group(1)) if m and float(m.group(1)) > 0 else None
+
     def _voices(self) -> dict[str, list[str]]:
         """What each speaker was heard saying: every line kept, plus the lines to this seat kept before that began."""
         out = {k: list(v) for k, v in (self.st.get("voices") or {}).items()}
@@ -975,6 +982,22 @@ def _repeats(text: str, said: list[str], names: Any = ()) -> str | None:
         if len(both) >= 5 and len(both) / len(mine) >= 0.6:
             return old
     return None
+
+
+def _real_timers(r: Any, rate: float | None) -> Any:
+    """timers() gives `in` as world seconds and `when` as world time ("in about 29 minutes"); sleep counts real
+    minutes. Pip read dusk "in about 29 minutes" at 4x real time as 29 real minutes: it was about 7."""
+    if not rate or rate == 1 or not isinstance(r, list):
+        return r
+    out = []
+    for t in r:
+        if isinstance(t, dict) and isinstance(t.get("in"), (int, float)):
+            t = dict(t)
+            if isinstance(t.get("when"), str):
+                t["when"] = re.sub(r"\b(minute|hour|day)", r"world \1", t["when"])
+            t["real_minutes"] = max(1, round(t["in"] / rate / 60))
+        out.append(t)
+    return out
 
 
 _TOLD = r"(?:said|says|told (?:me|you|us|him|her|them)|tells (?:me|you|us)|reckons|swore|claims|claimed|mentioned)"
