@@ -191,7 +191,7 @@
 
   // ---------- languages ----------
   const here = document.documentElement.dataset.code;
-  const root = document.querySelector('link[rel=stylesheet][href$="site.css"]').getAttribute('href').replace('site.css', '');
+  const root = document.querySelector('link[rel=stylesheet][href*="site.css"]').getAttribute('href').split('site.css')[0];
   const pick = (code) => { try { localStorage.setItem('bh-lang', code); } catch (e) {} };
   document.getElementById('lang').addEventListener('change', (e) => {
     pick(e.target.value);

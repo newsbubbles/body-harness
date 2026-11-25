@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{@fonts}}">
-<link rel="stylesheet" href="{{@root}}site.css">
+<link rel="stylesheet" href="{{@root}}site.css?v={{@v}}">
 <link rel="icon" href="{{@root}}icon.svg" type="image/svg+xml">
 </head>
 <body class="lang-{{lang}}">
@@ -204,6 +204,6 @@ bh tell sefa "Ask Mara about the ferry before dark"</code></pre></li>
 <div id="tip" hidden></div>
 <script id="t" type="application/json">{{@chart_strings}}</script>
 <script id="langs" type="application/json">{{@lang_map}}</script>
-<script src="{{@root}}site.js"></script>
+<script src="{{@root}}site.js?v={{@v}}"></script>
 </body>
 </html>

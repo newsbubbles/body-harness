@@ -4,6 +4,7 @@
 
 English is the base: a key missing from a translation falls back to the English text. No dependencies.
 """
+import hashlib
 import html
 import json
 import re
@@ -137,9 +138,11 @@ def main():
             print(f"{code}: {len(gaps)} keys fall back to English: {', '.join(gaps[:6])}")
         texts[code] = merge(en, own)
     texts["en"] = en
+    # Pages lets browsers keep site.css/site.js for 10 minutes; a content hash in the link makes a new build load at once
+    v = hashlib.sha256(b"".join((HERE / "src" / a).read_bytes() for a in ("site.css", "site.js"))).hexdigest()[:10]
     for code, (_, path) in LANGS.items():
         t = texts[code]
-        page = render(template, t, blocks(t, code, texts))
+        page = render(template, t, {**blocks(t, code, texts), "v": v})
         left = re.findall(r"\{\{[^}]*\}\}", page)
         if left:
             raise SystemExit(f"{code}: unfilled {left[:5]}")
