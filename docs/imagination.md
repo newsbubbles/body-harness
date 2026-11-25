@@ -212,6 +212,29 @@ any two. The seats split in two. Nine ended between 88 and 241 coins; six ended 
 So the next Strongbox run gives every group the same brief except the one line that names its tool, and the
 world says that coins can go below 0.
 
+### The fourth run: one brief for all
+
+Fifteen new seats, each alone, the same brief for every group but one line naming its tool (none for the group
+with no imagination), and the world now saying that coins can go below 0:
+
+| | Coins (from 20) | Rounds won | Imaginings / searches |
+|---|---|---|---|
+| asked to imagine | 111, 122, 162, 163, 187 | 148 of 187 | 0, 0, 0, 1, 1 |
+| no imagination | -20, 39, 74, 163, 199 | 111 of 150 | |
+| `past` search | 63, 82, 137, 154, 189 | 135 of 174 | 7 to 57 a seat |
+
+- **No seat stopped.** One went to -20 coins and kept playing. Saying what the world allows fixed what the third run
+  showed.
+- **The groups do not separate.** The seats asked to imagine are ahead on average (149 coins against 91 with no
+  imagination and 125 with `past`), but among the 252 ways to split those ten seats into two fives, 12% put a gap
+  that wide on one side by chance alone. And they imagined twice in 250 turns, so the tool did not do it.
+- **Every group got better at the game.** Over all fifteen seats, rounds won went from 182 of 251 in the first half
+  of each seat's rounds to 212 of 260 in the second (72% to 82%).
+
+Four runs of the Strongbox say one thing: a cheap model asked who lies does not reach for imagination, whatever its
+brief says. It reads what villagers told it and decides. The Purse, where the question was one fighter's moves in
+numbers, is where imagining was used, and searching its own past still did better there.
+
 ## Re-living
 
 `relive()` re-lives every moment the seat lived (up to the last 40): an imagining it acted on, from the numbers it
