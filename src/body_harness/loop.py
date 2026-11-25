@@ -678,9 +678,12 @@ class Mind:
             i += 1
             if spec == self.model.spec:
                 continue
+            # the seat's provider pin names endpoints for its own model: sent with another model it matches none (Rin's
+            # first escalation to Haiku came back 404, "no endpoints found")
+            extra = {k: v for k, v in (self.cfg.get("extra") or {}).items() if k != "provider"}
             try:
                 self.model = self.rungs.get(spec) or Model.from_config(
-                    spec, {**self.cfg, "session": self.base_model.session})
+                    spec, {**self.cfg, "extra": extra, "session": self.base_model.session})
             except ModelError as e:
                 _log(self.seat.name, f"cannot escalate to {spec}: {e}")
                 continue

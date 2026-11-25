@@ -351,11 +351,13 @@ def test_escalate_hands_the_turn_to_the_next_model(monkeypatch):
     m.turns = 3
     m.model = m.base_model = Model("openrouter:a/cheap", "https://example.test", "", "a/cheap", "openrouter")
     m.rungs = {}
-    m.cfg = {"escalate": ["openrouter:a/cheap", "openrouter:b/better"]}
+    m.cfg = {"escalate": ["openrouter:a/cheap", "openrouter:b/better"],
+             "extra": {"provider": {"order": ["baidu/fp8"]}, "top_k": 5}}
     turn = {"trouble": 2}
     messages = [{"role": "assistant", "content": "", "reasoning_details": [{"x": 1}]}]
     assert m._escalate(turn, messages, "test")
     assert m.model.spec == "openrouter:b/better" and turn["escalated"] == ["openrouter:b/better"]
+    assert m.model.extra == {"top_k": 5}  # the pin is for the seat's own model: no endpoint serves the next one
     assert turn["trouble"] == 0 and "reasoning_details" not in messages[0]
     assert not m._escalate(turn, messages, "test")  # nothing above it
 
