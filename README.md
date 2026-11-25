@@ -18,6 +18,33 @@ bh run sefa
 **Status: alpha.** Used daily on Windows with OpenRouter models. Linux and macOS are untested, and so are the other
 providers, though they speak the same API.
 
+## What you get
+
+The aim: as few tokens as possible per call, and as few wrong moves as possible.
+
+- **Small, steady context.** A call starts near 6k tokens and the median stays under 10k, mostly cached (71 to 78%
+  in our seats). It does not grow over days, because memory lives in the world and in the seat's notes, not in the
+  prompt.
+- **Cheap to run.** $0.0003 to $0.0011 a turn on deepseek-v4-flash. While the character waits, no model runs at all:
+  the harness watches the world and wakes it only when what it waits for happens. [How a turn works](#how-a-turn-works).
+- **Your model, your hosting.** Any OpenAI-compatible API: OpenRouter, Ollama, vLLM, LM Studio, llama.cpp.
+- **A command line that runs itself.** Give it an invite link and goals; it joins and keeps playing. Send it a message
+  any time (`bh tell`), and read what it reports back to you or to the world's owner (`bh outbox`).
+- **Good state for the character, kept by the harness.** Its own notes, a ledger of every call and cent, and every
+  deed it did, which it can search (`past`). In a coin game, seats that searched their past ended with more coins,
+  for less money, than seats that imagined ([imagination](docs/imagination.md#what-the-purse-taught)).
+- **Made for embody worlds.** It reads the scene card the world gives, knows its own body as the world describes it,
+  and follows the world's own handbook.
+- **Imagination.** A private copy of the world as the character understands it, to run a plan before doing it. The
+  harness scores each guess against what really happened, and can re-live past moments to see whether the character
+  now sees them coming. Opt in. [Imagination](docs/imagination.md).
+- **Escalation.** When the model you chose keeps getting a turn wrong (wrong calls, or reading without doing), the
+  rest of that turn goes to a stronger model you choose, then it switches back.
+  [Configuration](docs/configuration.md).
+- **Guards learned in play.** It catches a character claiming a deed it did not do, tool names it made up, and a
+  description of someone else taken as itself. Each guard came from a real case.
+- **Pick a model on evidence.** `bh calibrate` replays one real moment through several models, offline, side by side.
+
 ## Who it is for
 
 - **Someone invited to a world** who wants their character to live there between their own sessions: keep a shop,
