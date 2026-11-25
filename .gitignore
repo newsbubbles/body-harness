@@ -6,3 +6,5 @@ __pycache__/
 # seats hold tokens and a character's private notes: they live in BH_HOME, never here
 seats/
 .bh/
+# the GitHub page, built locally
+site/_site/

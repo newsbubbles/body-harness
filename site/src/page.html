@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="{{@html_lang}}" dir="{{dir}}" data-code="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{meta.title}}</title>
+<meta name="description" content="{{meta.description}}">
+<meta property="og:title" content="{{meta.title}}">
+<meta property="og:description" content="{{meta.description}}">
+<meta property="og:type" content="website">
+<link rel="canonical" href="{{@canonical}}">
+{{@alternates}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="{{@fonts}}">
+<link rel="stylesheet" href="{{@root}}site.css">
+<link rel="icon" href="{{@root}}icon.svg" type="image/svg+xml">
+</head>
+<body class="lang-{{lang}}">
+<a class="skip" href="#main">{{nav.skip}}</a>
+<div id="suggest" class="suggest" hidden><div class="page row"><span id="suggest-text"></span><button type="button" id="suggest-close">{{suggest_close}}</button></div></div>
+<header class="top">
+  <div class="page row">
+    <a class="brand" href="{{@root}}{{@self}}">body-harness</a>
+    <nav class="links" aria-label="{{nav.sections}}">
+      <a href="#story">{{nav.story}}</a><a href="#turn">{{nav.turn}}</a><a href="#numbers">{{nav.numbers}}</a><a href="#imagination">{{nav.imagination}}</a><a href="#start">{{nav.start}}</a>
+    </nav>
+    <label class="lang-pick"><span class="sr">{{nav.languages}}</span>
+      <select id="lang" aria-label="{{nav.languages}}">{{@lang_options}}</select>
+    </label>
+  </div>
+</header>
+
+<main id="main" class="page stack" style="gap:20px">
+  <section class="hero stack">
+    <p class="eyebrow">{{hero.eyebrow}}</p>
+    <h1>{{hero.title}}</h1>
+    <p class="lede prose">{{hero.lede}}</p>
+    <div class="row cta">
+      <a class="btn primary" href="https://github.com/newsbubbles/body-harness">{{hero.cta_repo}}</a>
+      <a class="btn" href="#start">{{hero.cta_start}}</a>
+    </div>
+    <div class="stats">{{@stats}}</div>
+  </section>
+
+  <section id="story" class="stack">
+    <h2>{{story.title}}</h2>
+    <p class="prose">{{story.intro}}</p>
+    <ol class="timeline">{{@chapters}}</ol>
+  </section>
+
+  <section id="turn" class="stack">
+    <h2>{{turn.title}}</h2>
+    <p class="prose lede-s">{{turn.intro}}</p>
+    <div class="flow" role="list">
+      <div class="node" role="listitem">{{turn.flow.wake}}</div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="node" role="listitem">{{turn.flow.card}}</div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="loop" role="listitem">
+        <div class="node model">{{turn.flow.model}}</div>
+        <div class="swap" aria-hidden="true">⇅</div>
+        <div class="node">{{turn.flow.checks}}</div>
+        <div class="swap" aria-hidden="true">⇅</div>
+        <div class="node world">{{turn.flow.world}}</div>
+      </div>
+      <div class="side node" role="listitem">{{turn.flow.escalate}}</div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="node sleep" role="listitem">{{turn.flow.sleep}}</div>
+      <div class="back" aria-hidden="true">↺</div>
+    </div>
+    <h3>{{turn.guards_title}}</h3>
+    <div class="guards">{{@guards}}</div>
+  </section>
+
+  <section id="numbers" class="stack">
+    <h2>{{numbers.title}}</h2>
+    <p class="prose">{{numbers.intro}}</p>
+
+    <div class="figure">
+      <h3>{{numbers.savings.title}}</h3>
+      <p class="small muted">{{numbers.savings.caption}}</p>
+      <div class="legend" id="leg-savings"></div>
+      <div class="chart" dir="ltr" id="chart-savings" role="img" aria-label="{{numbers.savings.aria}}"></div>
+      <p class="small muted">{{numbers.savings.note}}</p>
+    </div>
+    <p class="prose">{{numbers.savings.text}}</p>
+
+    <h3 class="sub">{{numbers.models.title}}</h3>
+    <p class="prose">{{numbers.models.intro}}</p>
+    <div class="two">
+      <div class="figure">
+        <h3>{{numbers.models.slept_title}}</h3>
+        <div class="legend" id="leg-slept"></div>
+        <div class="chart" dir="ltr" id="chart-slept" role="img" aria-label="{{numbers.models.slept_aria}}"></div>
+      </div>
+      <div class="figure">
+        <h3>{{numbers.models.cost_title}}</h3>
+        <div class="chart" dir="ltr" id="chart-cost" role="img" aria-label="{{numbers.models.cost_aria}}"></div>
+        <p class="small muted">{{numbers.models.cost_note}}</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>{{@model_th}}</tr></thead>
+        <tbody id="model-rows"></tbody>
+      </table>
+    </div>
+    <p class="prose">{{numbers.models.verdict}}</p>
+
+    <h3 class="sub">{{numbers.small.title}}</h3>
+    <div class="two">
+      <div class="figure">
+        <h3>{{numbers.small.jev_h}}</h3>
+        <p class="small">{{numbers.small.jev_p}}</p>
+        <div class="chart" dir="ltr" id="chart-jev" role="img" aria-label="{{numbers.small.jev_aria}}"></div>
+        <p class="small muted">{{numbers.small.jev_note}}</p>
+      </div>
+      <div class="figure">
+        <h3>{{numbers.small.think_h}}</h3>
+        <p class="small">{{numbers.small.think_p}}</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="imagination" class="stack">
+    <h2>{{imagination.title}}</h2>
+    <p class="prose lede-s">{{imagination.lede}}</p>
+    <h3>{{imagination.steps_title}}</h3>
+    <ol class="steps prose">{{@steps}}</ol>
+    <h3>{{imagination.test_title}}</h3>
+    <p class="prose">{{imagination.test_p}}</p>
+    <pre class="code" dir="ltr"><code>def check(ctx):
+    return True
+
+def apply(ctx):
+    if ctx.rand.roll('1d20') &gt;= 10: ctx.target.state.hp -= ctx.rand.roll('1d4') + 1
+    ctx.actor.state.hp -= ctx.rand.roll('1d6') + ctx.rand.roll('1d2')</code></pre>
+    <p class="callout prose">{{imagination.result}}</p>
+    <h3>{{imagination.why_title}}</h3>
+    <p class="prose">{{imagination.why_p}}</p>
+    <p class="prose small">{{imagination.docs}}</p>
+
+    <h3 class="sub">{{ideas.title}}</h3>
+    <p class="prose muted">{{ideas.intro}}</p>
+    <div class="guards">{{@ideas}}</div>
+  </section>
+
+  <section id="claims" class="stack">
+    <h2>{{claims.title}}</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>{{@claims_th}}</tr></thead>
+        <tbody>{{@claims}}</tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="compare" class="stack">
+    <h2>{{compare.title}}</h2>
+    <p class="prose">{{compare.intro}}</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>{{@compare_th}}</tr></thead>
+        <tbody>{{@compare}}</tbody>
+      </table>
+    </div>
+    <p class="small muted">{{compare.note}}</p>
+  </section>
+
+  <section id="start" class="stack">
+    <h2>{{start.title}}</h2>
+    <p class="prose">{{start.intro}}</p>
+    <ol class="steps prose">
+      <li>{{start.s1}}<pre class="code" dir="ltr"><code>uv tool install git+https://github.com/newsbubbles/body-harness</code></pre></li>
+      <li>{{start.s2}}<pre class="code" dir="ltr"><code>bh join https://your.world/i/&lt;code&gt; --name sefa --model openrouter:deepseek/deepseek-v4-flash
+bh run sefa</code></pre></li>
+      <li>{{start.s3}}<pre class="code" dir="ltr"><code>bh status
+bh log sefa -n 5
+bh tell sefa "Ask Mara about the ferry before dark"</code></pre></li>
+    </ol>
+    <p class="prose">{{start.no_world}}</p>
+    <p class="prose callout">{{start.agents}}</p>
+  </section>
+
+  <section id="sources" class="stack">
+    <h2>{{sources.title}}</h2>
+    <ul class="small">{{@sources}}</ul>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="page stack" style="gap:8px">
+    <p>{{footer.made}}</p>
+    <p class="row small" style="gap:6px 18px"><a href="https://github.com/newsbubbles/body-harness">{{footer.repo}}</a><a href="https://github.com/newsbubbles/embody">{{footer.embody}}</a></p>
+    {{@translation_note}}
+  </div>
+</footer>
+<div id="tip" hidden></div>
+<script id="t" type="application/json">{{@chart_strings}}</script>
+<script id="langs" type="application/json">{{@lang_map}}</script>
+<script src="{{@root}}site.js"></script>
+</body>
+</html>
