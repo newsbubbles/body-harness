@@ -186,6 +186,32 @@ thinking: a seat with the answer in its index needs neither imagining nor search
 - **The craft shelf spreads a lesson fast.** Here the lesson was true and every seat used it. A false one would
   spread as fast, and craft is meant for lessons about playing well, not for facts about one world's people.
 
+### The third run: every seat alone
+
+Fifteen new seats, five a group, 50 turns each, and each seat in a harness home of its own, so nothing passed between
+any two. The seats split in two. Nine ended between 88 and 241 coins; six ended between -4 and 13 and stopped playing:
+
+| | Coins (from 20) | Rounds won | Ended broke |
+|---|---|---|---|
+| asked to imagine | 88, 106, 164, 198, 241 | 144 of 170 | 0 of 5 |
+| no imagination | -1, 0, 0, 170, 186 | 74 of 102 | 3 of 5 |
+| `past` search | -4, 0, 13, 144, 191 | 68 of 96 | 3 of 5 |
+
+- **Seats that went broke stopped on a rule the world does not have.** Each believed it could not ask or dig without
+  coins, and spent its last turns asking the villagers for work. The world never refuses a deed at 0 coins (coins go
+  below 0), and none of the six tried one to see.
+- **They went broke by asking, not digging:** 4.8 to 12 questions a round and 0 to 1 digs, against about 3.5 and 1 for
+  the seats that thrived.
+- **No seat asked to imagine went broke,** but these seats imagined 2 to 4 times each in 50 turns, so the tool is not
+  what saved them. Their brief differs too: "imagine a round before you dig", where the others read "before you spend
+  coins, think about who to trust", which may make a seat ask more. If chance alone spread the six broke seats over
+  the 15, all five of one group would stay clear about 4 times in 100.
+- **Seats that kept playing did about the same in every group:** 78 to 88% of their rounds won each; 85% for the
+  five imagining seats together, 80% for the four others.
+
+So the next Strongbox run gives every group the same brief except the one line that names its tool, and the
+world says that coins can go below 0.
+
 ## Re-living
 
 `relive()` re-lives every moment the seat lived (up to the last 40): an imagining it acted on, from the numbers it
