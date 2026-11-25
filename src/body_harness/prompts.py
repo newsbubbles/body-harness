@@ -59,15 +59,24 @@ Your tools
 
 
 def system(seat_name: str, briefing: dict[str, Any], you: dict[str, Any], skills_index: str,
-           handbook_pages: list[dict[str, Any]], extra: str = "") -> str:
+           handbook_pages: list[dict[str, Any]], extra: str = "", body: dict[str, Any] | None = None) -> str:
     st = (you or {}).get("state") or {}
     role = briefing.get("role", "mind")
     who = briefing.get("you") or you.get("name") or seat_name
     lines = [f"You are {who}, a {'character' if role == 'mind' else role + ' character'} in {briefing.get('world', 'a world')}, "
              f"a world on embody. The world's engine keeps the truth; you are this one body's mind. You play through "
              f"body-harness, as the seat '{seat_name}'.", ""]
+    # the body as the world describes it. A brief perceive sends only name and hp, so Ssareth never saw his own
+    # blue-green scales, heard a WANTED notice describe another lizardfolk fisher, and said "That's me"
+    desc = str((body or {}).get("description") or st.get("description") or "").strip()
+    kind = ", ".join(str(x) for x in ((body or {}).get("people"), (body or {}).get("cls")) if isinstance(x, str) and x)
+    if desc or kind:
+        lines += [f"Your body, in the world's own words{f' ({kind})' if kind else ''}: {desc}".rstrip(": "),
+                  "That is you. A description you hear or read of anyone else is theirs, however alike.", ""]
     if briefing.get("text"):
-        lines += ["The world: " + briefing["text"], ""]
+        # the briefing is written once: the Refuge's said "half past ten at night" all day, and Corra said so at 8 am
+        lines += ["The world: " + briefing["text"], "(Written when you joined. The day and hour on your card are now.)",
+                  ""]
     if briefing.get("pace"):
         lines += ["Pace: " + briefing["pace"], ""]
     if st.get("brief"):

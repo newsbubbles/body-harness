@@ -80,6 +80,7 @@ class Mind:
         self.registry = Registry(self)
         self.bundle: dict[str, Any] = {}
         self.briefing: dict[str, Any] = self.st.get("briefing", {})
+        self.body: dict[str, Any] = {}
         self.role = self.briefing.get("role", self.cfg.get("role", "mind"))
         self.ops: list[str] = []
         self.me = self.st.get("me", "")
@@ -139,7 +140,20 @@ class Mind:
             self.role = self.briefing.get("role", self.role)
         self.me = (j.get("you") or {}).get("id", self.me)
         self._keep_bundle(j)
+        await self._read_body()
         return j
+
+    async def _read_body(self) -> None:
+        """The body's own description, kind and class, once per join, for the system prompt (inspect leaves no trace).
+        A world that refuses it leaves the prompt as it was."""
+        if not self.me:
+            return
+        try:
+            r = await self.door.op("inspect", entity=self.me)
+        except Exception:
+            return
+        st = (r.get("state") if isinstance(r, dict) else None) or {}
+        self.body = {k: st[k] for k in ("description", "people", "cls") if isinstance(st.get(k), str) and st[k]}
 
     def _keep_bundle(self, b: dict[str, Any]) -> None:
         if not isinstance(b, dict) or "you" not in b:
@@ -728,7 +742,7 @@ class Mind:
         self.st["inbox_seen"] = time.time()
         recent = self.st.get("recent", [])[-int(self.cfg.get("recent_notes", 5)):]
         sys_text = prompts.system(self.seat.name, self.briefing, b.get("you") or {}, self.skills.index(),
-                                  self.st.get("handbook") or [], self.cfg.get("extra_prompt", ""))
+                                  self.st.get("handbook") or [], self.cfg.get("extra_prompt", ""), self.body)
         # lines said to this seat stay on its wakes for a while: a friend's correction that arrived inside one tool
         # result was otherwise gone by the next turn, and the seat's own notes carried the old plan forward
         now, cur = time.time(), {e.get("seq") for e in evs}

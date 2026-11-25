@@ -274,6 +274,19 @@ def test_to_me_reads_target_to_and_first_name():
     assert scene.to_me(say("Reeve, a word."), me, "The Reeve") is False  # titles alone never count
 
 
+def test_system_carries_the_body_and_dates_the_briefing():
+    from body_harness import prompts
+    s = prompts.system("ss", {"you": "Ssareth", "text": "It is half past ten at night."}, {"name": "Ssareth"}, "", [],
+                       "", {"description": "Blue-green scales, a scar round the left eye.", "people": "lizardfolk"})
+    assert "Your body, in the world's own words (lizardfolk): Blue-green scales" in s
+    assert "however alike" in s and "The day and hour on your card are now" in s
+    # byte-stable: the same body gives the same prompt, and no body gives no body line
+    assert s == prompts.system("ss", {"you": "Ssareth", "text": "It is half past ten at night."}, {"name": "Ssareth"},
+                               "", [], "", {"description": "Blue-green scales, a scar round the left eye.",
+                                            "people": "lizardfolk"})
+    assert "Your body" not in prompts.system("ss", {}, {"name": "S"}, "", [], "")
+
+
 def test_plan_shows_on_the_wake_and_told_asks_for_a_rewrite():
     from body_harness import prompts
     w = prompts.wake("someone spoke", "(scene)", "", "", "", ["note"], None, "Ask about the Eye job", True)
