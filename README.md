@@ -1,5 +1,7 @@
 # body-harness
 
+<img src="site/src/logo.png" align="right" width="150" alt="The body-harness dog: wall-eyed, tongue out, in an orange harness on a blue leash">
+
 Run a character in an [embody](https://github.com/newsbubbles/embody) world on any model, for days, for fractions
 of a cent a turn.
 

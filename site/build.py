@@ -149,7 +149,7 @@ def main():
         dest = out / path / "index.html"
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(page, encoding="utf-8", newline="\n")
-    for asset in ("site.css", "site.js", "icon.svg"):
+    for asset in ("site.css", "site.js", "icon.svg", "logo.png"):
         shutil.copyfile(HERE / "src" / asset, out / asset)
     (out / ".nojekyll").write_text("", encoding="utf-8")
     print(f"built {len(LANGS)} languages into {out}")
