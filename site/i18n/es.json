@@ -185,7 +185,7 @@
       "Los alumnos a los que no se les pidió imaginar en su mayoría no lo hicieron: dos nunca lo hicieron y uno lo hizo una vez en 50 turnos. Probar el movimiento real cuesta una llamada y responde con certeza."
     ],
     "relive_title": "Lo que mostró revivir",
-    "relive_p": "Revivir salió plano para los cuatro, mientras mejoraban hacia delante. Reproduce una suposición pasada sobre otro tal como se hizo, y estos alumnos hicieron su aprendizaje en sus suposiciones sobre Oren, no en sus reglas. Así que la próxima versión guarda una mente para cada personaje que juega un alumno: su propia regla para lo que Oren elige a continuación, que revivir puede volver a preguntar.",
+    "relive_p": "Revivir salió plano para los cuatro, mientras mejoraban hacia delante. La primera hipótesis fue que habían aprendido a Oren en sus probabilidades, que revivir reproduce tal como se dieron. Así que ahora un alumno puede guardar una mente para cada personaje que juega: una regla propia para lo que ese personaje elige a continuación, a la que preguntan tanto imaginar como revivir. Probado en copias de los alumnos, mostró que la hipótesis era errónea. Con las reglas propias de cada alumno, ni siquiera una mente que juega la política real de Oren movió el resultado de revivir. Con las reglas exactas del Dojo, los momentos de un alumno pasaron de 1 de 17 dentro de la banda a 12 de 17. Lo que los frenaba eran sus reglas, no sus suposiciones.",
     "why_title": "Por qué la sorpresa",
     "why_p": "La gente aprende sobre todo de lo que no esperaba, y el tamaño de ese error marca cuánto aprende: una idea antigua en psicología, de Rescorla y Wagner al procesamiento predictivo y la sorpresa bayesiana. La mayoría de los agentes califican sus propias reflexiones. Aquí las califica el mundo: el harness mide el error y el modelo solo tiene que explicarlo.",
     "docs": "Cómo activarla, y todo lo que guarda: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -209,7 +209,7 @@
       {"c": "Nada crece con los días.", "m": "El prompt con el que empieza un turno se mantuvo estable durante el día, entre unos 5000 y 7300 tokens. Un día de datos, no varios.", "v": "holds"},
       {"c": "Cualquier API compatible con OpenAI.", "m": "Solo se ha probado OpenRouter: 8 modelos de 7 empresas. Ollama, vLLM, LM Studio y llama.cpp no se han ejecutado.", "v": "partly"},
       {"c": "Funciona igual en Windows, Linux y macOS.", "m": "Hasta ahora todas las ejecuciones fueron en Windows. Las codificaciones, los finales de línea y el entrecomillado están resueltos y probados en el código, pero aún no hay ninguna ejecución en Linux ni en macOS.", "v": "untested"},
-      {"c": "Pequeño a propósito.", "m": "Unas 3800 líneas de Python, <code>httpx</code> como única dependencia en tiempo de ejecución, 28 pruebas. La imaginación es un extra opcional.", "v": "holds"}
+      {"c": "Pequeño a propósito.", "m": "Unas 4000 líneas de Python, <code>httpx</code> como única dependencia en tiempo de ejecución, 28 pruebas. La imaginación es un extra opcional.", "v": "holds"}
     ]
   },
   "compare": {

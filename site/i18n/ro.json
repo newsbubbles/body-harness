@@ -185,7 +185,7 @@
       "Elevii cărora nu li s-a cerut să imagineze în mare parte nu au făcut-o: doi niciodată, iar unul o dată în 50 de ture. Să încerci mișcarea reală costă un apel și dă un răspuns sigur."
     ],
     "relive_title": "Ce a arătat retrăirea",
-    "relive_p": "Retrăirea a ieșit plată pentru toți patru, în timp ce ei progresau mergând înainte. Ea reia o presupunere trecută despre altcineva așa cum a fost făcută, iar acești elevi și-au făcut învățarea în presupunerile despre Oren, nu în regulile lor. Așa că următoarea versiune păstrează o minte pentru fiecare personaj pe care îl joacă un elev: propria lui regulă pentru ce alege Oren mai departe, pe care retrăirea o poate întreba din nou.",
+    "relive_p": "Retrăirea a ieșit plată pentru toți patru, în timp ce ei progresau mergând înainte. Prima ipoteză a fost că învățaseră despre Oren în șansele lor, pe care retrăirea le reia așa cum au fost date. Așa că acum un elev poate păstra o minte pentru fiecare personaj pe care îl joacă: o regulă proprie pentru ce alege acesta mai departe, pe care o întreabă atât imaginarea, cât și retrăirea. Încercată pe copiile elevilor, a arătat că ipoteza era greșită. Cu regulile proprii ale fiecărui elev, nici măcar o minte care joacă politica reală a lui Oren nu a mișcat retrăirea. Cu regulile exacte ale Dojo-ului, momentele unui elev au trecut de la 1 din 17 în interiorul intervalului la 12 din 17. Regulile lor i-au ținut în loc, nu presupunerile.",
     "why_title": "De ce surpriza",
     "why_p": "Oamenii învață cel mai mult din ce nu se așteptau, iar mărimea acelei erori dictează cât de mult învață: o idee veche în psihologie, de la Rescorla și Wagner până la procesarea predictivă și surpriza bayesiană. Majoritatea agenților își notează singuri reflecțiile. Aici le notează lumea: harness-ul măsoară eroarea, iar modelul trebuie doar să o explice.",
     "docs": "Cum o pornești și tot ce păstrează: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -209,7 +209,7 @@
       {"c": "Nimic nu crește de la o zi la alta.", "m": "Promptul cu care începe o tură a rămas constant toată ziua, la aproximativ 5.000 până la 7.300 de tokeni. Date pentru o singură zi, nu pentru mai multe.", "v": "holds"},
       {"c": "Orice API compatibil cu OpenAI.", "m": "Doar OpenRouter a fost folosit efectiv: 8 modele de la 7 producători. Ollama, vLLM, LM Studio și llama.cpp nu au fost rulate încă.", "v": "partly"},
       {"c": "Rulează la fel pe Windows, Linux și macOS.", "m": "Toate rulările de până acum au fost pe Windows. Codificările, sfârșiturile de linie și ghilimelele sunt tratate și testate în cod, dar încă nu există nicio rulare pe Linux sau macOS.", "v": "untested"},
-      {"c": "Mic, intenționat.", "m": "Aproximativ 3.800 de linii de Python, <code>httpx</code> singura dependență la rulare, 28 de teste. Imaginația este un extra opțional.", "v": "holds"}
+      {"c": "Mic, intenționat.", "m": "Aproximativ 4.000 de linii de Python, <code>httpx</code> singura dependență la rulare, 28 de teste. Imaginația este un extra opțional.", "v": "holds"}
     ]
   },
   "compare": {

@@ -185,7 +185,7 @@
       "Les élèves à qui on ne demandait pas d'imaginer, pour la plupart, ne l'ont pas fait : deux jamais, et un une seule fois en 50 tours. Essayer le vrai coup coûte un appel et donne une réponse sûre."
     ],
     "relive_title": "Ce que revivre a montré",
-    "relive_p": "Revivre est resté plat pour les quatre, alors qu'ils progressaient en avançant. Cela rejoue une supposition passée sur quelqu'un d'autre telle qu'elle a été faite, et ces élèves ont appris dans leurs suppositions sur Oren, pas dans leurs règles. Alors la prochaine version garde un esprit pour chaque personnage qu'un élève joue : sa propre règle pour ce qu'Oren choisit ensuite, que revivre peut interroger à nouveau.",
+    "relive_p": "Revivre est resté plat pour les quatre, alors qu'ils progressaient en avançant. La première hypothèse était qu'ils avaient appris Oren dans leurs probabilités, que revivre rejoue telles qu'elles ont été données. Alors un élève peut maintenant garder un esprit pour chaque personnage qu'il joue : une règle à lui pour ce que ce personnage choisit ensuite, que l'imagination et revivre interrogent tous les deux. Un essai sur des copies des élèves a montré que l'hypothèse était fausse. Avec les règles propres à chaque élève, même un esprit qui joue la vraie politique d'Oren n'a pas fait bouger revivre. Avec les règles exactes du Dojo, les moments d'un élève sont passés de 1 sur 17 dans la fourchette à 12 sur 17. Ce sont leurs règles qui les freinaient, pas leurs suppositions.",
     "why_title": "Pourquoi la surprise",
     "why_p": "Les gens apprennent surtout de ce à quoi ils ne s'attendaient pas, et la taille de cette erreur détermine combien ils apprennent : une vieille idée en psychologie, de Rescorla et Wagner jusqu'au traitement prédictif et à la surprise bayésienne. La plupart des agents notent leurs propres réflexions. Ici, c'est le monde qui les note : le harness mesure l'erreur, et le modèle n'a plus qu'à l'expliquer.",
     "docs": "Comment l'activer, et tout ce qu'elle conserve : <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -209,7 +209,7 @@
       {"c": "Rien ne grossit d'un jour à l'autre.", "m": "Le prompt de début de tour est resté stable toute la journée, autour de 5 000 à 7 300 tokens. Une journée de données, pas plusieurs.", "v": "holds"},
       {"c": "N'importe quelle API compatible OpenAI.", "m": "Seul OpenRouter a été utilisé : 8 modèles de 7 éditeurs. Ollama, vLLM, LM Studio et llama.cpp n'ont pas été testés.", "v": "partly"},
       {"c": "Fonctionne de la même façon sous Windows, Linux et macOS.", "m": "Tous les essais jusqu'ici ont tourné sous Windows. Les encodages, les fins de ligne et les guillemets sont gérés et testés dans le code, mais il n'y a encore eu aucun essai sous Linux ni macOS.", "v": "untested"},
-      {"c": "Petit, et c'est voulu.", "m": "Environ 3 800 lignes de Python, <code>httpx</code> comme seule dépendance d'exécution, 28 tests. L'imagination est un extra optionnel.", "v": "holds"}
+      {"c": "Petit, et c'est voulu.", "m": "Environ 4 000 lignes de Python, <code>httpx</code> comme seule dépendance d'exécution, 28 tests. L'imagination est un extra optionnel.", "v": "holds"}
     ]
   },
   "compare": {

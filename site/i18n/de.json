@@ -185,7 +185,7 @@
       "Schüler, die nicht zum Vorstellen aufgefordert wurden, taten es meistens nicht: zwei nie, und einer einmal in 50 Zügen. Die echte Technik auszuprobieren kostet einen Aufruf und gibt eine sichere Antwort."
     ],
     "relive_title": "Was das Wiedererleben zeigte",
-    "relive_p": "Das Wiedererleben blieb bei allen vier flach, während sie nach vorn besser wurden. Es spielt eine frühere Vermutung über jemand anderen so ab, wie sie gemacht wurde, und diese Schüler lernten in ihren Vermutungen über Oren, nicht in ihren Regeln. Deshalb behält der nächste Build einen eigenen Geist für jede Figur, die ein Schüler spielt: ihre eigene Regel dafür, was Oren als Nächstes wählt, die das Wiedererleben erneut fragen kann.",
+    "relive_p": "Das Wiedererleben blieb bei allen vier flach, während sie nach vorn besser wurden. Die erste Hypothese war, dass sie Oren in ihren Wahrscheinlichkeiten gelernt hatten, die das Wiedererleben so abspielt, wie sie gegeben wurden. Deshalb kann ein Schüler jetzt einen eigenen Geist für jede Figur behalten, die er spielt: eine eigene Regel dafür, was sie als Nächstes wählt, die sowohl die Vorstellung als auch das Wiedererleben fragen. Ein Versuch an Kopien der Schüler zeigte, dass die Hypothese falsch war. Mit den eigenen Regeln jedes Schülers bewegte nicht einmal ein Geist, der Orens echte Strategie spielt, das Wiedererleben. Mit den genauen Regeln des Dojo stiegen die Momente eines Schülers von 1 von 17 im Band auf 12 von 17. Ihre Regeln hielten sie zurück, nicht ihre Vermutungen.",
     "why_title": "Warum Überraschung",
     "why_p": "Menschen lernen am meisten aus dem, was sie nicht erwartet haben, und die Größe dieses Fehlers bestimmt, wie viel sie lernen: eine alte Idee der Psychologie, von Rescorla und Wagner bis zu Predictive Processing und Bayesscher Überraschung. Die meisten Agenten benoten ihre eigenen Reflexionen. Hier benotet die Welt sie: Das Harness misst den Fehler, und das Modell muss ihn nur erklären.",
     "docs": "Wie du es einschaltest, und alles, was es speichert: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -209,7 +209,7 @@
       {"c": "Über Tage wächst nichts an.", "m": "Der Prompt, mit dem ein Zug beginnt, blieb über den Tag konstant, bei etwa 5.000 bis 7.300 Tokens. Daten von einem Tag, nicht von mehreren.", "v": "holds"},
       {"c": "Jede OpenAI-kompatible API.", "m": "Erprobt wurde bisher nur OpenRouter: 8 Modelle von 7 Herstellern. Ollama, vLLM, LM Studio und llama.cpp liefen noch nicht.", "v": "partly"},
       {"c": "Läuft gleich unter Windows, Linux und macOS.", "m": "Bisher lief alles unter Windows. Kodierungen, Zeilenenden und Quoting sind im Code behandelt und getestet, aber es gab noch keinen Lauf unter Linux oder macOS.", "v": "untested"},
-      {"c": "Absichtlich klein.", "m": "Etwa 3.800 Zeilen Python, <code>httpx</code> als einzige Laufzeitabhängigkeit, 28 Tests. Vorstellungskraft ist ein optionales Extra.", "v": "holds"}
+      {"c": "Absichtlich klein.", "m": "Etwa 4.000 Zeilen Python, <code>httpx</code> als einzige Laufzeitabhängigkeit, 28 Tests. Vorstellungskraft ist ein optionales Extra.", "v": "holds"}
     ]
   },
   "compare": {

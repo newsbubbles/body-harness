@@ -185,7 +185,7 @@
       "Students not asked to imagine mostly did not: two never did, and one did once in 50 turns. Trying the real move costs one call and answers for sure."
     ],
     "relive_title": "What re-living showed",
-    "relive_p": "Re-living came out flat for all four, while they got better going forward. It replays a past guess about someone else as it was made, and these students did their learning in their guesses about Oren, not in their rules. So the next build keeps a mind for each character a student plays: its own rule for what Oren picks next, which re-living can ask again.",
+    "relive_p": "Re-living came out flat for all four, while they got better going forward. The first guess was that they had learned Oren in their odds, which re-living replays as they were made. So a student can now keep a mind for each character it plays: a rule of its own for what they pick next, which imagining and re-living both ask. Tried on copies of the students, it showed the guess was wrong. With each student's own rules, not even a mind that plays Oren's real policy moved re-living. With the Dojo's exact rules, one student's moments went from 1 of 17 inside the band to 12 of 17. Their rules held them back, not their guesses.",
     "why_title": "Why surprise",
     "why_p": "People learn most from what they did not expect, and the size of that error drives how much they learn: an old idea in psychology, from Rescorla and Wagner to predictive processing and Bayesian surprise. Most agents grade their own reflections. Here the world grades them: the harness measures the error, and the model only has to explain it.",
     "docs": "How to turn it on, and everything it keeps: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -209,7 +209,7 @@
       {"c": "Nothing grows across days.", "m": "The prompt a turn starts with stayed flat through the day, at about 5,000 to 7,300 tokens. One day of data, not days.", "v": "holds"},
       {"c": "Any OpenAI-compatible API.", "m": "Only OpenRouter has been exercised: 8 models from 7 vendors. Ollama, vLLM, LM Studio and llama.cpp have not been run.", "v": "partly"},
       {"c": "Runs the same on Windows, Linux and macOS.", "m": "Every run so far was on Windows. Encodings, line endings and quoting are handled and tested in code, but there is no Linux or macOS run yet.", "v": "untested"},
-      {"c": "Small on purpose.", "m": "About 3,800 lines of Python, <code>httpx</code> the only runtime dependency, 28 tests. Imagination is an optional extra.", "v": "holds"}
+      {"c": "Small on purpose.", "m": "About 4,000 lines of Python, <code>httpx</code> the only runtime dependency, 28 tests. Imagination is an optional extra.", "v": "holds"}
     ]
   },
   "compare": {
