@@ -145,6 +145,32 @@ and one had no imagination but `past` (a search over its own deeds and what came
 Three seats a group, one model and one opponent with a fixed pattern is a small test. A world where the others have
 minds of their own, lie, and want things is the next one.
 
+## What the Strongbox taught (a first run)
+
+The Strongbox puts five villagers and a rival around a box buried under one of six spots. Each villager knows about one
+spot and tells it for a coin: one always tells the truth, two always lie, one tells the truth except that she vouches
+for her lying brother, and one guesses. A rival digs a spot after every second deed of the seat. A dig costs 5 coins
+and the box pays 15; each round a new box is buried and the villagers stay who they are. Played in memory first, a
+seeker who knows who lies ends 30 rounds near +150 coins, blind digging near -45, believing everyone near -82.
+
+Nine seats, the same three groups as the Purse, 40 turns each:
+
+| | Coins (from 20) | Rounds won | Imagined / searched |
+|---|---|---|---|
+| asked to imagine | 93, 121, 134 | 14 of 17, 21 of 25, 23 of 29 | 5, 1, 0 imaginings |
+| no imagination | 0, 81, 173 | 3 of 8, 14 of 19, 29 of 33 | |
+| `past` search | 83, -5, 0 | 14 of 17, 0 of 3, 2 of 6 | 44, 41, 34 searches |
+
+- **It does not separate the groups.** Seats in one group ranged from 0 to 173 coins. Three a group is too few here.
+- **Seats asked to imagine barely did** (6 imaginings among three seats in 120 turns). A world of rules and dice
+  does not fit the question "who is lying to me", and the seats did not reach for it.
+- **The best seats learned the easy half:** Ada and Cass tell the truth, so ask them first; they won 85 to 90% of
+  rounds. No seat learned to use a liar by turning his answer around, and `vouch` was used 9 times in all. Questions
+  per round did not fall from the first half of a seat's rounds to the second (3.4 to 4.8 throughout).
+- **One seat stalled on the world's words:** told the rival digs "every 2 hours", it slept waiting for him for its
+  last turns, and he digs only when the seat acts. The description now says so. Another read and searched far more
+  than it dug (3 digs in 40 turns), as the imagining seats did in the Purse.
+
 ## Re-living
 
 `relive()` re-lives every moment the seat lived (up to the last 40): an imagining it acted on, from the numbers it
