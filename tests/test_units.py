@@ -433,6 +433,24 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert branch["ok"] and "1 of your 2 real steps" in branch["replayed"] and "Ssareth.hp" in branch["came_out"]
     assert im.relive({"id": "nope"}, "Ssareth")["ok"] is False
     assert not im.relive({"id": r["id"], "instead": [{"verb": "fly"}]}, "Ssareth")["ok"]  # no rule for it now
+    # the seat plays the others: a guess of what someone else does, as odds drawn each trial, and a choice made at
+    # the same moment as its own, read by its rule from ctx.params (Rin could only guess what Oren would pick)
+    im.spec["open"] = []
+    im._write({"guard": "ctx.actor.state.stance = 1", "rest": "ctx.actor.state.stance = 0",
+               "strike": "if ctx.params.his == 'guard': ctx.actor.state.hp -= 3\n"
+                         "if ctx.params.his == 'throw': ctx.target.state.hp -= 3\n"
+                         "if ctx.target.state.stance == 1: ctx.actor.state.hp -= 1"}, None, "Ssareth", {})
+    guess = im.imagine({"plan": [{"actor": "Marlo", "verb": {"guard": 1, "rest": 1}},
+                                 {"verb": "strike", "target": "Marlo", "odds": {"his": {"guard": 3, "throw": 1}}}]},
+                       card, "Ssareth", 5)
+    assert guess["ok"] and guess["trials"] == 50
+    drew = guess["your_guesses_drawn"]
+    assert drew["his=guard"] > drew["his=throw"] > 0 and drew["Marlo guard"] + drew["Marlo rest"] == guess["trials"]
+    assert len(guess["came_out"]["Ssareth.hp"]["counts"]) >= 3  # 12, 11, 9 and 8: every mix of the two guesses
+    gr = im.records()[guess["id"]]
+    assert gr["domain"] == "strike" and gr["first"]["verb"] == "strike"  # bound by the seat's own deed
+    assert im.bind("strike", "Marlo") == guess["id"]
+    assert im.imagine({"plan": [{"verb": {"guard": 1, "strike": 1}}]}, card, "Ssareth", 5)["ok"] is False
     assert imagine.surprise([5] * 20, 5) == (0.0, True)
     # the shape cheap models send: bodies with no def lines; a check given as one condition returns it
     src, _ = imagine.rule_source({"check": "ctx.actor.state.hp > 4", "apply": "ctx.target.state.hp -= 2"})

@@ -145,7 +145,12 @@ IMAGINE = fn("imagine", "Try a plan in your imagination before you do it: a priv
                         "imports; dice from ctx.rand.roll). setup= {name: "
                         "{hp, ac, atk, gold...}}: what you believe of someone. You are 'me', from your real card. "
                         "Both are kept for next time. plan= steps [{actor, verb, target}], played in order `rounds` "
-                        "times, until a check says no. It answers how things came out over the trials. When you then "
+                        "times, until a check says no. This world is yours: anyone in it does what you say, so a "
+                        "step for someone else is your guess of what they would do. Unsure, give odds, drawn afresh "
+                        "each trial: {actor: 'Oren', verb: {'guard': 3, 'strike': 1}}; or, when both choose at "
+                        "once, a choice inside your own step: {verb: 'strike', target: 'Oren', odds: {'his': "
+                        "{'guard': 3, 'throw': 1}}}, which your rule reads as ctx.params.his. It answers how things "
+                        "came out over the trials. When you then "
                         "really do the plan's first step, the harness compares what happens with what you imagined "
                         "and tells you how surprised to be. With nothing given, it shows your rules and beliefs (and "
                         "a starter).",

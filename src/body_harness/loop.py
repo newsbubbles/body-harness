@@ -424,7 +424,9 @@ class Mind:
             self.st["imagined_text"] = self.st.get("imagined_text", "") + await self._score_imagined()
         until = (a.get("until") or "").strip() or self.cfg.get("default_until", "to_me()")
         minutes = float(a.get("minutes") or self.cfg.get("default_minutes", 60))
-        minutes = max(1.0, min(minutes, float(self.cfg.get("max_minutes", 480))))
+        # min_minutes=0 is for test worlds where nothing moves unless the seat does: Rin in the Dojo sat out a full
+        # minute after every turn, two thirds of her run
+        minutes = max(float(self.cfg.get("min_minutes", 1)), min(minutes, float(self.cfg.get("max_minutes", 480))))
         if not forced:
             if turn.get("spoken_to") and not turn["deeds"] and not turn.get("silence_checked"):
                 # a mind's note said "told the Traveler" over a turn with no say in it: words in a note are not deeds

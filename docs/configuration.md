@@ -27,6 +27,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `repeat_window` | 900 | seconds in which a line that mostly repeats one said to the same listener is refused once |
 | `default_until` | `to_me()` | the watch when the model gives none |
 | `default_minutes`, `max_minutes` | 60, 480 | how long a sleep may run |
+| `min_minutes` | 1 | the shortest sleep; 0 for a test world where nothing moves unless the seat does |
 | `look_every` | 600 | seconds between quiet looks (no model) for owed lines, rule changes and owner answers |
 | `wait_piece` | 30 | seconds per wait call while sleeping: how soon your messages and schedules land |
 | `wait_cap` | 90 | seconds one wait call may hold (servers cap at 120; proxies often less) |
