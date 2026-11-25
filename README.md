@@ -189,6 +189,7 @@ bh service add|remove N                    keep a seat running, restarted when i
 bh service status | run | stop             what the supervisor keeps; run it; stop it and its seats
 bh service install | uninstall             Windows: a scheduled task that starts the supervisor at logon
 bh config N key=value ...                  show or set a seat's settings
+bh past-import N                           read the body's deeds from before this seat into `past`
 bh calibrate N --models a,b | --sets F.toml [--set S] [--cfg L:k=v] [--runs 2] [--wake -1] [--json]
                                            replay one of the seat's saved wakes through each model,
                                            offline, and score them side by side

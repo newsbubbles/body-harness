@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -92,7 +93,8 @@ def line(m: dict[str, Any]) -> str:
     head = f"#{m['n']} t{m.get('turn')} {m['verb']}" + (f" {m['target']}" if m.get("target") else "")
     if m.get("text"):
         head += f" \"{m['text'][:80]}\""
-    rest = [f"{k}={v}" for k, v in m.items() if k not in SHOWN and k not in ("ts", "ok", "happened", "refused")]
+    rest = [f"{k}={v}" for k, v in m.items() if k not in SHOWN and k not in ("ts", "ok", "happened", "refused",
+                                                                            "seq", "from")]
     if not m["ok"]:
         rest.append(f"REFUSED: {m.get('refused', '')}")
     return head + (" -> " + " ".join(rest) if rest else "")
@@ -124,7 +126,7 @@ def search(moments: list[dict[str, Any]], verb: str = "", where: dict[str, Any] 
         return ("You have done nothing yet that past() can read: it reads your own deeds (act, say) and what came "
                 "of each. Act first.")
     pool = moments[-last:] if last and last > 0 else moments
-    fields = sorted({k for m in pool for k in m if k not in ("ts",)})
+    fields = sorted({k for m in pool for k in m if k not in ("ts", "seq")})
     where = dict(where or {})
     for k in where:
         if k not in fields:
@@ -197,9 +199,98 @@ def search(moments: list[dict[str, Any]], verb: str = "", where: dict[str, Any] 
     return "\n".join(out)
 
 
+WORLD_FILE = "past_world.json"
+PAGE, MAX_PAGES = 500, 200
+
+
+def world_deeds(events: list[dict[str, Any]], me: str, names: dict[str, str]) -> list[dict[str, Any]]:
+    """The body's own deeds from the world's history, in the shape deeds() gives, with what each caused: what a body
+    did before this harness ran it. A body that lived weeks in a world before it got a seat would otherwise start with
+    an empty past."""
+    out, by_seq = [], {}
+    for e in sorted(events, key=lambda e: e.get("seq") or 0):
+        kind, p = e.get("kind"), e.get("payload") or {}
+        if e.get("actor") == me and kind in ("act", "say"):
+            t = float(e.get("t") or 0)
+            tgt = str(p.get("target") or e.get("target") or "")
+            m: dict[str, Any] = {"n": 0, "turn": f"d{int(t // 86400) + 1}", "seq": e.get("seq"),
+                                 "verb": str(p.get("verb") or "") if kind == "act" else "say",
+                                 "target": names.get(tgt, tgt), "ok": True, "from": "world"}
+            if kind == "say":
+                m["text"] = str(p.get("text") or "")[:200]
+            for k, v in (p.get("params") or {}).items():
+                if isinstance(v, (str, int, float, bool)):
+                    m["param." + str(k)] = v
+            out.append(m)
+            by_seq[e.get("seq")] = m
+        elif e.get("caused_by") in by_seq and kind not in ("act", "say"):
+            m = by_seq[e["caused_by"]]
+            bits = [f"{k}={v}" for k, v in p.items() if isinstance(v, (str, int, float, bool)) and k != "target"]
+            h = f"{kind}" + (f" ({', '.join(bits)[:120]})" if bits else "")
+            m["happened"] = (m.get("happened", "") + " | " + h).strip(" |")[:300]
+            m.setdefault("outcome", kind)
+    return out
+
+
+async def import_world(door: Any, me: str, names: dict[str, str], seat_dir: Path) -> str:
+    """Page through history(touching=me) and keep the body's own deeds in past_world.json. Run again, it starts over:
+    the world's log is the source, the file a copy. Deeds the seat logs after the import come from calls.jsonl."""
+    events, since, pages = [], 0, 0
+    while pages < MAX_PAGES:
+        r = await door.op("history", since=since, touching=me, limit=PAGE)
+        if isinstance(r, dict):
+            if r.get("ok") is False:
+                return f"the world refused history: {r.get('reason')}"
+            r = r.get("events") or r.get("result") or []
+        if not isinstance(r, list) or not r:
+            break
+        events += [e for e in r if isinstance(e, dict)]
+        top = max(int(e.get("seq") or 0) for e in r if isinstance(e, dict))
+        if top <= since:
+            break
+        since, pages = top, pages + 1  # a short page is not the end: the engine's own kinds are skipped in it
+    moments = world_deeds(events, me, names)
+    (seat_dir / WORLD_FILE).write_text(json.dumps({"at": time.time(), "until": since, "events": len(events),
+                                                   "moments": moments}), encoding="utf-8")
+    more = " (stopped at the page limit: older deeds are in)" if pages >= MAX_PAGES else ""
+    return f"{len(moments)} deeds from {len(events)} events in the world's history, up to seq {since}{more}"
+
+
+def moments(p: Path) -> list[dict[str, Any]]:
+    """Every deed past() searches: the world's copy of what the body did before (past_world.json), then the seat's own
+    log of what it did after that copy was made."""
+    w = p.with_name(WORLD_FILE)
+    old, at = [], 0.0
+    if w.exists():
+        try:
+            d = json.loads(w.read_text(encoding="utf-8"))
+            old, at = list(d.get("moments") or []), float(d.get("at") or 0)
+        except (OSError, ValueError):
+            pass
+    new = deeds(calls(p))
+    # where the seat's own log begins inside the world's copy: its first line said, found word for word there, less
+    # the deeds the world logged before it (refusals are never in the world's log)
+    cut, k = None, 0
+    for m in new:
+        if m["verb"] == "say" and m.get("text"):
+            i = next((i for i, w in enumerate(old) if w.get("verb") == "say" and w.get("text") == m["text"]), None)
+            if i is not None:
+                cut = max(0, i - k)
+            break
+        k += 1 if m["ok"] else 0
+    if cut is not None:
+        old = old[:cut]
+    elif old:
+        new = [m for m in new if (m.get("ts") or 0) > at]
+    out = old + new
+    for i, m in enumerate(out, 1):
+        m["n"] = i
+    return out
+
+
 def past(p: Path, args: dict[str, Any]) -> str:
     try:
-        return search(deeds(calls(p)), verb=str(args.get("verb") or ""), where=args.get("where") or None,
+        return search(moments(p), verb=str(args.get("verb") or ""), where=args.get("where") or None,
                       match=str(args.get("match") or ""), seq=args.get("seq") or None,
                       before=args.get("before") or 0, after=args.get("after") or 0, count=args.get("count"),
                       limit=args.get("limit") or LIMIT, last=args.get("last") or 0)

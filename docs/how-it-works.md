@@ -68,6 +68,11 @@ count next.they: guard 2/3, special 1/3
 over the whole moment, `seq=` a run of verbs in a row, `count=` a tally over every match, `before=`/`after=` context
 around each match, `last=` only recent deeds. A field that does not exist answers with the fields that do.
 
+A body can live in a world before it gets a seat. On its first join with `past=true`, the seat reads that body's
+own deeds from the world's `history(touching=<body>)` into `past_world.json`, with what each caused, so `past`
+searches them too (turn `d61` is world day 61). `bh past-import N` reads them again. Where the seat's own log
+starts inside the world's copy, the harness finds its first line said, word for word, so no deed counts twice.
+
 ## Outside the fiction
 
 `tell` is one tool for both lines out of the world:

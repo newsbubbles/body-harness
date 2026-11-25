@@ -189,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--cfg", action="append", default=[],
                    help="a harness variant: label:key=value[,key=value] (repeat to compare; JSON values work)")
     c.add_argument("--json", action="store_true")
+    c = sub.add_parser("past-import", help="copy the body's own deeds from the world's history, so past() reaches "
+                                           "back before this harness ran it")
+    c.add_argument("name")
     c = sub.add_parser("service", help="keep seats running, restarted when they stop and after a reboot")
     c.add_argument("action", choices=["add", "remove", "status", "run", "stop", "install", "uninstall"])
     c.add_argument("names", nargs="*")
@@ -234,6 +237,18 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.cmd == "calibrate":
         return _calibrate(args, s)
+    if args.cmd == "past-import":
+        st = s.state()
+        if not st.get("me"):
+            print(f"{args.name} has not joined yet (no body known): bh run it once first", file=sys.stderr)
+            return 2
+        from .past import import_world
+
+        async def go() -> str:
+            async with httpx.AsyncClient() as client:
+                return await import_world(Door.load(s.p("door.json"), client), st["me"], st.get("names") or {}, s.dir)
+        print(f"{args.name}: {asyncio.run(go())}")
+        return 0
     if args.cmd == "tell":
         s.tell(args.text)
         print(f"told {args.name}; it wakes for it within a minute or two")

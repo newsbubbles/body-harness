@@ -189,6 +189,13 @@ class Mind:
                                   [p for p in (hb.get("pages") or []) if isinstance(p, dict)]
         except DoorError:
             pass
+        if self.cfg.get("past") and self.me and not self.seat.p(past.WORLD_FILE).exists():
+            # a body that lived before this harness ran it keeps its deeds searchable: the world's log is the source
+            try:
+                _log(self.seat.name, "past: " + await past.import_world(self.door, self.me, self.names.by_id,
+                                                                        self.seat.dir))
+            except (DoorError, OSError, ValueError) as e:
+                _log(self.seat.name, f"past: could not read the world's history ({e}); bh past-import tries again")
         self.save()
 
     # ---------- tools ----------

@@ -573,3 +573,27 @@ def test_timers_say_real_minutes():
     assert t[0]["real_minutes"] == 7 and t[0]["when"] == "in about 29 world minutes"
     assert t[1]["real_minutes"] == 187 and "world hours" in t[1]["when"]
     assert _real_timers([{"in": 60}], None) == [{"in": 60}]
+
+
+def test_past_reaches_back_through_the_world(tmp_path: Path):
+    from body_harness.past import WORLD_FILE, moments, search, world_deeds
+    # a body's deeds from before the harness ran it, as the world's history gives them
+    evs = [{"seq": 10, "t": 90000, "kind": "act", "actor": "e84", "target": "e812",
+            "payload": {"verb": "read", "target": "e812", "params": {}}},
+           {"seq": 11, "t": 90000, "kind": "read", "actor": "e84", "target": "e812", "caused_by": 10,
+            "payload": {"text": "fifty-eight hollow bodies"}},
+           {"seq": 12, "t": 90100, "kind": "say", "actor": "e23", "payload": {"text": "not mine"}},
+           {"seq": 13, "t": 90200, "kind": "say", "actor": "e84", "target": "e23",
+            "payload": {"text": "Captain, the glass was written on", "target": "e23"}}]
+    w = world_deeds(evs, "e84", {"e812": "casting glass", "e23": "the captain"})
+    assert [m["verb"] for m in w] == ["read", "say"] and w[0]["target"] == "casting glass"
+    assert w[0]["outcome"] == "read" and "fifty-eight" in w[0]["happened"] and w[0]["turn"] == "d2"
+    (tmp_path / WORLD_FILE).write_text(json.dumps({"at": 1000.0, "moments": w}), encoding="utf-8")
+    calls = tmp_path / "calls.jsonl"
+    calls.write_text("\n".join(json.dumps(r) for r in [
+        {"ts": 900.0, "turn": 1, "tool": "say", "args": {"text": "old, already in the world copy"}, "out": "{}"},
+        {"ts": 1100.0, "turn": 2, "tool": "act", "args": {"verb": "drink", "target": "cask"}, "out": '{"ok": true}'},
+    ]) + "\n", encoding="utf-8")
+    ms = moments(calls)
+    assert [m["verb"] for m in ms] == ["read", "say", "drink"] and [m["n"] for m in ms] == [1, 2, 3]
+    assert "1 of your 3 deeds" in search(ms, match="hollow")
