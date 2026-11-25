@@ -137,6 +137,11 @@ def apply(ctx):
     if ctx.rand.roll('1d20') &gt;= 10: ctx.target.state.hp -= ctx.rand.roll('1d4') + 1
     ctx.actor.state.hp -= ctx.rand.roll('1d6') + ctx.rand.roll('1d2')</code></pre>
     <p class="callout prose">{{imagination.result}}</p>
+    <h3>{{imagination.dojo_title}}</h3>
+    <p class="prose">{{imagination.dojo_p}}</p>
+    <ul class="prose">{{@dojo}}</ul>
+    <h3>{{imagination.relive_title}}</h3>
+    <p class="prose">{{imagination.relive_p}}</p>
     <h3>{{imagination.why_title}}</h3>
     <p class="prose">{{imagination.why_p}}</p>
     <p class="prose small">{{imagination.docs}}</p>

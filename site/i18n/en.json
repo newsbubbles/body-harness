@@ -74,6 +74,13 @@
         "body": [
           "The last idea of the day was the biggest: give each character a private embody world of its own, to imagine in. It writes the rules as it believes them, plays a plan forty times, and then the harness compares what it imagined with what really happened. The difference, measured as surprise, is what it learns from. It was built and tested that night (see <a href=\"#imagination\">imagination</a>)."
         ]
+      },
+      {
+        "when": "The next day",
+        "title": "No dice",
+        "body": [
+          "Dice made every lesson noisy, so the next test world was a dojo with fighting-game rules and no dice at all. The characters learned to play their master with odds, and a new tool let them live their past again through what they know now. It showed where their learning really was (see <a href=\"#imagination\">imagination</a>)."
+        ]
       }
     ]
   },
@@ -159,13 +166,26 @@
       "<b>Rules as it believes them.</b> The character writes each verb's rule as a small embody script: when it can happen, and what happens. Dice are the world's own.",
       "<b>Beliefs about people.</b> Numbers it believes of others. Anything its scene card shows wins over belief.",
       "<b>A spread, not a story.</b> The plan plays out 40 times, each with a new seed. The answer is how every number came out: the 10 to 90% band and how the plans ended.",
-      "<b>The harness binds it.</b> When the character really does the first step, that imagining becomes a prediction.",
+      "<b>It plays everyone else.</b> The imagined world is the character's own, so the others do what it says. When it does not know what someone will do, it gives odds (guard 3, strike 1), and each trial draws one.",
+      "<b>The harness binds it.</b> When the character really does its own first step, that imagining becomes a prediction.",
       "<b>The harness scores it.</b> When the plan's run ends, the harness reads the real numbers and scores each as surprise in bits. The model never grades itself.",
-      "<b>Reflection.</b> A big surprise goes back to the character with the rules it used. It decides what was wrong (a rule, a belief, or luck), fixes its world, and keeps the lesson."
+      "<b>Reflection.</b> A big surprise goes back to the character with the rules it used. It decides what was wrong (a rule, a belief, or luck), fixes its world, and keeps the lesson.",
+      "<b>Re-living.</b> It can play its past again, from the numbers it saw then and its deeds as it did them, through the rules and beliefs it holds now, and see how many of those moments it would now see coming."
     ],
     "test_title": "The first live test",
     "test_p": "A character on deepseek-v4-flash sparred, in a small test world, with a partner who was secretly much stronger than it had been told. It broke its own imagination six ways: it copied the starter's verb name instead of its own, asked for 3 trials, wrote rules in shapes the harness could not read, kept a rule that crashed, rested before the result was read, and had later spars bind older imaginings. Each became a fix. After them, it wrote this rule from what it had felt:",
     "result": "Imagined: 16 to 21 hit points left. Real: 18. Surprise: 0.14 bits, inside the band. Its own note: \"In line with imagination.\"",
+    "dojo_title": "The Dojo: no dice",
+    "dojo_p": "Dice put a noise floor under every surprise: a character cannot tell a wrong belief from a bad roll in a few tries. So the next test world had none. The Dojo is a sparring floor run like a fighting game: strike, throw, guard and a special move, each beating some and losing to others, with a cooldown on the special. The master, Oren, picks by a fixed policy the students are not told, and his damage numbers are secret. Four students on deepseek-v4-flash, 50 turns each, each on its own floor:",
+    "dojo": [
+      "They imagined 197 times, and 182 of those gave odds for Oren's next move rather than one guess.",
+      "Both fighters' hit points came out inside the imagined 80% band 77 times of 130 in the first half of each student's scored moments, and 92 of 129 in the second. Three of the four improved; one got worse.",
+      "50 of their 59 verdicts blamed a belief, 7 a rule, 2 luck. In the first 50-turn test, every verdict had blamed a rule.",
+      "One student found three of Oren's four secret damage numbers exactly. None found the special's.",
+      "Students not asked to imagine mostly did not: two never did, and one did once in 50 turns. Trying the real move costs one call and answers for sure."
+    ],
+    "relive_title": "What re-living showed",
+    "relive_p": "Re-living came out flat for all four, while they got better going forward. It replays a past guess about someone else as it was made, and these students did their learning in their guesses about Oren, not in their rules. So the next build keeps a mind for each character a student plays: its own rule for what Oren picks next, which re-living can ask again.",
     "why_title": "Why surprise",
     "why_p": "People learn most from what they did not expect, and the size of that error drives how much they learn: an old idea in psychology, from Rescorla and Wagner to predictive processing and Bayesian surprise. Most agents grade their own reflections. Here the world grades them: the harness measures the error, and the model only has to explain it.",
     "docs": "How to turn it on, and everything it keeps: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -174,7 +194,6 @@
     "title": "Ideas on the table",
     "intro": "Not built. Written down so they are not lost.",
     "items": [
-      {"h": "Re-live", "p": "An embody world is a build plus a history of events. A character could replay its own past from where it stood, and at a chosen moment let the replay turn into imagination: what if I had said no?"},
       {"h": "Dreams", "p": "Mix replays of related memories, the way sleep is thought to replay the day. In a world with no sleep, call it daydreaming."},
       {"h": "Reflexes", "p": "A short list of rules the character writes for itself, checked by the harness while it sleeps, so small things get handled without waking the mind."},
       {"h": "Training data", "p": "Every turn is logged with what it saw, did and cost. With the consent of the people in the world, that could train small, cheap NPC models."}
@@ -190,7 +209,7 @@
       {"c": "Nothing grows across days.", "m": "The prompt a turn starts with stayed flat through the day, at about 5,000 to 7,300 tokens. One day of data, not days.", "v": "holds"},
       {"c": "Any OpenAI-compatible API.", "m": "Only OpenRouter has been exercised: 8 models from 7 vendors. Ollama, vLLM, LM Studio and llama.cpp have not been run.", "v": "partly"},
       {"c": "Runs the same on Windows, Linux and macOS.", "m": "Every run so far was on Windows. Encodings, line endings and quoting are handled and tested in code, but there is no Linux or macOS run yet.", "v": "untested"},
-      {"c": "Small on purpose.", "m": "About 3,500 lines of Python, <code>httpx</code> the only runtime dependency, 28 tests. Imagination is an optional extra.", "v": "holds"}
+      {"c": "Small on purpose.", "m": "About 3,800 lines of Python, <code>httpx</code> the only runtime dependency, 28 tests. Imagination is an optional extra.", "v": "holds"}
     ]
   },
   "compare": {
@@ -218,7 +237,7 @@
   "sources": {
     "title": "Sources",
     "items": [
-      "Our own data: the seats' ledgers and usage logs, calibration copies, a replay set of about 60 labelled moments, and the imagination test's prediction log. All from 24 November 2026.",
+      "Our own data: the seats' ledgers and usage logs, calibration copies, a replay set of about 60 labelled moments, and the imagination tests' prediction logs, from 24 and 25 November 2026.",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "On imagination and surprise: Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha and Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla and Wagner (1972) · Itti and Baldi, Bayesian surprise (2009) · Schacter and Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

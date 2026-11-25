@@ -74,6 +74,13 @@
         "body": [
           "La dernière idée de la journée était la plus grande : donner à chaque personnage son propre monde embody privé, pour y imaginer. Il y écrit les règles telles qu'il les croit, joue un plan quarante fois, puis le harness compare ce qu'il a imaginé avec ce qui s'est vraiment passé. L'écart, mesuré comme une surprise, est ce dont il apprend. Cela a été construit et testé le soir même (voir <a href=\"#imagination\">imagination</a>)."
         ]
+      },
+      {
+        "when": "Le lendemain",
+        "title": "Pas de dés",
+        "body": [
+          "Les dés rendaient chaque leçon bruitée, alors le monde de test suivant a été un dojo avec des règles de jeu de combat et pas un seul dé. Les personnages ont appris à jouer leur maître avec des probabilités, et un nouvel outil leur a permis de revivre leur passé à travers ce qu'ils savent maintenant. Cela a montré où se trouvait vraiment leur apprentissage (voir <a href=\"#imagination\">imagination</a>)."
+        ]
       }
     ]
   },
@@ -159,13 +166,26 @@
       "<b>Les règles telles qu'il les croit.</b> Le personnage écrit la règle de chaque verbe sous forme d'un petit script embody : quand elle peut s'appliquer, et ce qui se passe. Les dés sont ceux du monde.",
       "<b>Ce qu'il croit des autres.</b> Des chiffres qu'il attribue aux autres. Tout ce que montre sa fiche de scène l'emporte sur la croyance.",
       "<b>Une distribution, pas une histoire.</b> Le plan est joué 40 fois, chacune avec une nouvelle graine. La réponse, c'est la façon dont chaque chiffre est sorti : la fourchette de 10 à 90 % et la façon dont les plans se sont terminés.",
-      "<b>Le harness l'engage.</b> Quand le personnage fait vraiment la première étape, cet exercice d'imagination devient une prédiction.",
+      "<b>Il joue tous les autres.</b> Le monde imaginé appartient au personnage, donc les autres font ce qu'il dit. Quand il ne sait pas ce que quelqu'un va faire, il donne des probabilités (garde 3, frappe 1), et chaque essai en tire une.",
+      "<b>Le harness l'engage.</b> Quand le personnage fait vraiment sa propre première étape, cet exercice d'imagination devient une prédiction.",
       "<b>Le harness le note.</b> Quand l'exécution du plan se termine, le harness lit les vrais chiffres et note chacun comme une surprise, en bits. Le modèle ne se note jamais lui-même.",
-      "<b>Réflexion.</b> Une grande surprise revient au personnage avec les règles qu'il a utilisées. Il décide de ce qui était faux (une règle, une croyance, ou la chance), corrige son monde et garde la leçon."
+      "<b>Réflexion.</b> Une grande surprise revient au personnage avec les règles qu'il a utilisées. Il décide de ce qui était faux (une règle, une croyance, ou la chance), corrige son monde et garde la leçon.",
+      "<b>Revivre.</b> Il peut rejouer son passé, à partir des chiffres qu'il voyait alors et de ses actes tels qu'il les a faits, à travers les règles et les croyances qu'il a maintenant, et voir combien de ces moments il verrait maintenant venir."
     ],
     "test_title": "Le premier test en direct",
     "test_p": "Un personnage sur deepseek-v4-flash s'est entraîné au combat, dans un petit monde de test, avec un partenaire qui était en secret bien plus fort que ce qu'on lui avait dit. Il a cassé sa propre imagination de six façons : il a copié le nom de verbe de l'exemple de départ au lieu du sien, a demandé 3 essais, a écrit des règles sous des formes que le harness ne savait pas lire, a gardé une règle qui plantait, s'est reposé avant que le résultat soit lu, et a laissé des combats suivants s'engager sur d'anciens exercices d'imagination. Chaque problème est devenu un correctif. Après eux, il a écrit cette règle d'après ce qu'il avait ressenti :",
     "result": "Imaginé : 16 à 21 points de vie restants. Réel : 18. Surprise : 0,14 bit, dans la fourchette. Sa propre note : « Conforme à l'imagination. »",
+    "dojo_title": "Le Dojo : pas de dés",
+    "dojo_p": "Les dés mettent un plancher de bruit sous chaque surprise : en quelques essais, un personnage ne peut pas distinguer une croyance fausse d'un mauvais jet. Alors le monde de test suivant n'en avait aucun. Le Dojo est une salle d'entraînement qui fonctionne comme un jeu de combat : frappe, projection, garde et un coup spécial, chacun battant certains et perdant contre d'autres, avec un temps de recharge sur le coup spécial. Le maître, Oren, choisit selon une politique fixe qu'on ne dit pas aux élèves, et ses chiffres de dégâts sont secrets. Quatre élèves sur deepseek-v4-flash, 50 tours chacun, chacun dans sa propre salle :",
+    "dojo": [
+      "Ils ont imaginé 197 fois, et 182 de ces fois ont donné des probabilités pour le prochain coup d'Oren plutôt qu'une seule supposition.",
+      "Les points de vie des deux combattants sont tombés dans la fourchette imaginée de 80 % 77 fois sur 130 dans la première moitié des moments notés de chaque élève, et 92 fois sur 129 dans la seconde. Trois des quatre ont progressé ; un a régressé.",
+      "50 de leurs 59 verdicts ont accusé une croyance, 7 une règle, 2 la chance. Lors du premier test de 50 tours, chaque verdict avait accusé une règle.",
+      "Un élève a trouvé exactement trois des quatre chiffres de dégâts secrets d'Oren. Aucun n'a trouvé celui du coup spécial.",
+      "Les élèves à qui on ne demandait pas d'imaginer, pour la plupart, ne l'ont pas fait : deux jamais, et un une seule fois en 50 tours. Essayer le vrai coup coûte un appel et donne une réponse sûre."
+    ],
+    "relive_title": "Ce que revivre a montré",
+    "relive_p": "Revivre est resté plat pour les quatre, alors qu'ils progressaient en avançant. Cela rejoue une supposition passée sur quelqu'un d'autre telle qu'elle a été faite, et ces élèves ont appris dans leurs suppositions sur Oren, pas dans leurs règles. Alors la prochaine version garde un esprit pour chaque personnage qu'un élève joue : sa propre règle pour ce qu'Oren choisit ensuite, que revivre peut interroger à nouveau.",
     "why_title": "Pourquoi la surprise",
     "why_p": "Les gens apprennent surtout de ce à quoi ils ne s'attendaient pas, et la taille de cette erreur détermine combien ils apprennent : une vieille idée en psychologie, de Rescorla et Wagner jusqu'au traitement prédictif et à la surprise bayésienne. La plupart des agents notent leurs propres réflexions. Ici, c'est le monde qui les note : le harness mesure l'erreur, et le modèle n'a plus qu'à l'expliquer.",
     "docs": "Comment l'activer, et tout ce qu'elle conserve : <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -174,7 +194,6 @@
     "title": "Idées sur la table",
     "intro": "Pas encore construites. Notées pour ne pas les perdre.",
     "items": [
-      {"h": "Revivre", "p": "Un monde embody, c'est une construction plus un historique d'événements. Un personnage pourrait rejouer son propre passé depuis l'endroit où il se trouvait, et à un moment choisi laisser la rediffusion devenir imagination : et si j'avais dit non ?"},
       {"h": "Rêves", "p": "Mélanger des rediffusions de souvenirs liés, comme le sommeil est censé rejouer la journée. Dans un monde sans sommeil, appelons ça rêver éveillé."},
       {"h": "Réflexes", "p": "Une courte liste de règles que le personnage écrit pour lui-même, vérifiées par le harness pendant qu'il dort, pour que les petites choses soient réglées sans réveiller l'esprit."},
       {"h": "Données d'entraînement", "p": "Chaque tour est journalisé avec ce qu'il a vu, fait et coûté. Avec le consentement des personnes présentes dans le monde, cela pourrait entraîner de petits modèles de PNJ bon marché."}
@@ -190,7 +209,7 @@
       {"c": "Rien ne grossit d'un jour à l'autre.", "m": "Le prompt de début de tour est resté stable toute la journée, autour de 5 000 à 7 300 tokens. Une journée de données, pas plusieurs.", "v": "holds"},
       {"c": "N'importe quelle API compatible OpenAI.", "m": "Seul OpenRouter a été utilisé : 8 modèles de 7 éditeurs. Ollama, vLLM, LM Studio et llama.cpp n'ont pas été testés.", "v": "partly"},
       {"c": "Fonctionne de la même façon sous Windows, Linux et macOS.", "m": "Tous les essais jusqu'ici ont tourné sous Windows. Les encodages, les fins de ligne et les guillemets sont gérés et testés dans le code, mais il n'y a encore eu aucun essai sous Linux ni macOS.", "v": "untested"},
-      {"c": "Petit, et c'est voulu.", "m": "Environ 3 500 lignes de Python, <code>httpx</code> comme seule dépendance d'exécution, 28 tests. L'imagination est un extra optionnel.", "v": "holds"}
+      {"c": "Petit, et c'est voulu.", "m": "Environ 3 800 lignes de Python, <code>httpx</code> comme seule dépendance d'exécution, 28 tests. L'imagination est un extra optionnel.", "v": "holds"}
     ]
   },
   "compare": {
@@ -218,7 +237,7 @@
   "sources": {
     "title": "Sources",
     "items": [
-      "Nos propres données : les registres et journaux d'utilisation des sièges, les copies de calibration, un jeu de rediffusion d'environ 60 moments étiquetés, et le journal de prédictions du test d'imagination. Le tout du 24 novembre 2026.",
+      "Nos propres données : les registres et journaux d'utilisation des sièges, les copies de calibration, un jeu de rediffusion d'environ 60 moments étiquetés, et les journaux de prédictions des tests d'imagination, des 24 et 25 novembre 2026.",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "Sur l'imagination et la surprise : Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha et Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla et Wagner (1972) · Itti et Baldi, Bayesian surprise (2009) · Schacter et Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

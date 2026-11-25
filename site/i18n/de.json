@@ -74,6 +74,13 @@
         "body": [
           "Die letzte Idee des Tages war die größte: Jede Figur bekommt eine eigene, private embody-Welt, in der sie sich Dinge vorstellen kann. Sie schreibt die Regeln so, wie sie sie glaubt, spielt einen Plan vierzigmal durch, und dann vergleicht das Harness, was sie sich vorgestellt hat, mit dem, was wirklich passiert ist. Der Unterschied, gemessen als Überraschung, ist das, woraus sie lernt. Gebaut und getestet wurde das noch in derselben Nacht (siehe <a href=\"#imagination\">Vorstellungskraft</a>)."
         ]
+      },
+      {
+        "when": "Am nächsten Tag",
+        "title": "Keine Würfel",
+        "body": [
+          "Würfel machten jede Lektion verrauscht, also war die nächste Testwelt ein Dojo mit Kampfspielregeln und ganz ohne Würfel. Die Figuren lernten, ihren Meister mit Wahrscheinlichkeiten zu spielen, und ein neues Tool ließ sie ihre Vergangenheit noch einmal erleben, mit dem, was sie jetzt wissen. Es zeigte, wo ihr Lernen wirklich steckte (siehe <a href=\"#imagination\">Vorstellungskraft</a>)."
+        ]
       }
     ]
   },
@@ -159,13 +166,26 @@
       "<b>Regeln, wie sie sie glaubt.</b> Die Figur schreibt die Regel jedes Verbs als kleines embody-Skript: wann es passieren kann und was dann passiert. Die Würfel sind die der Welt.",
       "<b>Annahmen über Leute.</b> Zahlen, die sie über andere glaubt. Alles, was ihre Szenenkarte zeigt, hat Vorrang vor Annahmen.",
       "<b>Eine Streuung, keine Geschichte.</b> Der Plan wird 40-mal durchgespielt, jedes Mal mit einem neuen Seed. Die Antwort zeigt, wie jede Zahl ausgefallen ist: das Band von 10 bis 90 % und wie die Pläne endeten.",
-      "<b>Das Harness bindet sie.</b> Wenn die Figur den ersten Schritt wirklich macht, wird aus dieser Vorstellung eine Vorhersage.",
+      "<b>Sie spielt alle anderen.</b> Die vorgestellte Welt gehört der Figur selbst, also tun die anderen, was sie sagt. Wenn sie nicht weiß, was jemand tun wird, gibt sie Wahrscheinlichkeiten an (Block 3, Schlag 1), und jeder Durchlauf zieht eine davon.",
+      "<b>Das Harness bindet sie.</b> Wenn die Figur ihren eigenen ersten Schritt wirklich macht, wird aus dieser Vorstellung eine Vorhersage.",
       "<b>Das Harness bewertet sie.</b> Wenn der Lauf des Plans endet, liest das Harness die echten Zahlen und bewertet jede als Überraschung in Bits. Das Modell benotet sich nie selbst.",
-      "<b>Reflexion.</b> Eine große Überraschung geht zusammen mit den verwendeten Regeln zurück an die Figur. Sie entscheidet, was falsch war (eine Regel, eine Annahme oder Zufall), repariert ihre Welt und behält die Lektion."
+      "<b>Reflexion.</b> Eine große Überraschung geht zusammen mit den verwendeten Regeln zurück an die Figur. Sie entscheidet, was falsch war (eine Regel, eine Annahme oder Zufall), repariert ihre Welt und behält die Lektion.",
+      "<b>Wiedererleben.</b> Sie kann ihre Vergangenheit noch einmal spielen, aus den Zahlen, die sie damals sah, und ihren Taten, wie sie sie tat, durch die Regeln und Annahmen, die sie jetzt hat, und sehen, wie viele dieser Momente sie jetzt kommen sehen würde."
     ],
     "test_title": "Der erste Live-Test",
     "test_p": "Eine Figur auf deepseek-v4-flash lieferte sich in einer kleinen Testwelt Übungskämpfe mit einem Partner, der heimlich viel stärker war, als man ihr gesagt hatte. Dabei brachte sie ihre eigene Vorstellung auf sechs Arten zum Scheitern: Sie übernahm den Verbnamen aus der Vorlage statt ihres eigenen, verlangte 3 Durchläufe, schrieb Regeln in Formen, die das Harness nicht lesen konnte, behielt eine Regel, die abstürzte, ruhte sich aus, bevor das Ergebnis gelesen war, und ließ spätere Übungskämpfe an ältere Vorstellungen binden. Aus jedem Fehler wurde ein Fix. Danach schrieb sie diese Regel aus dem, was sie gespürt hatte:",
     "result": "Vorgestellt: 16 bis 21 Trefferpunkte übrig. Echt: 18. Überraschung: 0,14 Bits, innerhalb des Bands. Ihre eigene Notiz: „Im Einklang mit der Vorstellung.“",
+    "dojo_title": "Das Dojo: keine Würfel",
+    "dojo_p": "Würfel legen unter jede Überraschung einen Rauschboden: In wenigen Versuchen kann eine Figur eine falsche Annahme nicht von Würfelpech unterscheiden. Also hatte die nächste Testwelt keine. Das Dojo ist eine Trainingsfläche, die wie ein Kampfspiel läuft: Schlag, Wurf, Block und eine Spezialtechnik, jede schlägt manche und verliert gegen andere, mit einer Abklingzeit für die Spezialtechnik. Der Meister, Oren, wählt nach einer festen Strategie, die den Schülern nicht verraten wird, und seine Schadenszahlen sind geheim. Vier Schüler auf deepseek-v4-flash, je 50 Züge, jeder auf seiner eigenen Fläche:",
+    "dojo": [
+      "Sie stellten sich 197-mal etwas vor, und 182 dieser Vorstellungen gaben Wahrscheinlichkeiten für Orens nächste Technik an statt einer einzigen Vermutung.",
+      "Die Trefferpunkte beider Kämpfer lagen in der ersten Hälfte der bewerteten Momente jedes Schülers 77 von 130 Mal im vorgestellten 80-%-Band, in der zweiten 92 von 129 Mal. Drei der vier wurden besser; einer wurde schlechter.",
+      "50 ihrer 59 Urteile gaben einer Annahme die Schuld, 7 einer Regel, 2 dem Zufall. Im ersten Test mit 50 Zügen hatte jedes Urteil einer Regel die Schuld gegeben.",
+      "Ein Schüler fand drei von Orens vier geheimen Schadenszahlen genau heraus. Keiner fand die der Spezialtechnik.",
+      "Schüler, die nicht zum Vorstellen aufgefordert wurden, taten es meistens nicht: zwei nie, und einer einmal in 50 Zügen. Die echte Technik auszuprobieren kostet einen Aufruf und gibt eine sichere Antwort."
+    ],
+    "relive_title": "Was das Wiedererleben zeigte",
+    "relive_p": "Das Wiedererleben blieb bei allen vier flach, während sie nach vorn besser wurden. Es spielt eine frühere Vermutung über jemand anderen so ab, wie sie gemacht wurde, und diese Schüler lernten in ihren Vermutungen über Oren, nicht in ihren Regeln. Deshalb behält der nächste Build einen eigenen Geist für jede Figur, die ein Schüler spielt: ihre eigene Regel dafür, was Oren als Nächstes wählt, die das Wiedererleben erneut fragen kann.",
     "why_title": "Warum Überraschung",
     "why_p": "Menschen lernen am meisten aus dem, was sie nicht erwartet haben, und die Größe dieses Fehlers bestimmt, wie viel sie lernen: eine alte Idee der Psychologie, von Rescorla und Wagner bis zu Predictive Processing und Bayesscher Überraschung. Die meisten Agenten benoten ihre eigenen Reflexionen. Hier benotet die Welt sie: Das Harness misst den Fehler, und das Modell muss ihn nur erklären.",
     "docs": "Wie du es einschaltest, und alles, was es speichert: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -174,7 +194,6 @@
     "title": "Ideen auf dem Tisch",
     "intro": "Nicht gebaut. Aufgeschrieben, damit sie nicht verloren gehen.",
     "items": [
-      {"h": "Wiedererleben", "p": "Eine embody-Welt ist ein Build plus eine Geschichte von Ereignissen. Eine Figur könnte ihre eigene Vergangenheit von dort aus nachspielen, wo sie damals stand, und an einem gewählten Moment das Replay in Vorstellung übergehen lassen: Was wäre, wenn ich Nein gesagt hätte?"},
       {"h": "Träume", "p": "Replays verwandter Erinnerungen mischen, so wie der Schlaf vermutlich den Tag noch einmal abspielt. In einer Welt ohne Schlaf nenn es Tagträumen."},
       {"h": "Reflexe", "p": "Eine kurze Liste von Regeln, die die Figur für sich selbst schreibt und die das Harness prüft, während sie schläft. So werden Kleinigkeiten erledigt, ohne den Geist zu wecken."},
       {"h": "Trainingsdaten", "p": "Jeder Zug wird protokolliert, mit dem, was die Figur sah, was sie tat und was es kostete. Mit Zustimmung der Menschen in der Welt ließen sich damit kleine, günstige NPC-Modelle trainieren."}
@@ -190,7 +209,7 @@
       {"c": "Über Tage wächst nichts an.", "m": "Der Prompt, mit dem ein Zug beginnt, blieb über den Tag konstant, bei etwa 5.000 bis 7.300 Tokens. Daten von einem Tag, nicht von mehreren.", "v": "holds"},
       {"c": "Jede OpenAI-kompatible API.", "m": "Erprobt wurde bisher nur OpenRouter: 8 Modelle von 7 Herstellern. Ollama, vLLM, LM Studio und llama.cpp liefen noch nicht.", "v": "partly"},
       {"c": "Läuft gleich unter Windows, Linux und macOS.", "m": "Bisher lief alles unter Windows. Kodierungen, Zeilenenden und Quoting sind im Code behandelt und getestet, aber es gab noch keinen Lauf unter Linux oder macOS.", "v": "untested"},
-      {"c": "Absichtlich klein.", "m": "Etwa 3.500 Zeilen Python, <code>httpx</code> als einzige Laufzeitabhängigkeit, 28 Tests. Vorstellungskraft ist ein optionales Extra.", "v": "holds"}
+      {"c": "Absichtlich klein.", "m": "Etwa 3.800 Zeilen Python, <code>httpx</code> als einzige Laufzeitabhängigkeit, 28 Tests. Vorstellungskraft ist ein optionales Extra.", "v": "holds"}
     ]
   },
   "compare": {
@@ -218,7 +237,7 @@
   "sources": {
     "title": "Quellen",
     "items": [
-      "Unsere eigenen Daten: die Ledger und Nutzungslogs der Plätze, Kalibrierungskopien, ein Replay-Set von etwa 60 gelabelten Momenten und das Vorhersage-Log des Vorstellungstests. Alles vom 24. November 2026.",
+      "Unsere eigenen Daten: die Ledger und Nutzungslogs der Plätze, Kalibrierungskopien, ein Replay-Set von etwa 60 gelabelten Momenten und die Vorhersage-Logs der Vorstellungstests, vom 24. und 25. November 2026.",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "Zu Vorstellung und Überraschung: Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha und Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla und Wagner (1972) · Itti und Baldi, Bayesian surprise (2009) · Schacter und Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

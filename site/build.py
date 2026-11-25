@@ -96,6 +96,7 @@ def blocks(t, code, lang_map):
         "guards": cards(t["turn"]["guards"]),
         "ideas": cards(t["ideas"]["items"]),
         "steps": "".join(f"<li>{s}</li>" for s in t["imagination"]["steps"]),
+        "dojo": "".join(f"<li>{s}</li>" for s in t["imagination"]["dojo"]),
         "model_th": model_th,
         "claims_th": "".join(f"<th>{h}</th>" for h in t["claims"]["th"]),
         "claims": claims,

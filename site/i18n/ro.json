@@ -74,6 +74,13 @@
         "body": [
           "Ultima idee a zilei a fost cea mai mare: fiecare personaj primește o lume embody privată, doar a lui, în care să-și imagineze. Scrie regulile așa cum crede că sunt, joacă un plan de patruzeci de ori, apoi harness-ul compară ce și-a imaginat cu ce s-a întâmplat cu adevărat. Diferența, măsurată ca surpriză, este lucrul din care învață. A fost construită și testată chiar în acea noapte (vezi <a href=\"#imagination\">imaginația</a>)."
         ]
+      },
+      {
+        "when": "A doua zi",
+        "title": "Fără zaruri",
+        "body": [
+          "Zarurile făceau fiecare lecție zgomotoasă, așa că următoarea lume de test a fost un dojo cu reguli de joc de luptă și fără niciun zar. Personajele au învățat să-și joace maestrul cu șanse, iar o unealtă nouă le-a lăsat să-și trăiască din nou trecutul prin ce știu acum. Asta a arătat unde era cu adevărat învățarea lor (vezi <a href=\"#imagination\">imaginația</a>)."
+        ]
       }
     ]
   },
@@ -159,13 +166,26 @@
       "<b>Regulile, așa cum le crede.</b> Personajul scrie regula fiecărui verb ca un mic script embody: când se poate întâmpla și ce se întâmplă. Zarurile sunt chiar ale lumii.",
       "<b>Convingeri despre oameni.</b> Cifre pe care le crede despre ceilalți. Orice arată fișa scenei are prioritate față de convingeri.",
       "<b>O distribuție, nu o poveste.</b> Planul se joacă de 40 de ori, de fiecare dată cu un seed nou. Răspunsul arată cum a ieșit fiecare cifră: intervalul dintre 10% și 90% și felul în care s-au încheiat planurile.",
-      "<b>Harness-ul o leagă.</b> Când personajul face cu adevărat primul pas, acea imaginare devine o predicție.",
+      "<b>Îi joacă pe toți ceilalți.</b> Lumea imaginată este a personajului, așa că ceilalți fac ce spune el. Când nu știe ce va face cineva, dă șanse (gardă 3, lovitură 1), iar fiecare încercare trage una.",
+      "<b>Harness-ul o leagă.</b> Când personajul face cu adevărat propriul prim pas, acea imaginare devine o predicție.",
       "<b>Harness-ul o notează.</b> Când rularea planului se încheie, harness-ul citește cifrele reale și o notează pe fiecare ca surpriză în biți. Modelul nu se notează niciodată singur.",
-      "<b>Reflecția.</b> O surpriză mare se întoarce la personaj împreună cu regulile pe care le-a folosit. El decide ce a fost greșit (o regulă, o convingere sau norocul), își repară lumea și păstrează lecția."
+      "<b>Reflecția.</b> O surpriză mare se întoarce la personaj împreună cu regulile pe care le-a folosit. El decide ce a fost greșit (o regulă, o convingere sau norocul), își repară lumea și păstrează lecția.",
+      "<b>Retrăirea.</b> Își poate juca din nou trecutul, pornind de la cifrele pe care le-a văzut atunci și de la faptele sale așa cum le-a făcut, prin regulile și convingerile pe care le are acum, și poate vedea câte dintre acele momente le-ar vedea acum venind."
     ],
     "test_title": "Primul test live",
     "test_p": "Un personaj pe deepseek-v4-flash s-a antrenat la luptă, într-o mică lume de test, cu un partener care era în secret mult mai puternic decât i se spusese. Și-a stricat propria imaginație în șase feluri: a copiat numele verbului din exemplul de pornire în loc să-l folosească pe al lui, a cerut doar 3 încercări, a scris reguli în forme pe care harness-ul nu le putea citi, a păstrat o regulă care dădea crash, s-a odihnit înainte ca rezultatul să fie citit și a lăsat luptele de mai târziu să se lege de imaginări mai vechi. Fiecare a devenit o remediere. După ele, a scris această regulă din ce simțise:",
     "result": "Imaginat: între 16 și 21 de puncte de viață rămase. Real: 18. Surpriză: 0,14 biți, în interiorul intervalului. Nota lui: „Conform cu ce mi-am imaginat.”",
+    "dojo_title": "Dojo-ul: fără zaruri",
+    "dojo_p": "Zarurile pun un prag de zgomot sub fiecare surpriză: în câteva încercări, un personaj nu poate deosebi o convingere greșită de ghinionul la zaruri. Așa că următoarea lume de test nu avea deloc. Dojo-ul este o sală de antrenament care merge ca un joc de luptă: lovitură, proiectare, gardă și o mișcare specială, fiecare bate unele și pierde în fața altora, cu un timp de reîncărcare la mișcarea specială. Maestrul, Oren, alege după o politică fixă pe care elevii nu o cunosc, iar cifrele lui de daune sunt secrete. Patru elevi pe deepseek-v4-flash, câte 50 de ture fiecare, fiecare în propria sală:",
+    "dojo": [
+      "Au făcut 197 de imaginări, iar 182 dintre ele au dat șanse pentru următoarea mișcare a lui Oren în loc de o singură presupunere.",
+      "Punctele de viață ale ambilor luptători au ieșit în intervalul imaginat de 80% de 77 de ori din 130 în prima jumătate a momentelor notate ale fiecărui elev, și de 92 de ori din 129 în a doua. Trei din patru s-au îmbunătățit; unul s-a înrăutățit.",
+      "50 dintre cele 59 de verdicte ale lor au dat vina pe o convingere, 7 pe o regulă, 2 pe noroc. În primul test de 50 de ture, fiecare verdict dăduse vina pe o regulă.",
+      "Un elev a găsit exact trei dintre cele patru cifre secrete de daune ale lui Oren. Niciunul nu a găsit-o pe cea a mișcării speciale.",
+      "Elevii cărora nu li s-a cerut să imagineze în mare parte nu au făcut-o: doi niciodată, iar unul o dată în 50 de ture. Să încerci mișcarea reală costă un apel și dă un răspuns sigur."
+    ],
+    "relive_title": "Ce a arătat retrăirea",
+    "relive_p": "Retrăirea a ieșit plată pentru toți patru, în timp ce ei progresau mergând înainte. Ea reia o presupunere trecută despre altcineva așa cum a fost făcută, iar acești elevi și-au făcut învățarea în presupunerile despre Oren, nu în regulile lor. Așa că următoarea versiune păstrează o minte pentru fiecare personaj pe care îl joacă un elev: propria lui regulă pentru ce alege Oren mai departe, pe care retrăirea o poate întreba din nou.",
     "why_title": "De ce surpriza",
     "why_p": "Oamenii învață cel mai mult din ce nu se așteptau, iar mărimea acelei erori dictează cât de mult învață: o idee veche în psihologie, de la Rescorla și Wagner până la procesarea predictivă și surpriza bayesiană. Majoritatea agenților își notează singuri reflecțiile. Aici le notează lumea: harness-ul măsoară eroarea, iar modelul trebuie doar să o explice.",
     "docs": "Cum o pornești și tot ce păstrează: <a href=\"https://github.com/newsbubbles/body-harness/blob/main/docs/imagination.md\">docs/imagination.md</a>."
@@ -174,7 +194,6 @@
     "title": "Idei pe masă",
     "intro": "Neconstruite încă. Scrise ca să nu se piardă.",
     "items": [
-      {"h": "Retrăire", "p": "O lume embody este o construcție plus un istoric de evenimente. Un personaj și-ar putea rejuca propriul trecut din locul în care se afla și, la un moment ales, ar putea lăsa reluarea să devină imaginație: ce-ar fi fost dacă spuneam nu?"},
       {"h": "Vise", "p": "Amestecă reluări ale unor amintiri înrudite, așa cum se crede că somnul reia ziua. Într-o lume fără somn, să-i spunem visare cu ochii deschiși."},
       {"h": "Reflexe", "p": "O listă scurtă de reguli pe care personajul și le scrie singur, verificate de harness cât timp doarme, ca lucrurile mărunte să fie rezolvate fără să trezească mintea."},
       {"h": "Date de antrenament", "p": "Fiecare tură e înregistrată cu ce a văzut, ce a făcut și cât a costat. Cu acordul oamenilor din lume, asta ar putea antrena modele NPC mici și ieftine."}
@@ -190,7 +209,7 @@
       {"c": "Nimic nu crește de la o zi la alta.", "m": "Promptul cu care începe o tură a rămas constant toată ziua, la aproximativ 5.000 până la 7.300 de tokeni. Date pentru o singură zi, nu pentru mai multe.", "v": "holds"},
       {"c": "Orice API compatibil cu OpenAI.", "m": "Doar OpenRouter a fost folosit efectiv: 8 modele de la 7 producători. Ollama, vLLM, LM Studio și llama.cpp nu au fost rulate încă.", "v": "partly"},
       {"c": "Rulează la fel pe Windows, Linux și macOS.", "m": "Toate rulările de până acum au fost pe Windows. Codificările, sfârșiturile de linie și ghilimelele sunt tratate și testate în cod, dar încă nu există nicio rulare pe Linux sau macOS.", "v": "untested"},
-      {"c": "Mic, intenționat.", "m": "Aproximativ 3.500 de linii de Python, <code>httpx</code> singura dependență la rulare, 28 de teste. Imaginația este un extra opțional.", "v": "holds"}
+      {"c": "Mic, intenționat.", "m": "Aproximativ 3.800 de linii de Python, <code>httpx</code> singura dependență la rulare, 28 de teste. Imaginația este un extra opțional.", "v": "holds"}
     ]
   },
   "compare": {
@@ -218,7 +237,7 @@
   "sources": {
     "title": "Surse",
     "items": [
-      "Datele noastre: registrele și jurnalele de utilizare ale sloturilor, copiile de calibrare, un set de reluare cu aproximativ 60 de momente etichetate și jurnalul de predicții al testului de imaginație. Toate din 24 noiembrie 2026.",
+      "Datele noastre: registrele și jurnalele de utilizare ale sloturilor, copiile de calibrare, un set de reluare cu aproximativ 60 de momente etichetate și jurnalele de predicții ale testelor de imaginație, din 24 și 25 noiembrie 2026.",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "Despre imaginație și surpriză: Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha și Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla și Wagner (1972) · Itti și Baldi, Bayesian surprise (2009) · Schacter și Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",
