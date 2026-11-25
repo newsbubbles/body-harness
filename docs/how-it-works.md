@@ -73,6 +73,14 @@ own deeds from the world's `history(touching=<body>)` into `past_world.json`, wi
 searches them too (turn `d61` is world day 61). `bh past-import N` reads them again. Where the seat's own log
 starts inside the world's copy, the harness finds its first line said, word for word, so no deed counts twice.
 
+A body can also come with notes from before: a digest of its old sessions, its memory files, a start brief.
+`bh import <seat> <path>` links a file or folder into the seat's `import/` folder, so nothing is duplicated and
+nothing moves (a folder as a symlink, or a junction on Windows; a file that cannot be linked as a small pointer
+file). `--copy` copies instead, `--unzip` unpacks a zip archive, `--list` and `--remove` manage them. Removing a
+link never touches what it pointed at. With anything imported, the seat gets `records`: `match=` searches every
+line of every text file the folder reaches, following links, and `file=` reads one. A token or `.env` file in an
+imported folder is never read.
+
 ## Outside the fiction
 
 `tell` is one tool for both lines out of the world:
@@ -137,6 +145,7 @@ Everything is a file under `$BH_HOME/seats/<name>/`:
 | file | what |
 |---|---|
 | `door.json` | the world's address and the seat's token (never shown to the model, logs or sandbox) |
+| `import/` | files and folders its operator gave it, mostly links ([bh import](#two-memories)) |
 | `hands/` | extra grants on the same world, one door file each ([a builder's hand](#a-mind-with-a-builders-hand)) |
 | `config.json` | the seat's settings |
 | `state.json` | who it is, its plan, last notes, what it heard, its watch |

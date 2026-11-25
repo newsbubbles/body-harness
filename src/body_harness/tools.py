@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from . import imports
+
 if TYPE_CHECKING:
     from .loop import Mind
 
@@ -191,6 +193,18 @@ PAST = fn("past", "Search what you really did and what came of it: every deed (a
            "count": S, "before": {"type": "integer"}, "after": {"type": "integer"}, "last": {"type": "integer"},
            "limit": {"type": "integer"}})
 
+
+
+def records_tool(names: list[str]) -> dict[str, Any]:
+    return fn("records", "Read the records your operator gave you from before: notes, digests, memories ("
+                         + ", ".join(names[:12]) + ("..." if len(names) > 12 else "") + "). match= a regex or plain "
+                         "words, searched over every line of every file (file:line hits). file= one file to read, "
+                         "from_line= and lines= for a window. With nothing given: the list of files. What they say "
+                         "happened before; the world now is what look() shows.",
+              {"match": S, "file": S, "from_line": {"type": "integer"}, "lines": {"type": "integer"},
+               "limit": {"type": "integer"}})
+
+
 EXTRAS: dict[str, dict[str, Any]] = {
     "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
                                "in_minutes= real minutes from now; what= what to do then. op='list' shows what is "
@@ -291,6 +305,8 @@ class Registry:
             core = core + [IMAGINE, REFLECT, RELIVE]
         if self.m.cfg.get("past"):
             core = core + [PAST]
+        if (got := imports.entries(self.m.seat.dir)):
+            core = core + [records_tool([e["name"] for e in got])]
         return core + [s for s in (self.schema(n) for n in loaded) if s]
 
 

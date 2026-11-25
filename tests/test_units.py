@@ -647,3 +647,40 @@ def test_author_ops_go_through_the_hand_that_reaches_the_target():
     asyncio.run(reg.load_world_ops())
     assert reg.world["spawn"]["hands"] == ["north", "south"] and "builder hand" in reg.world["spawn"]["description"]
     assert reg.world["inspect"]["hands"] == []
+
+
+def test_import_links_folders_and_records_searches_through_them(tmp_path: Path):
+    # a world's host keeps each mind's scrubbed notes in its own private folder; linking them in means nothing is
+    # duplicated and nothing moves, and the seat still finds a line in them
+    from body_harness import imports
+    notes = tmp_path / "private" / "jory"
+    (notes / "memory").mkdir(parents=True)
+    (notes / "digest.md").write_text("Day 40: sold the north field\nDay 41: the mill wheel cracked\n", encoding="utf-8")
+    (notes / "memory" / "people.md").write_text("Hollis owes me two coins\n", encoding="utf-8")
+    (notes / "door.json").write_text('{"token": "never"}', encoding="utf-8")
+    (notes / "blob.bin").write_bytes(b"\0\1\2")
+    seat = tmp_path / "seat"
+    seat.mkdir()
+    assert "linked import/jory" in imports.add(seat, str(notes))
+    one = tmp_path / "private" / "start.md"
+    one.write_text("You keep the mill.\n", encoding="utf-8")
+    imports.add(seat, str(one))
+    fs = imports.files(seat)
+    assert sorted(fs) == ["jory/digest.md", "jory/memory/people.md", "start.md"]  # no token, no binary
+    assert "2 lines match" in imports.records(seat, {"match": "mill"})
+    assert "jory/memory/people.md:1: Hollis owes" in imports.records(seat, {"match": "owes"})
+    assert "2: Day 41" in imports.records(seat, {"file": "digest.md", "from_line": 2})
+    assert imports.records(seat, {"match": "never|token"}).startswith("nothing in your 3")
+    try:
+        imports.add(seat, str(notes))
+        raise AssertionError("a second import of the same name went through")
+    except ValueError as e:
+        assert "already has jory" in str(e)
+    assert "untouched" in imports.remove(seat, "jory")
+    assert (notes / "digest.md").exists() and sorted(imports.files(seat)) == ["start.md"]
+    z = tmp_path / "old.zip"
+    import zipfile
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("notes/a.md", "the kiln was cold")
+    imports.add(seat, str(z), "unzip")
+    assert "old/notes/a.md:1" in imports.records(seat, {"match": "kiln"})

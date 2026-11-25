@@ -247,6 +247,16 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("past-import", help="copy the body's own deeds from the world's history, so past() reaches "
                                            "back before this harness ran it")
     c.add_argument("name")
+    c = sub.add_parser("import", help="give a seat files or folders to search with records(): linked by default, "
+                                      "so nothing is duplicated and nothing moves")
+    c.add_argument("name")
+    c.add_argument("path", nargs="?", help="a file, a folder, or with --unzip a zip archive")
+    g = c.add_mutually_exclusive_group()
+    g.add_argument("--copy", action="store_true", help="copy it in instead of linking")
+    g.add_argument("--unzip", action="store_true", help="unpack a zip archive into the import folder")
+    g.add_argument("--list", action="store_true", help="what the seat has imported")
+    g.add_argument("--remove", metavar="ENTRY", help="unlink an import (its target is untouched), or put a copy aside")
+    c.add_argument("--as", dest="as_name", default="", help="the name it gets in the import folder")
     c = sub.add_parser("hand", help="a second grant for one seat (a builder's hand on part of the world): ops the "
                                     "mind's grant lacks go through it")
     c.add_argument("name")
@@ -309,6 +319,26 @@ def main(argv: list[str] | None = None) -> int:
             async with httpx.AsyncClient() as client:
                 return await import_world(Door.load(s.p("door.json"), client), st["me"], st.get("names") or {}, s.dir)
         print(f"{args.name}: {asyncio.run(go())}")
+        return 0
+    if args.cmd == "import":
+        from . import imports
+        try:
+            if args.list or (not args.path and not args.remove):
+                got = imports.entries(s.dir)
+                for e in got:
+                    print(f"{e['name']:24} {e['kind']}" + (f" -> {e['to']}" if e.get("to") else ""))
+                n = len(imports.files(s.dir))
+                print(f"{n} text files reachable by records()" if got else f"{args.name} has imported nothing: "
+                      f"bh import {args.name} PATH")
+            elif args.remove:
+                print(f"{args.name}: {imports.remove(s.dir, args.remove)}")
+            else:
+                mode = "copy" if args.copy else "unzip" if args.unzip else "link"
+                print(f"{args.name}: {imports.add(s.dir, args.path, mode, args.as_name)}; "
+                      f"{len(imports.files(s.dir))} text files reachable by records()")
+        except (ValueError, OSError) as e:
+            print(f"{args.name}: {e}", file=sys.stderr)
+            return 2
         return 0
     if args.cmd == "hand":
         return asyncio.run(_hand(args, s))

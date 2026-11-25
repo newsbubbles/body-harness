@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from . import imagine, past, prompts, sandbox, scene
+from . import imagine, imports, past, prompts, sandbox, scene
 from .door import Door, DoorError
 from .memory import Shelf, memo
 from .providers import Model, ModelError
@@ -270,6 +270,8 @@ class Mind:
             return "(noted)"
         if name == "find_tools":
             return compact(self.registry.find(str(args.get("query", ""))))
+        if name == "records" and imports.entries(self.seat.dir):
+            return compact(await asyncio.to_thread(imports.records, self.seat.dir, args), 8000)
         if name == "past" and self.cfg.get("past"):
             return compact(await asyncio.to_thread(past.past, self.seat.p("calls.jsonl"), args), 6000)
         if name in ("imagine", "reflect", "relive") and self.imagination is not None:
