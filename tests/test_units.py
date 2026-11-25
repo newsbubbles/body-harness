@@ -372,7 +372,7 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     if not imagine.available():
         pytest.skip("the imagine extra (embody-engine) is not installed")
     s = Seat(tmp_path, "x").create()
-    im = imagine.Imagination(s, {"imagine_trials": 30})
+    im = imagine.Imagination(s, {"imagine_trials": 50})
     card = {"you": {"name": "Ssareth", "hp": "12/12"}, "holding": ["Coin x40", "Fishing spear"]}
     assert imagine.body_state(card) == {"hp": 12, "max_hp": 12, "coin": 40, "fishing_spear": 1}
     here = {**card, "people": [{"name": "Marlo", "hp": "9/10"}]}
@@ -395,7 +395,8 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
                                                          "me": {"ac": 12, "atk": 3}},
                     "plan": [{"actor": "me", "verb": "attack", "target": "Marlo"},
                              {"actor": "Marlo", "verb": "attack", "target": "me"}], "rounds": 2}, card, "Ssareth", 1)
-    assert r["ok"] and r["trials"] == 30 and "Ssareth.hp" in r["came_out"]
+    assert r["ok"] and r["trials"] == 50 and "Ssareth.hp" in r["came_out"]
+    assert im.records()[r["id"]]["start"]["Ssareth.hp"] == 12
     lo, hi = r["came_out"]["Ssareth.hp"]["band"]
     assert 0 < hi <= 12
     assert im.bind("talk", "Marlo") is None  # not what was imagined
@@ -406,7 +407,16 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert scored and scored[0]["scored"]["max_bits"] >= 4 and not all(scored[0]["scored"]["inside"].values())
     text = im.wake_text(scored)
     assert "SURPRISE" in text and "reflect(id='" + r["id"] in text and "attack" in text
-    assert im.reflect({"id": r["id"], "verdict": "belief", "lesson": "Marlo hits far harder than +2"})["ok"]
+    # the wake carries what was really seen, per step: two blows took 21 hp, 10.5 a step, nothing near imagined
+    assert "Ssareth.hp per step of yours: imagined" in text and "really -10.5 on average over 1" in text
+    assert "outside what you imagine" in text
+    said = im.reflect({"id": r["id"], "verdict": "belief", "lesson": "Marlo hits far harder than +2"})
+    assert said["ok"] and "beliefs are as they were" in said["note"]  # a verdict says what to change
+    im._write(None, {"Marlo": {"atk": 7}}, "Ssareth", {})
+    assert "note" not in im.reflect({"id": r["id"], "verdict": "belief", "lesson": "Marlo hits far harder than +2"})
+    guess = im.reflect({"id": r["id"], "verdict": "rule", "lesson": "Marlo gets angry"})
+    assert "rules are as they were" in guess["note"] and "is a guess" in guess["note"]
+    assert sum(x.startswith("[attack]") for x in im.spec["lessons"]) <= 4
     assert "[attack] Marlo hits far harder than +2" in im.imagine({}, card, "Ssareth", 2)["lessons"]
     assert im.reflect({})["imaginings"][0]["reflected"] == "belief"
     assert imagine.surprise([5] * 20, 5) == (0.0, True)
@@ -434,3 +444,5 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     three = im.imagine({"plan": [{"verb": "wait"}], "rounds": 3}, here, "Ssareth", 4)
     im.bind("wait", None)
     assert im.score({"you": {"hp": "5/12"}}, "Ssareth") == [] and "Not scored (" + three["id"] in im.wake_text([])
+    # not scored, but still evidence: one wait of three done, hp 12 to 5
+    assert any("really -7.0 on average over" in e for e in im.evidence("wait"))

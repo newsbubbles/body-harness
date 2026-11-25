@@ -52,7 +52,8 @@ STARTER = {
                "    if ctx.rand.roll(\"1d20\") + ctx.actor.state.atk >= ctx.target.state.ac:\n"
                "        ctx.target.state.hp = ctx.target.state.hp - ctx.rand.roll(\"1d6\")\n"),
 }
-MIN_TRIALS, MAX_TRIALS, MAX_ROUNDS, BUDGET_S = 20, 200, 30, 8.0
+# 40 trials at least: with 20, a value never imagined and one imagined once read the same 4.4 bits
+MIN_TRIALS, MAX_TRIALS, MAX_ROUNDS, BUDGET_S = 40, 200, 30, 8.0
 FIGHT = ("attack", "spar", "fight", "strike", "hit", "duel", "brawl")
 OPEN_FOR, STALE_AFTER = 1800.0, 6 * 3600.0
 
@@ -302,6 +303,10 @@ class Imagination:
         cal = self.calibration()
         if cal:
             out["calibration"] = cal
+        recs = self.records()
+        ev = {d: e for d in dict.fromkeys(r["domain"] for r in recs.values()) if (e := self.evidence(d, recs))}
+        if ev:
+            out["evidence"] = ev
         return out
 
     # imagining ------------------------------------------------------------------------------------------------
@@ -387,7 +392,8 @@ class Imagination:
         rec = {"kind": "imagined", "id": pid, "ts": time.time(), "turn": turn_no, "me": me, "domain": domain,
                "plan": [{"actor": a_, "verb": v, "target": t} for a_, v, t, _ in steps], "rounds": rounds,
                "trials": done, "first": {"actor": first[0], "verb": first[1], "target": first[2]},
-               "values": kept, "endings": dict(endings.most_common(5)),
+               "values": kept, "start": {k: start[k] for k in kept if k in start},
+               "endings": dict(endings.most_common(5)),
                "rules": {v: self.spec["rules"][v]["id"] for v in {v for _, v, _, _ in steps}},
                "beliefs": {n: self.spec["beliefs"].get(n, {}) for n in {x for s in steps for x in (s[0], s[2]) if x}}}
         append_jsonl(self.log, rec)
@@ -405,6 +411,9 @@ class Imagination:
             out["notes"] = notes
         if self.spec["lessons"]:
             out["lessons"] = self.spec["lessons"][-5:]
+        ev = self.evidence(domain)
+        if ev:
+            out["really_seen"] = ev
         if first[0] == me:
             out["next"] = (f"if you do it, act(verb='{first[1]}'" + (f", target='{first[2]}'" if first[2] else "") +
                            "): the harness will compare what really happens with this")
@@ -470,10 +479,14 @@ class Imagination:
             if done != planned:
                 # three exchanges imagined, one done, then a rest: scored, that read 4.4 bits of surprise that was
                 # only a different plan. A different plan is not a wrong imagination
-                append_jsonl(self.log, {"kind": "partial", "id": b["id"], "ts": now, "done": done, "of": planned})
+                # not scored, but what really came of it is still evidence: 12 of Tamsin's 20 acted plans were
+                # partial, and every one of them showed what a spar really does
+                append_jsonl(self.log, {"kind": "partial", "id": b["id"], "ts": now, "done": done, "of": planned,
+                                        "real": {k: real[k] for k in r.get("values") or {} if k in real}})
                 self.partials.append(f"Not scored ({b['id']}): you imagined {planned} of your own steps and did "
-                                     f"{done}. Imagine the plan you will really carry out, and the harness can "
-                                     f"compare it")
+                                     f"{done}. What really happened still counts as evidence. Imagine the plan "
+                                     f"you will really carry out (rounds=1 for one at a time), and the harness "
+                                     f"can score it")
                 continue
             if now - b["ts"] > STALE_AFTER:
                 append_jsonl(self.log, {"kind": "stale", "id": b["id"], "ts": now})
@@ -507,6 +520,36 @@ class Imagination:
             lines.append(f"{d}: {n} scored, {inside} of {n} inside the imagined 80% band, mean surprise {mean:.1f} bits")
         return lines
 
+    def evidence(self, domain: str, recs: dict[str, dict[str, Any]] | None = None) -> list[str]:
+        """How each number moved per step of the seat's own, imagined against real, over every plan of this kind it
+        really did, scored or not. Tamsin was told how surprised to be and never what the numbers were: all seven
+        of her reflections blamed a rule and invented one (Brann has a memory, hits harder when low), while the
+        numbers said plainly that he hit about twice as hard as she believed."""
+        imag: dict[str, list[float]] = {}
+        real: dict[str, list[float]] = {}
+        for r in (recs or self.records()).values():
+            got = r.get("scored") or r.get("partial")
+            if r.get("domain") != domain or not r.get("start") or not (got or {}).get("real"):
+                continue
+            planned = max(1, len(_my_steps(r)) * int(r.get("rounds") or 1))
+            done = max(1, int(got.get("done") or planned))
+            for k, v in got["real"].items():
+                if k in r["start"] and k in (r.get("values") or {}) and _num(v):
+                    real.setdefault(k, []).append((v - r["start"][k]) / done)
+                    imag.setdefault(k, []).extend((x - r["start"][k]) / planned for x in r["values"][k])
+        lines = []
+        for k, got in real.items():
+            want = sorted(imag[k])
+            if not any(got) and not any(want):
+                continue
+            band = (want[int(0.1 * (len(want) - 1))], want[int(round(0.9 * (len(want) - 1)))])
+            avg = statistics.mean(got)
+            lines.append(f"{k} per step of yours: imagined {statistics.median(want):+.1f} (8 of 10 trials "
+                         f"{band[0]:+.1f} to {band[1]:+.1f}), really {avg:+.1f} on average over {len(got)} "
+                         f"(from {min(got):+.1f} to {max(got):+.1f})" +
+                         ("" if band[0] <= avg <= band[1] else ": the real average is outside what you imagine"))
+        return lines
+
     def wake_text(self, scored: list[dict[str, Any]]) -> str:
         if not scored and not self.partials:
             return ""
@@ -522,14 +565,20 @@ class Imagination:
                              f"(median {sp['median']}), really {real}: {s['bits'][k]} bits")
             if s["max_bits"] >= lim:
                 beliefs = "; ".join(f"{n} {json.dumps(b)}" for n, b in r["beliefs"].items() if b)
+                ev = self.evidence(r["domain"])
                 parts.append(
                     f"SURPRISE ({r['id']}): you imagined {what} ({r['trials']} trials). " + "; ".join(lines) +
                     f". Only about 1 in {2 ** s['max_bits']:.0f} imaginings came out that far off. Rules it used: "
                     + ", ".join(f"{v} {i}" for v, i in r["rules"].items()) +
                     (f". What you believed: {beliefs}" if beliefs else "") +
-                    ". Decide what was wrong: a rule (fix it with imagine(rules=...)), what you believe of someone "
-                    "(imagine(setup=...)), or luck. Then reflect(id='" + r["id"] + "', verdict='rule'|'belief'|"
-                    "'luck', lesson='one line') so the lesson rides on your next imaginings.")
+                    (". Everything you have really seen of " + r["domain"] + ":\n- " + "\n- ".join(ev) + "\n"
+                     if ev else ". ") +
+                    "Decide what was wrong, in this order. A belief: would other numbers for someone (their attack, "
+                    "defence, damage) bring the imagined spread onto the real average? Then change them with "
+                    "imagine(setup=...). A rule: only when the same thing keeps happening that no numbers in your "
+                    "rule could produce, over several tries, not one. Luck: one result your dice allow, with the "
+                    "averages in line. A story that fits one result is not a rule. Then reflect(id='" + r["id"] +
+                    "', verdict='belief'|'rule'|'luck', lesson='one line, with the numbers').")
             else:
                 parts.append(f"As imagined ({r['id']}): {what}. " + "; ".join(lines) + ".")
         cal = self.calibration()
@@ -549,12 +598,33 @@ class Imagination:
             lesson = str(a.get("lesson") or "").strip()[:240]
             append_jsonl(self.log, {"kind": "reflected", "id": pid, "ts": time.time(), "verdict": verdict,
                                     "lesson": lesson})
+            tag = f"[{r['domain']}] "
             if lesson and verdict != "luck":
-                self.spec["lessons"] = (self.spec["lessons"] + [f"[{r['domain']}] {lesson}"])[-12:]
+                # the last few per kind of plan: Tamsin's seven spar lessons contradicted each other and all rode along
+                same = [x for x in self.spec["lessons"] if x.startswith(tag)][-3:]
+                self.spec["lessons"] = ([x for x in self.spec["lessons"] if not x.startswith(tag)] + same +
+                                        [tag + lesson])[-12:]
                 self.save()
-            return {"ok": True, "kept": lesson if verdict != "luck" else None, "calibration": self.calibration()}
+            out: dict[str, Any] = {"ok": True, "kept": lesson if verdict != "luck" else None,
+                                   "calibration": self.calibration()}
+            # a verdict says what to change: check it was changed
+            if verdict == "belief" and all(self.spec["beliefs"].get(n, {}) == b for n, b in r["beliefs"].items()):
+                out["note"] = ("your beliefs are as they were when you imagined this: change the numbers with "
+                               "imagine(setup={name: {...}}), or the next imagining makes the same mistake")
+            elif verdict == "rule":
+                if all((self.spec["rules"].get(v) or {}).get("id") == i for v, i in r["rules"].items()):
+                    out["note"] = ("your rules are as they were when you imagined this: fix one with "
+                                   "imagine(rules=...), or the next imagining makes the same mistake")
+                seen = sum(1 for x in recs.values() if x.get("domain") == r["domain"] and
+                           ((x.get("scored") or x.get("partial") or {}).get("real")))
+                if seen < 3:
+                    out["note"] = (out.get("note", "") + "; " if out.get("note") else "") + (
+                        f"a new rule from {seen} real {r['domain']} is a guess: check first whether other numbers "
+                        f"for someone (a belief) explain it")
+            return out
         scored = sorted((r for r in recs.values() if "scored" in r), key=lambda r: -r["scored"]["max_bits"])[:8]
         return {"ok": True, "calibration": self.calibration(), "lessons": self.spec["lessons"][-8:],
+                "evidence": {d: self.evidence(d, recs) for d in dict.fromkeys(r["domain"] for r in scored)},
                 "imaginings": [{"id": r["id"], "plan": r["domain"], "first": r["first"],
                                 "imagined": {k: spread(r["values"][k])["band"] for k in r["scored"]["real"]},
                                 "real": r["scored"]["real"], "bits": r["scored"]["bits"],

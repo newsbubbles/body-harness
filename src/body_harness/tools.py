@@ -153,10 +153,12 @@ IMAGINE = fn("imagine", "Try a plan in your imagination before you do it: a priv
               "plan": {"type": "array", "items": {"type": "object"}}, "rounds": {"type": "integer"},
               "trials": {"type": "integer"}})
 REFLECT = fn("reflect", "Look back on what you imagined against what really happened. With no id: your biggest "
-                        "surprises, how well your imagination did per kind of plan, and your lessons. With id, "
-                        "verdict (rule: a rule was wrong; belief: you misjudged someone; luck: the dice) and lesson "
-                        "(one line): what you learned, kept and shown on your next imaginings.",
-             {"id": S, "verdict": {"type": "string", "enum": ["rule", "belief", "luck"]}, "lesson": S})
+                        "surprises, the numbers you have really seen per kind of plan, how well your imagination did, "
+                        "and your lessons. With id, verdict and lesson (one line, with the numbers): belief (someone's "
+                        "numbers were off: check this first), rule (the same thing keeps happening that no numbers "
+                        "in your rule could produce), or luck (one result your dice allow). Change the belief or rule "
+                        "with imagine() too; the lesson is shown on your next imaginings.",
+             {"id": S, "verdict": {"type": "string", "enum": ["belief", "rule", "luck"]}, "lesson": S})
 
 EXTRAS: dict[str, dict[str, Any]] = {
     "schedule": fn("schedule", "Ask to be woken later for something: at_t= a world time in seconds, or "
