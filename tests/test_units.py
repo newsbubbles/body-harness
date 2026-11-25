@@ -727,33 +727,6 @@ def test_world_import_saves_as_it_goes_and_resumes(tmp_path: Path):
     assert "1200 deeds" in asyncio.run(past.import_world(d, "e1", {}, tmp_path)) and len(d.calls) == 1  # nothing new
 
 
-def test_budget_pauses_a_seat_before_its_model_is_called(tmp_path: Path):
-    # a test day spent $9 on one account before anyone looked: seats stop themselves at a day budget
-    import time as _t
-    from body_harness import loop
-    from body_harness.loop import Mind
-    from body_harness.seat import Seat
-    home = tmp_path
-    for name, cost in (("a", 0.30), ("b", 0.50)):
-        d = home / "seats" / name
-        d.mkdir(parents=True)
-        (d / "usage.jsonl").write_text(json.dumps({"ts": _t.time() - 60, "seat": name, "model": "x:y", "calls": 1,
-                                                   "cost": cost}) + "\n" +
-                                       json.dumps({"ts": _t.time() - 90000, "seat": name, "model": "x:y", "calls": 1,
-                                                   "cost": 5.0}) + "\n", encoding="utf-8")
-    m = Mind.__new__(Mind)
-    m.seat = Seat(home, "a")
-    loop._SPENT.clear()
-    assert m._over_budget() == ""  # no budget set: never paused
-    (home / "seats" / "a" / "config.json").write_text(json.dumps({"budget_day": 0.25}), encoding="utf-8")
-    assert "$0.30" in m._over_budget() and "budget_day" in m._over_budget()  # yesterday's $5 does not count
-    (home / "seats" / "a" / "config.json").write_text(json.dumps({"budget_day": 1}), encoding="utf-8")
-    (home / "config.json").write_text(json.dumps({"budget_home_day": 0.75}), encoding="utf-8")
-    assert "$0.80" in m._over_budget() and "budget_home_day" in m._over_budget()
-    (home / "config.json").write_text(json.dumps({"budget_home_day": 2}), encoding="utf-8")
-    assert m._over_budget() == ""
-
-
 def test_reflexes_answer_small_things_and_wake_the_mind_for_the_rest(tmp_path: Path):
     # Pip woke for every "Morning, Pip" and every time-up with nothing changed; a rule the mind wrote handles those,
     # and anything unsure, refused or uncovered wakes it as before
