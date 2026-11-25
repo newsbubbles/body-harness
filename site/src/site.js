@@ -31,6 +31,20 @@
   function legend(id, items) {
     document.getElementById(id).innerHTML = items.map(([n, v]) => `<span><i style="background:var(${v})"></i>${n}</span>`).join('');
   }
+  // each chart is drawn at the width it is shown, so its words stay 12px on a phone; below NARROW a category's
+  // name goes on its own line above its marks instead of in a column beside them
+  const NARROW = 460;
+  function frame(host) {
+    const W = Math.max(260, Math.round(host.clientWidth || 520));
+    return { W, narrow: W < NARROW };
+  }
+  // the label column fits the longest name, but never more than 40% of the chart
+  function labelColumn(svg, names, W, min) {
+    const probe = names.map(n => txt(svg, 0, 0, n, 'cat'));
+    const L = Math.max(min, ...probe.map(t => t.getComputedTextLength() + 16));
+    probe.forEach(t => t.remove());
+    return Math.min(L, Math.round(W * 0.4));
+  }
 
   // ---------- savings ----------
   const phaseColors = ['--s1', '--s2', '--s3'];
@@ -43,19 +57,22 @@
     const S = T.savings;
     legend('leg-savings', S.phases.map((p, i) => [p, phaseColors[i]]));
     const host = document.getElementById('chart-savings'); host.innerHTML = '';
-    const W = 760, L = 78, R = 120, bh = 16, gap = 2, gg = 22, top = 10;
-    const H = top + seats.length * (3 * bh + 2 * gap) + (seats.length - 1) * gg + 34;
+    const { W, narrow } = frame(host);
+    const bh = 16, gap = 2, gg = narrow ? 14 : 22, top = 10, head = narrow ? 22 : 0, gh = 3 * bh + 2 * gap;
+    const H = top + seats.length * (head + gh) + (seats.length - 1) * gg + 34;
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}` }, host);
+    const L = narrow ? 0 : labelColumn(svg, seats.map(s => s[0]), W, 60), R = 118;
     const max = 0.005, x = (v) => L + (v / max) * (W - L - R);
     const plotBottom = H - 24;
-    for (let t = 0; t <= max + 1e-9; t += 0.001) {
+    for (let t = 0; t <= max + 1e-9; t += narrow ? 0.0025 : 0.001) {
       el('line', { x1: x(t), x2: x(t), y1: top - 4, y2: plotBottom, class: 'gridline' }, svg);
-      txt(svg, x(t), plotBottom + 14, '$' + t.toFixed(3), '', 'middle');
+      txt(svg, x(t), plotBottom + 14, '$' + t.toFixed(narrow ? 4 : 3), '', narrow && t === 0 ? 'start' : 'middle');
     }
     let y = top;
     seats.forEach(([name, vals, ns]) => {
-      const gh = 3 * bh + 2 * gap;
-      txt(svg, L - 10, y + gh / 2, name, 'cat', 'end');
+      if (narrow) txt(svg, 0, y + 8, name, 'cat');
+      else txt(svg, L - 10, y + gh / 2, name, 'cat', 'end');
+      y += head;
       vals.forEach((v, i) => {
         const yy = y + i * (bh + gap);
         el('path', { d: barPath(L, yy, Math.max(2, x(v) - L), bh), fill: css(phaseColors[i]) }, svg);
@@ -88,18 +105,21 @@
     const M = T.models;
     legend('leg-slept', [[M.slept_legend[0], '--s2'], [M.slept_legend[1], '--s1']]);
     const host = document.getElementById('chart-slept'); host.innerHTML = '';
-    const W = 520, L = 140, R = 40, row = 28, top = 8;
+    const { W, narrow } = frame(host);
+    const row = narrow ? 42 : 28, top = 8;
     const H = top + models.length * row + 30;
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}` }, host);
+    const L = narrow ? 10 : labelColumn(svg, models.map(m => m[0]), W, 120), R = 24;
     const x = (v) => L + v * (W - L - R), plotBottom = top + models.length * row;
-    [0, 0.25, 0.5, 0.75, 1].forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, pct(t), '', 'middle'); });
+    [0, 0.25, 0.5, 0.75, 1].forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, pct(t), '', narrow && t === 0 ? 'start' : 'middle'); });
     models.forEach((m, i) => {
-      const cy = top + i * row + row / 2;
-      txt(svg, L - 10, cy, m[0], 'cat', 'end');
+      const y0 = top + i * row, cy = narrow ? y0 + 29 : y0 + row / 2;
+      if (narrow) txt(svg, 0, y0 + 10, m[0], 'cat');
+      else txt(svg, L - 10, cy, m[0], 'cat', 'end');
       if (m[1] != null && m[1] !== m[2]) el('line', { x1: x(m[1]), x2: x(m[2]), y1: cy, y2: cy, stroke: css('--rule'), 'stroke-width': 2 }, svg);
       if (m[1] != null) el('circle', { cx: x(m[1]), cy, r: 6, fill: css('--s2'), stroke: css('--surface'), 'stroke-width': 2 }, svg);
       el('circle', { cx: x(m[2]), cy, r: 6, fill: css('--s1'), stroke: css('--surface'), 'stroke-width': 2 }, svg);
-      const hit = el('rect', { x: 0, y: cy - row / 2, width: W, height: row, fill: 'transparent' }, svg);
+      const hit = el('rect', { x: 0, y: y0, width: W, height: row, fill: 'transparent' }, svg);
       hover(hit, `<b>${m[0]}</b><br>${fill(M.slept_tip_before, { v: m[1] == null ? M.not_run : pct(m[1]) })}<br>${fill(M.slept_tip_after, { v: pct(m[2]) })}`);
     });
   }
@@ -107,14 +127,17 @@
     const M = T.models;
     const host = document.getElementById('chart-cost'); host.innerHTML = '';
     const sorted = [...models].sort((a, b) => a[4] - b[4]);
-    const W = 520, L = 140, R = 70, row = 28, bh = 16, top = 8;
+    const { W, narrow } = frame(host);
+    const row = narrow ? 42 : 28, bh = 16, top = 8;
     const H = top + sorted.length * row + 30;
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}` }, host);
+    const L = narrow ? 0 : labelColumn(svg, sorted.map(m => m[0]), W, 120), R = 70;
     const max = 0.014, x = (v) => L + (v / max) * (W - L - R), plotBottom = top + sorted.length * row;
-    [0, 0.004, 0.008, 0.012].forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, '$' + t.toFixed(3), '', 'middle'); });
+    [0, 0.004, 0.008, 0.012].forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, '$' + t.toFixed(3), '', narrow && t === 0 ? 'start' : 'middle'); });
     sorted.forEach((m, i) => {
-      const yy = top + i * row + (row - bh) / 2;
-      txt(svg, L - 10, yy + bh / 2, m[0], 'cat', 'end');
+      const yy = top + i * row + (narrow ? 20 : (row - bh) / 2);
+      if (narrow) txt(svg, 0, yy - 10, m[0], 'cat');
+      else txt(svg, L - 10, yy + bh / 2, m[0], 'cat', 'end');
       el('path', { d: barPath(L, yy, Math.max(2, x(m[4]) - L), bh), fill: css('--s1') }, svg);
       txt(svg, x(m[4]) + 6, yy + bh / 2, money(m[4]), 'val');
       const hit = el('rect', { x: 0, y: yy - 4, width: W, height: bh + 8, fill: 'transparent' }, svg);
@@ -128,18 +151,18 @@
   function jevChart() {
     const J = T.jev;
     const host = document.getElementById('chart-jev'); host.innerHTML = '';
-    const W = 520, R = 70, row = 30, bh = 16, top = 8;
+    const { W, narrow } = frame(host);
+    const R = 56, row = narrow ? 42 : 30, bh = 16, top = 8;
     const H = top + jev.length * row + 30;
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}` }, host);
     // the label column fits the longest translated name
-    const probe = J.names.map(n => txt(svg, 0, 0, n, 'cat'));
-    const L = Math.max(130, ...probe.map(t => t.getComputedTextLength() + 16));
-    probe.forEach(t => t.remove());
+    const L = narrow ? 0 : labelColumn(svg, J.names, W, 130);
     const x = (v) => L + v * (W - L - R), plotBottom = top + jev.length * row;
-    [0, 0.5, 1].forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, pct(t), '', 'middle'); });
+    [0, 0.5, 1].forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, pct(t), '', narrow && t === 0 ? 'start' : 'middle'); });
     jev.forEach(([k, n], i) => {
-      const yy = top + i * row + (row - bh) / 2, v = k / n;
-      txt(svg, L - 10, yy + bh / 2, J.names[i], 'cat', 'end');
+      const yy = top + i * row + (narrow ? 20 : (row - bh) / 2), v = k / n;
+      if (narrow) txt(svg, 0, yy - 10, J.names[i], 'cat');
+      else txt(svg, L - 10, yy + bh / 2, J.names[i], 'cat', 'end');
       el('path', { d: barPath(L, yy, Math.max(2, x(v) - L), bh), fill: css('--s1') }, svg);
       txt(svg, x(v) + 6, yy + bh / 2, `${k}/${n}`, 'val');
       const hit = el('rect', { x: 0, y: yy - 4, width: W, height: bh + 8, fill: 'transparent' }, svg);
@@ -150,7 +173,18 @@
 
   function drawAll() { savings(); slept(); cost(); jevChart(); }
   modelTable();
+  // on a phone each table row becomes a card, and each cell names its column (site.css reads data-l)
+  document.querySelectorAll('table').forEach(t => {
+    const heads = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+    t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-l', heads[i] || '')));
+  });
   drawAll();
+  // the charts are drawn to their shown width: draw again when it changes (a phone turned, a window resized)
+  let shownW = 0;
+  new ResizeObserver(() => {
+    const w = document.getElementById('chart-cost').clientWidth;
+    if (w && w !== shownW) { shownW = w; drawAll(); }
+  }).observe(document.querySelector('main'));
   // the bars take their colors from the theme tokens: redraw when the theme changes
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
   new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
