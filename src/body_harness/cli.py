@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -23,7 +24,7 @@ from pathlib import Path
 import httpx
 
 from . import seat as seats
-from .door import Door, open_invite
+from .door import Door, DoorError, open_invite
 from .usage import fold
 
 
@@ -32,6 +33,60 @@ def _since(text: str) -> float:
         return 0.0
     n, unit = float(text[:-1]), text[-1]
     return time.time() - n * {"m": 60, "h": 3600, "d": 86400}.get(unit, 3600)
+
+
+async def _hand(args: argparse.Namespace, s: seats.Seat) -> int:
+    """A seat's extra grants, one door file each in hands/. The token stays in the file, as door.json's does."""
+    d = s.p("hands")
+    if args.action == "list":
+        files = sorted(d.glob("*.json")) if d.exists() else []
+        if not files:
+            print(f"{s.name} has no hands: bh hand {s.name} add NAME <invite>")
+            return 0
+        async with httpx.AsyncClient() as client:
+            for f in files:
+                try:
+                    o = await Door.load(f, client).get("/op")
+                    print(f"{f.stem:12} {o.get('role', '?')}, {len(o.get('ops') or [])} ops")
+                except (DoorError, httpx.HTTPError) as e:
+                    print(f"{f.stem:12} the door did not answer: {e}")
+        return 0
+    if not args.hand or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", args.hand):
+        print("name the hand: lowercase letters, digits, - and _ (bh hand SEAT add lehr <invite>)", file=sys.stderr)
+        return 2
+    f = d / f"{args.hand}.json"
+    if args.action == "remove":
+        if not f.exists():
+            print(f"{s.name} has no hand {args.hand}", file=sys.stderr)
+            return 2
+        gone = d / "removed"
+        gone.mkdir(parents=True, exist_ok=True)
+        f.rename(gone / f"{args.hand}.{int(time.time())}.json")  # kept aside, not deleted: the grant lives on in the world
+        print(f"{s.name}: hand {args.hand} put aside; the grant itself stays until the world's owner revokes it. "
+              f"Restart the seat to drop it")
+        return 0
+    if not args.invite:
+        print("add needs the hand's invite: bh hand SEAT add NAME <link|file>", file=sys.stderr)
+        return 2
+    if f.exists():
+        print(f"{s.name} already has a hand {args.hand}: remove it first", file=sys.stderr)
+        return 2
+    async with httpx.AsyncClient() as client:
+        base, token, _ = await open_invite(client, args.invite)
+        door = Door(base, token, client)
+        o = await door.get("/op")
+        d.mkdir(parents=True, exist_ok=True)
+        if base != Door.load(s.p("door.json"), client).base:
+            # the link has opened once already: keep the grant aside rather than lose it
+            (d / "removed").mkdir(exist_ok=True)
+            door.save(d / "removed" / f"{args.hand}.{int(time.time())}.json")
+            print(f"that grant is for another server than {s.name}'s world: not added (kept in hands/removed)",
+                  file=sys.stderr)
+            return 2
+        door.save(f)
+    print(f"{s.name}: hand {args.hand} added ({o.get('role', '?')}, {len(o.get('ops') or [])} ops). Ops the mind's "
+          f"grant lacks go through it from the seat's next start")
+    return 0
 
 
 async def _join(args: argparse.Namespace, h: Path) -> int:
@@ -192,6 +247,12 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("past-import", help="copy the body's own deeds from the world's history, so past() reaches "
                                            "back before this harness ran it")
     c.add_argument("name")
+    c = sub.add_parser("hand", help="a second grant for one seat (a builder's hand on part of the world): ops the "
+                                    "mind's grant lacks go through it")
+    c.add_argument("name")
+    c.add_argument("action", choices=["add", "list", "remove"])
+    c.add_argument("hand", nargs="?", help="the hand's name (add, remove)")
+    c.add_argument("invite", nargs="?", help="with add: the invite link (it opens once), page or file")
     c = sub.add_parser("service", help="keep seats running, restarted when they stop and after a reboot")
     c.add_argument("action", choices=["add", "remove", "status", "run", "stop", "install", "uninstall"])
     c.add_argument("names", nargs="*")
@@ -249,6 +310,8 @@ def main(argv: list[str] | None = None) -> int:
                 return await import_world(Door.load(s.p("door.json"), client), st["me"], st.get("names") or {}, s.dir)
         print(f"{args.name}: {asyncio.run(go())}")
         return 0
+    if args.cmd == "hand":
+        return asyncio.run(_hand(args, s))
     if args.cmd == "tell":
         s.tell(args.text)
         print(f"told {args.name}; it wakes for it within a minute or two")

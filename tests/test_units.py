@@ -597,3 +597,53 @@ def test_past_reaches_back_through_the_world(tmp_path: Path):
     ms = moments(calls)
     assert [m["verb"] for m in ms] == ["read", "say", "drink"] and [m["n"] for m in ms] == [1, 2, 3]
     assert "1 of your 3 deeds" in search(ms, match="hollow")
+
+
+def test_author_ops_go_through_the_hand_that_reaches_the_target():
+    # some minds hold a body's mind grant and a builder hand on one part of the world: the engine refuses limits on a
+    # mind grant, so the hand is a second token, and spawn under the hand's plot has to go through it
+    import asyncio
+    from body_harness.loop import Mind
+
+    class FakeDoor:
+        def __init__(self, name, under):
+            self.name, self.under, self.calls = name, under, []
+
+        async def op(self, op, **a):
+            self.calls.append(op)
+            if op == "spawn" and a.get("parent") not in self.under:
+                return {"ok": False, "reason": f"your grant reaches only under {self.name}'s plot"}
+            if op == "spawn" and a.get("type") == "dragon":
+                return {"ok": False, "reason": "no schema dragon"}
+            return {"ok": True, "by": self.name}
+
+    m = Mind.__new__(Mind)
+    m.st, m.door = {}, FakeDoor("mind", set())
+    m.hands = {"north": {"door": FakeDoor("north", {"e10"}), "ops": {"spawn"}, "role": "builder"},
+               "south": {"door": FakeDoor("south", {"e20"}), "ops": {"spawn"}, "role": "builder"}}
+    run = lambda op, **a: asyncio.run(m._op(op, a))
+    assert run("say", text="hi")["by"] == "mind"  # the mind's own ops never go through a hand
+    assert run("spawn", type="thing", parent="e20")["by"] == "south"  # north refused for reach, south covers it
+    assert m.st["hand_for"]["e20"] == "south"
+    m.hands["north"]["door"].calls.clear()
+    assert run("spawn", type="thing", parent="e20")["by"] == "south" and not m.hands["north"]["door"].calls
+    r = run("spawn", type="thing", parent="e9")
+    assert r["ok"] is False and "north" in r["reason"] and "south" in r["reason"] and len(r["hands_tried"]) == 2
+    r = run("spawn", type="dragon", parent="e10")  # refused for what it asks, not where: no other hand is tried
+    assert "no schema dragon" in r["reason"] and "hands_tried" not in r
+
+    # the hand's ops come to the model as tools, saying whose they are
+    from body_harness.tools import Registry
+    spec = lambda *ops: {"paths": {f"/op/{o}": {"post": {"operationId": o, "summary": o}} for o in ops}}
+
+    class SpecDoor(FakeDoor):
+        async def get(self, path):
+            return spec("inspect", "spawn") if "builder" in path else spec("inspect")
+    m.ops, m.role, m.door = ["inspect"], "mind", SpecDoor("mind", set())
+    for h in m.hands.values():
+        h["door"] = SpecDoor("x", set())
+    reg = Registry.__new__(Registry)
+    reg.m, reg.world = m, {}
+    asyncio.run(reg.load_world_ops())
+    assert reg.world["spawn"]["hands"] == ["north", "south"] and "builder hand" in reg.world["spawn"]["description"]
+    assert reg.world["inspect"]["hands"] == []

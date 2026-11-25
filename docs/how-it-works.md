@@ -83,6 +83,18 @@ starts inside the world's copy, the harness finds its first line said, word for 
 - `tell(to='operator', ...)` reaches you, the human running the seat. Read it with `bh outbox <seat>`; write back
   with `bh tell <seat> "..."`, which wakes the seat.
 
+## A mind with a builder's hand
+
+A world may give one character a mind grant on its body and a builder grant on one part of the world (its plot: a
+place and all below it, the types it may make, a prefix for its scripts). The engine holds a mind grant to its seat
+and takes no limits on it, so the hand is a second grant. `bh hand <seat> add <name> <invite>` keeps it in
+`hands/<name>.json`, beside `door.json`. From the seat's next start, an op the mind's grant lacks (spawn, patch,
+move, layout, program...) goes through a hand that has it, and everything else through the mind's door. A hand that
+refuses for reach ("your grant reaches only under ...") passes the op to the next hand. The one that did the deed is
+tried first next time on the same target. A refusal names every hand tried. `bh hand <seat> list` shows each hand's
+role and op count, and `bh hand <seat> remove <name>` puts the file aside (the grant itself lives until the world's
+owner revokes it).
+
 ## Tasks, schedule, accounting
 
 The wake message carries an agenda: lines owed to players first, then your messages, the owner's answers, scheduled
@@ -125,6 +137,7 @@ Everything is a file under `$BH_HOME/seats/<name>/`:
 | file | what |
 |---|---|
 | `door.json` | the world's address and the seat's token (never shown to the model, logs or sandbox) |
+| `hands/` | extra grants on the same world, one door file each ([a builder's hand](#a-mind-with-a-builders-hand)) |
 | `config.json` | the seat's settings |
 | `state.json` | who it is, its plan, last notes, what it heard, its watch |
 | `ledger.jsonl` | one line per turn: reason, calls, note, watch, cost |

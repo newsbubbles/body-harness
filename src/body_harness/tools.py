@@ -216,15 +216,24 @@ class Registry:
         self.world: dict[str, dict[str, Any]] = {}  # op -> {summary, description, schema}
 
     async def load_world_ops(self) -> None:
+        """The world ops this seat may call: its mind's grant's, then each hand's that the mind lacks."""
+        await self._load_ops(self.m.door, self.m.role, set(self.m.ops or []), "")
+        for h, hand in getattr(self.m, "hands", {}).items():
+            if hand["ops"]:
+                await self._load_ops(hand["door"], hand["role"], hand["ops"], h)
+
+    async def _load_ops(self, door: Any, role: str, allowed: set[str], hand: str) -> None:
         try:
-            spec = await self.m.door.get(f"/openapi.json?role={self.m.role}")
+            spec = await door.get(f"/openapi.json?role={role}")
         except Exception:
             spec = {}
-        allowed = set(self.m.ops or [])
         for path, item in (spec.get("paths") or {}).items():
             op = (item.get("post") or {})
             name = op.get("operationId") or path.rsplit("/", 1)[-1]
             if name in HIDDEN_OPS or name in CORE_NAMES or (allowed and name not in allowed):
+                continue
+            if hand and name in self.world:
+                self.world[name]["hands"].append(hand)
                 continue
             schema = (((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {}).get(
                 "schema") or {"type": "object", "properties": {}}
@@ -232,8 +241,10 @@ class Registry:
             schema.setdefault("type", "object")
             schema.setdefault("properties", {})
             desc = (op.get("description") or op.get("summary") or "").split("**Layer:**")[0].strip()
+            if hand:
+                desc = f"(through your builder hand {hand}, which reaches only its own part of the world) " + desc
             self.world[name] = {"summary": op.get("summary") or desc[:160], "description": desc[:1500],
-                                "schema": schema, "layer": op.get("x-layer", "")}
+                                "schema": schema, "layer": op.get("x-layer", ""), "hands": [hand] if hand else []}
 
     def catalog(self) -> list[tuple[str, str, str]]:
         """(name, kind, one line) for every findable thing."""

@@ -58,6 +58,15 @@ def _brief(args: dict[str, Any]) -> str:
     return ", ".join(f"{k}={v!r}" for k, v in args.items() if v not in (None, "", {}))[:160]
 
 
+# the engine's refusals for a limited grant's reach (its under, types, scripts): another hand may cover it
+_OUT_OF_REACH = re.compile(r"your grant|start with|the door refused this grant", re.I)
+_TARGET_KEYS = ("entity", "parent", "thing", "target", "to", "into", "under")
+
+
+def _target_of(args: dict[str, Any]) -> str:
+    return next((str(args[k]) for k in _TARGET_KEYS if isinstance(args.get(k), str) and args.get(k)), "")
+
+
 def _log(seat: str, msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {seat}: {msg}", flush=True)
 
@@ -69,6 +78,10 @@ class Mind:
         self.cfg = seat.config()
         self.door = Door.load(seat.p("door.json"), client)
         self.door.wait_cap = float(self.cfg.get("wait_cap", self.door.wait_cap))
+        # extra grants on the same world (a builder's hand on one part of it): bh hand SEAT add NAME <invite>
+        self.hands: dict[str, dict[str, Any]] = {
+            f.stem: {"door": Door.load(f, client), "ops": set(), "role": ""}
+            for f in (sorted(seat.p("hands").glob("*.json")) if seat.p("hands").is_dir() else [])}
         self.model = Model.from_config(self.cfg.get("model", ""), {**self.cfg, "session": self.cfg.get("session") or
                                        f"bh-{seat.name}-{uuid.uuid4().hex[:6]}"})
         self.base_model = self.model
@@ -182,6 +195,14 @@ class Mind:
             self.role = o.get("role", self.role)
         except DoorError:
             pass
+        for h, hand in list(self.hands.items()):
+            try:
+                o = await hand["door"].get("/op")
+                hand["ops"], hand["role"] = set(o.get("ops") or []) - set(self.ops), o.get("role", "")
+                _log(self.seat.name, f"hand {h}: {hand['role']}, {len(hand['ops'])} ops the mind's grant lacks")
+            except DoorError as e:
+                _log(self.seat.name, f"hand {h}: not used this run, its door refused ({e})")
+                del self.hands[h]
         await self.registry.load_world_ops()
         try:
             hb = await self.door.op("handbook")
@@ -199,6 +220,39 @@ class Mind:
         self.save()
 
     # ---------- tools ----------
+
+    def _hands_for(self, name: str, args: dict[str, Any]) -> list[str]:
+        """The hands to try for an op the mind's grant lacks: the one that last did a deed on this target first."""
+        hs = [h for h, hand in self.hands.items() if name in hand["ops"]]
+        last = (self.st.get("hand_for") or {}).get(_target_of(args))
+        return sorted(hs, key=lambda h: h != last)
+
+    async def _op(self, name: str, args: dict[str, Any]) -> Any:
+        """One world op, through the mind's door, or for an author op through the hand that covers the target. A
+        hand whose reach the target is outside refuses, and the next hand is tried; the refusal names each one."""
+        hands = self._hands_for(name, args)
+        if not hands:
+            return await self.door.op(name, **args)
+        tried: list[str] = []
+        r: Any = None
+        for h in hands:
+            try:
+                r = await self.hands[h]["door"].op(name, **args)
+            except DoorError as e:
+                r = {"ok": False, "reason": str(e)}
+            if not (isinstance(r, dict) and r.get("ok") is False):
+                if (t := _target_of(args)):
+                    self.st.setdefault("hand_for", {})[t] = h
+                    self.st["hand_for"] = dict(list(self.st["hand_for"].items())[-200:])
+                return r
+            tried.append(f"{h}: {r.get('reason')}")
+            if not _OUT_OF_REACH.search(str(r.get("reason") or "")):
+                break  # refused for what the op asks, not for where: every hand would say the same
+        r = dict(r)
+        r["reason"] = f"{r.get('reason')} (through your hand {', '.join(t.split(':')[0] for t in tried)})"
+        if len(tried) > 1:
+            r["hands_tried"] = tried
+        return r
 
     async def call(self, name: str, args: dict[str, Any], turn: dict[str, Any]) -> str:
         if name == "look":
@@ -309,18 +363,18 @@ class Mind:
         if name == "away":
             self.st["away"] = fixed
         fixed = self._drop_unsupported(name, fixed)
-        r = await self.door.op(name, **fixed)
+        r = await self._op(name, fixed)
         bad = re.search(r"unexpected keyword argument '(\w+)'", str(r)) if isinstance(r, dict) else None
         if bad and bad.group(1) in fixed:
             # an older engine has no such parameter (Klhyts Refuge's say takes no gesture): drop it for this seat
             # from now on and send the call again, rather than spend the model's step on a refusal
             self.st.setdefault("unsupported", {}).setdefault(name, []).append(bad.group(1))
             fixed = self._drop_unsupported(name, fixed)
-            r = await self.door.op(name, **fixed)
+            r = await self._op(name, fixed)
         if isinstance(r, dict) and r.get("ok") is False and "join" in str(r.get("reason", "")).lower() \
                 and "seat" in str(r.get("reason", "")).lower():
             await self.join()
-            r = await self.door.op(name, **fixed)
+            r = await self._op(name, fixed)
         ok = not (isinstance(r, dict) and r.get("ok") is False)
         if ok and name in DEEDS:
             turn["deeds"] += 1
