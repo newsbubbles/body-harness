@@ -726,6 +726,12 @@ class Mind:
                 rec["outcome"] = "own deed: woke the mind"
                 append_jsonl(self.seat.p("reflexes.jsonl"), rec)
                 return False
+            if all(x["do"] == "wake" for _, x in live):
+                # a wake rule only matters against another rule; alone it wakes the mind as the watch already does.
+                # Nico's first sleep with reflexes set two of these: a judge call that could change nothing
+                rec["outcome"] = "only wake rules: woke the mind, no judge"
+                append_jsonl(self.seat.p("reflexes.jsonl"), rec)
+                return False
             rules = [x for _, x in live]
             try:
                 if getattr(self, "judge", None) is None:

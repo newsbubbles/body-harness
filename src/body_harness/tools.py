@@ -203,8 +203,9 @@ def _reflex_sleep() -> dict[str, Any]:
         " reflexes= (optional) up to 5 rules your body follows while you sleep, so small things need no turn of "
         "yours. Each: if= what happens, in words ('Brakka greets me'); unless= what would make it something else "
         "(optional: 'unless he offers a job'); do= say (with text= the line, written now, and to=) | act (verb= "
-        "go, follow or rest, target=) | sleep (let it pass, keep waiting) | wake (wake me for it); max= how many "
-        "times (3). when='timeout' runs a rule when the minutes pass instead (do='sleep', minutes= to wait longer). "
+        "go, follow or rest, target=) | sleep (let it pass, keep waiting) | wake (only as an exception to your other "
+        "rules, like 'Brakka arrives' beside 'someone arrives' -> sleep: what no rule takes wakes you anyway); "
+        "max= how many times (3). when='timeout' runs a rule when the minutes pass instead (do='sleep', minutes= to wait longer). "
         "With reflexes, waiting_for= says in words what you wait for and why. A small judge reads what happened "
         "against your rule, your goals and waiting_for; when it is unsure you wake, and anything no rule covers "
         "wakes you as usual. Coin, giving, fighting and promises are never a rule's: do='wake' for those.")

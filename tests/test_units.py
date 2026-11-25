@@ -789,6 +789,10 @@ def test_reflexes_answer_small_things_and_wake_the_mind_for_the_rest(tmp_path: P
     assert asyncio.run(m._reflex([], "timeout")) is False  # max=1: spent
     log = [json.loads(x) for x in (home / "seats" / "pip" / "reflexes.jsonl").read_text().splitlines()]
     assert [r["outcome"] for r in log] == ["handled", "unsure: woke the mind", "woke the mind", "own deed: woke the mind", "handled"]
+    only_wake, _ = rx.check([{"if": "Brakka arrives", "do": "wake"}], "w", {})
+    m.st["reflexes"]["rules"], m.judge = only_wake, Judge({"r0": 0.99})  # wake rules alone: no judge call
+    assert asyncio.run(m._reflex(greet, "fired")) is False and not m.judge.seen
+    m.st["reflexes"]["rules"] = rules
     m.st["reflexes"]["rules"][0]["fired"] = 3  # every rule spent: no judge call at all
     m.st["reflexes"]["rules"][1]["fired"] = 3
     m.judge = Judge({})
