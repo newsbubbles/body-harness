@@ -23,6 +23,7 @@ from typing import Any
 import httpx
 
 from . import imagine, imports, past, prompts, sandbox, scene
+from . import reflexes as rx
 from .door import Door, DoorError
 from .memory import Shelf, memo
 from .providers import Model, ModelError
@@ -258,7 +259,8 @@ class Mind:
         if home is not None:
             spent = sum(_spent_day(p, now) for p in sorted((self.seat.home / "seats").glob("*/usage.jsonl")))
             if spent >= float(home):
-                return f"the seats in this home spent ${spent:.2f} in the last 24 hours, budget_home_day is "                        f"${float(home):.2f}"
+                return (f"the seats in this home spent ${spent:.2f} in the last 24 hours, budget_home_day is "
+                        f"${float(home):.2f}")
         return ""
 
     # ---------- tools ----------
@@ -586,6 +588,12 @@ class Mind:
                 return (f"Not asleep yet: your note says you {claim[0]}, but no act did it this turn, so the world "
                         f"does not know. Do it now (act(verb='{claim[1]}', ...)), or write the note as what you said, "
                         f"not what you did, and sleep.")
+        rules: list[dict[str, Any]] = []
+        waiting_for = str(a.get("waiting_for") or "").strip()
+        if self.cfg.get("reflexes") and not forced and a.get("reflexes"):
+            rules, bad = rx.check(a.get("reflexes"), waiting_for, self.cfg)
+            if bad:
+                return "Not asleep yet: " + "; ".join(bad)
         if "said_here()" in until:
             # the harness's shorthand: anyone but you said something here (heard('') would hear your own lines too)
             mine = json.dumps(str((self.bundle.get("you") or {}).get("name") or ""))
@@ -625,6 +633,8 @@ class Mind:
                 return ("Not asleep: while you were deciding, it happened:\n" + "\n".join(lines) +
                         "\nAnswer it if it needs you, then sleep again.")
         self.st["watch"] = {"until": until, "deadline": time.time() + minutes * 60, "armed": time.time()}
+        # every sleep sets its rules afresh: none given, none kept
+        self.st["reflexes"] = {"waiting_for": waiting_for, "rules": rules, "turn": self.turns} if rules else None
         note = str(a.get("note") or "").strip()
         turn["note"] = note
         turn["slept"] = True
@@ -676,6 +686,9 @@ class Mind:
                 self._mark_done({i["id"] for i in due})
                 return "something you scheduled is due: " + "; ".join(i["what"] for i in due), []
             if now >= watch["deadline"]:
+                if await self._reflex([], "timeout"):
+                    watch = self.st.get("watch") or watch
+                    continue
                 return f"time is up on your watch ({until!r} did not happen)", []
             # short pieces so the operator's word and real-time schedules land within half a minute; one light
             # request per piece per seat. (A wait is never cancelled mid-flight: the server would move the cursor
@@ -700,6 +713,8 @@ class Mind:
                     continue
                 return f"your watch was refused: {reason} ({w.get('hint', '')}); set a new one", []
             if w.get("fired"):
+                if await self._reflex(w.get("events") or [], "fired"):
+                    continue  # the body answered by the mind's own rule; the watch goes on from the new cursor
                 return f"what you waited for happened ({until})", w.get("events") or []
             due = self._due(float(w.get("t") or 0))
             if due:
@@ -718,6 +733,86 @@ class Mind:
                     self.st["owner_seen"] = b["owner_answered"]
                     return "the world's owner answered you", b.get("events") or []
         return "stopping", []
+
+    async def _reflex(self, events: list[dict[str, Any]], trigger: str) -> bool:
+        """Run the mind's own rule for what just happened, if one clearly holds. True: handled, keep sleeping. False:
+        wake the mind (no rule, an unsure judge, a refused deed, or a rule that says wake). Every look is logged."""
+        r = self.st.get("reflexes") or {}
+        live = [(i, x) for i, x in enumerate(r.get("rules") or []) if x["when"] == trigger and x["fired"] < x["max"]]
+        if not live:
+            return False
+        rec: dict[str, Any] = {"ts": time.time(), "turn": self.turns, "trigger": trigger,
+                               "waiting_for": r.get("waiting_for", "")}
+        chosen = None
+        if trigger == "timeout":
+            chosen = live[0][0]  # the minutes passing needs no judge
+        else:
+            lines = scene.event_lines(events, self.me, self.names, 12)
+            if not lines:
+                return False
+            rec["what_happened"] = lines
+            if any(x.split("] ", 1)[-1].startswith("you") for x in lines):
+                # the body's own deed landed (an arrival, a move it began): the mind sees that itself. In replay the
+                # judge read "you arrive" as "someone arrives" and kept the mind asleep at its destination
+                rec["outcome"] = "own deed: woke the mind"
+                append_jsonl(self.seat.p("reflexes.jsonl"), rec)
+                return False
+            rules = [x for _, x in live]
+            try:
+                if getattr(self, "judge", None) is None:
+                    self.judge = rx.Judge(str(self.cfg.get("judge") or ""), self.cfg)
+                ps, cost, secs = await self.judge.decide(self.client, rx.state(
+                    self.my_name(), self.bundle, str(self.st.get("plan") or ""), r.get("waiting_for", ""), lines),
+                    rx.questions(rules))
+            except (ModelError, httpx.HTTPError, ValueError) as e:
+                rec.update(outcome="judge failed", error=str(e)[:200])
+                append_jsonl(self.seat.p("reflexes.jsonl"), rec)
+                return False
+            u = Usage(calls=1, cost=cost, seconds=secs)
+            usage_append(self.seat.p("usage.jsonl"), self.seat.name, self.judge.spec, u, f"reflex ({trigger})")
+            k, best = rx.choose(rules, ps, float(self.cfg.get("reflex_fire", rx.FIRE)))
+            rec.update(p={live[i][1]["if"]: round(ps.get(f"r{i}", 0), 3) for i in range(len(live))},
+                       cost=cost, ms=round(secs * 1000))
+            if k is None:
+                near = best >= float(self.cfg.get("reflex_near", rx.NEAR))
+                rec["outcome"] = "unsure: woke the mind" if near else "no rule: woke the mind"
+                if near:
+                    self.st.setdefault("reflex_notes", []).append(
+                        f"a rule of yours nearly matched (p={best:.2f}) but the judge was not sure, so you woke")
+                append_jsonl(self.seat.p("reflexes.jsonl"), rec)
+                return False
+            chosen = live[k][0]
+        rule = r["rules"][chosen]
+        rule["fired"] += 1
+        rec["rule"], rec["do"] = rule.get("if") or "(time is up)", rule["do"]
+        handled, done = True, ""
+        if rule["do"] == "wake":
+            handled, done = False, f"your rule {rule['if']!r} matched, so you woke"
+        elif rule["do"] == "sleep":
+            if trigger == "timeout":
+                w = self.st.get("watch") or {}
+                w["deadline"] = time.time() + rule.get("minutes", 30) * 60
+                self.st["watch"] = w
+                done = f"time was up, and by your rule you waited {rule.get('minutes', 30):.0f} minutes more"
+            else:
+                done = f"your rule {rule['if']!r} matched, so you kept sleeping"
+        else:
+            args = ({"text": rule["text"], "to": rule.get("to") or None} if rule["do"] == "say" else
+                    {"verb": rule["verb"], "target": rule.get("target") or None})
+            res = await self.door.op(rule["do"], **args)
+            if isinstance(res, dict) and res.get("ok") is False:
+                handled = False
+                done = f"your rule {rule.get('if')!r} tried {rule['do']} and the world refused: {res.get('reason')}"
+                rec["refused"] = str(res.get("reason"))[:200]
+            else:
+                what = (f"said {rule['text']!r}" + (f" to {rule['to']}" if rule.get("to") else "")
+                        if rule["do"] == "say" else f"did {rule['verb']} {rule.get('target') or ''}".strip())
+                done = f"while you slept, by your rule {rule.get('if') or '(time is up)'!r}, you {what}"
+        rec["outcome"] = "handled" if handled else "woke the mind"
+        append_jsonl(self.seat.p("reflexes.jsonl"), rec)
+        self.st.setdefault("reflex_notes", []).append(done)
+        self.save()
+        return handled
 
     def _player_here(self) -> bool:
         for x in self.bundle.get("present") or []:
@@ -896,6 +991,9 @@ class Mind:
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
                             recent, heard, str(self.st.get("plan") or ""), told)
         user += self._companion_left(evs)
+        notes = self.st.pop("reflex_notes", None)
+        if notes:
+            user += "\n\n(harness: " + "; ".join(notes[-6:]) + ".)"
         if self.imagination is not None:
             user += self.st.pop("imagined_text", "") + self.imagination.wake_text(self.imagination.score(b, me_name))
         speakers = {self.names.name(e.get("actor")) for e in evs if e.get("kind") in ("say", "talked") and

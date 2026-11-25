@@ -752,3 +752,71 @@ def test_budget_pauses_a_seat_before_its_model_is_called(tmp_path: Path):
     assert "$0.80" in m._over_budget() and "budget_home_day" in m._over_budget()
     (home / "config.json").write_text(json.dumps({"budget_home_day": 2}), encoding="utf-8")
     assert m._over_budget() == ""
+
+
+def test_reflexes_answer_small_things_and_wake_the_mind_for_the_rest(tmp_path: Path):
+    # Pip woke for every "Morning, Pip" and every time-up with nothing changed; a rule the mind wrote handles those,
+    # and anything unsure, refused or uncovered wakes it as before
+    import asyncio
+    from body_harness import reflexes as rx
+    from body_harness.loop import Mind
+    from body_harness.seat import Seat
+    rules, bad = rx.check([{"if": "Brakka greets me", "do": "say", "text": "Morning, Brakka.", "to": "Brakka"},
+                           {"if": "Brakka leaves", "do": "act", "verb": "follow", "target": "Brakka"},
+                           {"when": "timeout", "do": "sleep", "minutes": 20, "max": 1}], "Brakka's job offer", {})
+    assert not bad and [r["do"] for r in rules] == ["say", "act", "sleep"]
+    assert any("waiting_for" in b for b in rx.check([{"if": "x", "do": "wake"}], "", {})[1])
+    assert any("coin" in b for b in rx.check([{"if": "x", "do": "act", "verb": "give"}], "w", {})[1])
+    assert any("text=" in b for b in rx.check([{"if": "x", "do": "say"}], "w", {})[1])
+
+    class Judge:
+        spec = "fake:judge"
+
+        def __init__(self, ps):
+            self.ps, self.seen = ps, []
+
+        async def decide(self, client, st, qs):
+            self.seen.append((st, qs))
+            return self.ps, 0.00003, 0.4
+
+    class Door:
+        def __init__(self, ok=True):
+            self.ops, self.ok = [], ok
+
+        async def op(self, op, **a):
+            self.ops.append((op, a))
+            return {"ok": True} if self.ok else {"ok": False, "reason": "Brakka is not here"}
+
+    home = tmp_path
+    (home / "seats" / "pip").mkdir(parents=True)
+    m = Mind.__new__(Mind)
+    m.seat, m.me, m.turns, m.client = Seat(home, "pip"), "e84", 4, None
+    m.names = scene.Names({"e84": "Pip", "e9": "Brakka"})
+    m.bundle = {"goals": [{"text": "find work", "status": "active"}], "here": {"name": "the Docks"},
+                "present": [{"name": "Brakka"}]}
+    m.cfg, m.st, m.door = {}, {"reflexes": {"waiting_for": "Brakka's job offer", "rules": rules, "turn": 4},
+                               "watch": {"until": "to_me()", "deadline": 0}}, Door()
+    m.save = lambda: None
+    greet = [{"seq": 5, "kind": "say", "actor": "e9", "payload": {"text": "Morning, Pip!"}}]
+    m.judge = Judge({"r0": 0.93, "r1": 0.05})
+    assert asyncio.run(m._reflex(greet, "fired")) is True
+    assert m.door.ops == [("say", {"text": "Morning, Brakka.", "to": "Brakka"})]
+    st, qs = m.judge.seen[0]
+    assert st["goals"] == ["find work"] and st["waiting_for"] == "Brakka's job offer" and "Morning, Pip" in \
+        " ".join(st["what_happened"]) and "Condition: Brakka greets me" in qs["r0"]["instructions"]
+    m.judge = Judge({"r0": 0.6, "r1": 0.1})  # unsure: the mind wakes, and is told why
+    assert asyncio.run(m._reflex(greet, "fired")) is False and "nearly matched" in m.st["reflex_notes"][-1]
+    m.door = Door(ok=False)
+    m.judge = Judge({"r0": 0.02, "r1": 0.97})  # a refused deed wakes the mind with the reason
+    assert asyncio.run(m._reflex(greet, "fired")) is False and "refused" in m.st["reflex_notes"][-1]
+    arrived = [{"seq": 6, "kind": "arrived", "actor": "e84", "payload": {}}]  # its own arrival: never judged
+    m.judge = Judge({"r0": 0.99, "r1": 0.99})
+    assert asyncio.run(m._reflex(arrived, "fired")) is False and not m.judge.seen
+    assert asyncio.run(m._reflex([], "timeout")) is True and m.st["watch"]["deadline"] > 0
+    assert asyncio.run(m._reflex([], "timeout")) is False  # max=1: spent
+    log = [json.loads(x) for x in (home / "seats" / "pip" / "reflexes.jsonl").read_text().splitlines()]
+    assert [r["outcome"] for r in log] == ["handled", "unsure: woke the mind", "woke the mind", "own deed: woke the mind", "handled"]
+    m.st["reflexes"]["rules"][0]["fired"] = 3  # every rule spent: no judge call at all
+    m.st["reflexes"]["rules"][1]["fired"] = 3
+    m.judge = Judge({})
+    assert asyncio.run(m._reflex(greet, "fired")) is False and not m.judge.seen

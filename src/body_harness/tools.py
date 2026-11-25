@@ -195,6 +195,24 @@ PAST = fn("past", "Search what you really did and what came of it: every deed (a
 
 
 
+def _reflex_sleep() -> dict[str, Any]:
+    """sleep with reflexes: the same tool, two more fields, for seats with reflexes on."""
+    base = next(t for t in CORE if t["function"]["name"] == "sleep")
+    f = json.loads(json.dumps(base["function"]))
+    f["description"] += (
+        " reflexes= (optional) up to 5 rules your body follows while you sleep, so small things need no turn of "
+        "yours. Each: if= what happens, in words ('Brakka greets me'); unless= what would make it something else "
+        "(optional: 'unless he offers a job'); do= say (with text= the line, written now, and to=) | act (verb= "
+        "go, follow or rest, target=) | sleep (let it pass, keep waiting) | wake (wake me for it); max= how many "
+        "times (3). when='timeout' runs a rule when the minutes pass instead (do='sleep', minutes= to wait longer). "
+        "With reflexes, waiting_for= says in words what you wait for and why. A small judge reads what happened "
+        "against your rule, your goals and waiting_for; when it is unsure you wake, and anything no rule covers "
+        "wakes you as usual. Coin, giving, fighting and promises are never a rule's: do='wake' for those.")
+    f["parameters"]["properties"]["waiting_for"] = {"type": "string"}
+    f["parameters"]["properties"]["reflexes"] = {"type": "array", "items": {"type": "object"}}
+    return {"type": "function", "function": f}
+
+
 def records_tool(names: list[str]) -> dict[str, Any]:
     return fn("records", "Read the records your operator gave you from before: notes, digests, memories ("
                          + ", ".join(names[:12]) + ("..." if len(names) > 12 else "") + "). match= a regex or plain "
@@ -303,6 +321,8 @@ class Registry:
         core = CORE + [THINK] if self.m.cfg.get("think_tool") else CORE
         if self.m.imagination is not None:
             core = core + [IMAGINE, REFLECT, RELIVE]
+        if self.m.cfg.get("reflexes") and self.m.cfg.get("judge"):
+            core = [_reflex_sleep() if t["function"]["name"] == "sleep" else t for t in core]
         if self.m.cfg.get("past"):
             core = core + [PAST]
         if (got := imports.entries(self.m.seat.dir)):

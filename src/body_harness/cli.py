@@ -155,9 +155,24 @@ def _status(h: Path) -> int:
             print(f"{'':14} watching {st['watch']['until']!r} ({left:.0f} min left)")
         if u:
             print(f"{'':14} {u.line()}")
+        rl = _reflex_line(s, st)
+        if rl:
+            print(f"{'':14} {rl}")
         if unread:
             print(f"{'':14} {len(unread)} unread report(s): bh outbox {s.name}")
     return 0
+
+
+def _reflex_line(s: seats.Seat, st: dict) -> str:
+    """One line on a seat's reflexes: rules set now, and over the last 24 hours what the judge looked at and did."""
+    rows = [r for r in seats.read_jsonl(s.p("reflexes.jsonl")) if r.get("ts", 0) > time.time() - 86400]
+    rules = (st.get("reflexes") or {}).get("rules") or []
+    if not rows and not rules:
+        return ""
+    handled = sum(1 for r in rows if r.get("outcome") == "handled")
+    cost = sum(float(r.get("cost") or 0) for r in rows)
+    return (f"reflexes: {len(rules)} set now; last 24 h {len(rows)} looks, {handled} handled without a turn, "
+            f"{len(rows) - handled} woke the mind, judge ${cost:.4f}")
 
 
 def _calibrate(args: argparse.Namespace, s: seats.Seat) -> int:
@@ -248,6 +263,9 @@ def main(argv: list[str] | None = None) -> int:
                                            "back before this harness ran it; run again, it goes on from where it stopped")
     c.add_argument("name")
     c.add_argument("--fresh", action="store_true", help="start over from the body's first event")
+    c = sub.add_parser("reflexes", help="the seat's reflexes: the rules set now and what each look did")
+    c.add_argument("name")
+    c.add_argument("-n", type=int, default=10)
     c = sub.add_parser("import", help="give a seat files or folders to search with records(): linked by default, "
                                       "so nothing is duplicated and nothing moves")
     c.add_argument("name")
@@ -326,6 +344,22 @@ def main(argv: list[str] | None = None) -> int:
         except (DoorError, ValueError, httpx.HTTPError) as e:
             print(f"{args.name}: stopped ({e}); what was read is kept, run it again to go on", file=sys.stderr)
             return 1
+        return 0
+    if args.cmd == "reflexes":
+        r = s.state().get("reflexes") or {}
+        if r.get("rules"):
+            print(f"waiting for: {r.get('waiting_for')}")
+            for x in r["rules"]:
+                print(f"  {x['when']:7} if {x.get('if') or '(time is up)'!r}"
+                      + (f" unless {x['unless']!r}" if x.get("unless") else "")
+                      + f" -> {x['do']} {x.get('text') or x.get('verb') or ''} ({x['fired']}/{x['max']} fired)")
+        else:
+            print(f"{args.name} has no reflexes set now")
+        for row in seats.read_jsonl(s.p("reflexes.jsonl"))[-args.n:]:
+            ps = ", ".join(f"{k[:40]!r} {v}" for k, v in (row.get("p") or {}).items())
+            print(f"{time.strftime('%m-%d %H:%M', time.localtime(row['ts']))} {row.get('trigger')}: "
+                  f"{row.get('outcome')}" + (f" by {row['rule']!r} ({row['do']})" if row.get("rule") else "")
+                  + (f" [{ps}]" if ps else "") + (f" {row['error']}" if row.get("error") else ""))
         return 0
     if args.cmd == "import":
         from . import imports

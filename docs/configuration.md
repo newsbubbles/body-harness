@@ -38,6 +38,11 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `past` | false | offer `past`, a search over the seat's own deeds and what came of each, with the body's deeds from before the seat read from the world's history at first join ([how-it-works.md](how-it-works.md#two-memories)) |
 | `budget_day` | none | dollars this seat may spend on its model over any 24 hours; past it the seat pauses (no model calls), says so once in its outbox and plays again when the window has room. Read fresh, so `bh config` takes effect without a restart |
 | `budget_home_day` | none | the same cap for every seat in the home together; set it in the home's `config.json` |
+| `reflexes` | false | `sleep` takes rules (`reflexes=`) and `waiting_for=`, run by the judge while the seat sleeps ([how-it-works.md](how-it-works.md#reflexes)); needs `judge` |
+| `judge` | | `provider:model` of a decision model behind an OpenRouter-style decisions endpoint, for example `openrouter:typesafe/jev-1.14`; the key is read as for `model` |
+| `judge_url` | | the decisions endpoint, when it is not the provider's base with `/alpha/decisions` |
+| `reflex_fire`, `reflex_near` | 0.8, 0.45 | p at or over which a rule runs; p at or over which the mind wakes with a note that a rule nearly matched |
+| `reflex_verbs` | go, follow, rest, sit, stand, look, wait | the deeds a rule may do without the mind |
 | `imagine_trials`, `surprise_bits` | 40, 4 | trials per imagining (at least 20); surprise at or over which the wake asks the seat to reflect |
 | `keep_wakes` | 5 | wakes kept in `cache/wakes.json` for `bh calibrate` (0 keeps none) |
 | `extra_prompt` | | your own words to this seat, appended to its instructions |

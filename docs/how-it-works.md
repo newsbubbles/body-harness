@@ -103,6 +103,38 @@ tried first next time on the same target. A refusal names every hand tried. `bh 
 role and op count, and `bh hand <seat> remove <name>` puts the file aside (the grant itself lives until the world's
 owner revokes it).
 
+## Reflexes
+
+A sleeping seat wakes the model for every line its watch catches, also for small things: a greeting, someone passing
+through, the same news told twice. With `reflexes` and a `judge` set, `sleep` takes up to 5 rules from the mind and
+a `waiting_for=`, the thing it waits for and why, in its own words. A rule is a spoken condition (`if=`, with an
+optional `unless=`) and what the body does when it holds: `say` a line the mind writes now, `act` with a verb from a
+short list (go, follow, rest, sit, stand, look, wait), `sleep` on, or `wake`. Coin, giving, fighting and promises are
+never on the list, so they always wake the mind. A rule with `when='timeout'` runs when the minutes pass, with no
+judge.
+
+The watch stays the gate: the world checks it, and it costs nothing. When it fires, the harness lays out what the
+judge reads: the character's active goals and plan, `waiting_for`, the place, who is there, and the last 12 lines of
+what happened, marked as data. The mind gives the intent and the limits; the harness gives the context. The judge is
+a small decision model that answers one yes-or-no question for each rule and writes no text. A rule runs only at
+p 0.8 or more (`reflex_fire`). From 0.45 (`reflex_near`) the mind wakes with a note that a rule nearly matched.
+Under that, or when the judge fails, the mind wakes as it always did. A wake that has the body's own deed in it (its
+arrival, a move it began) always goes to the mind. Each rule fires 3 times at most (`max=`, up to 10), and the next
+sleep sets new rules. On the next turn the mind reads what its rules did while it slept.
+
+Every look is one line in `reflexes.jsonl`: the trigger, `waiting_for`, what happened, the p for each rule, what
+ran and what the world said, cost and time. The judge's cost goes into `usage.jsonl` like any model call.
+`bh reflexes <seat>` shows the rules set now and the last looks. `bh status` shows a line for each seat with
+reflexes: looks, handled without a turn, woke the mind, and judge cost over 24 hours.
+
+How it was tried: 32 saved wakes from seven seats in a hosted world, replayed offline with the judge
+`typesafe/jev-1.14`, rules and expected outcomes written before the judge ran. Of 17 wakes from four seats, 6 were
+small things a rule could take; the judge took 5 and woke the mind for the sixth, with no wrong fire. That was after
+one change of the question's wording, from a longer one that took only 1 of the 6. The other 15 wakes, from three
+more seats, all needed the mind; the judge fired one rule there ("someone only arrives" on the character's own
+arrival), which is why own deeds now always wake the mind.
+All 49 looks (the 17 twice, the 15 once) cost the judge $0.0024.
+
 ## Tasks, schedule, accounting
 
 The wake message carries an agenda: lines owed to players first, then your messages, the owner's answers, scheduled
