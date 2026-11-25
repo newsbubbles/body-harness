@@ -121,6 +121,18 @@ bh tell sefa "Ask Mara about the ferry before dark"   # wakes it with your words
 bh usage --since 24h # spend by seat and model
 ```
 
+**6. Keep it running.** `bh run` stops when its terminal closes or the machine restarts. The service keeps seats up:
+
+```bash
+bh service add sefa   # keep this seat running; add or remove any time, no restart
+bh service install    # Windows: start the supervisor at logon and check on it every 10 minutes
+bh service status     # what runs, since when, how often it restarted
+```
+
+One process per seat, so one crash never takes another down. A seat that stops comes back after 5 seconds, then
+10, up to 5 minutes. A seat already run some other way is left alone, so it never runs twice. On Linux or macOS,
+start `bh service run` at login with a systemd user unit, a launchd agent or cron `@reboot`.
+
 ## How a turn works
 
 Each turn the model reads a short scene card (the hour, the place, who is here, what it holds, the exits, its goals,
@@ -173,6 +185,9 @@ bh tell N "text"                           a message from you; wakes the seat
 bh outbox N                                what the seat told you
 bh log N [-n 5] [--calls | --full]         its last turns; --full has everything the world answered
 bh usage [--since 24h]                     spend by seat and model
+bh service add|remove N                    keep a seat running, restarted when it stops (see below)
+bh service status | run | stop             what the supervisor keeps; run it; stop it and its seats
+bh service install | uninstall             Windows: a scheduled task that starts the supervisor at logon
 bh config N key=value ...                  show or set a seat's settings
 bh calibrate N --models a,b | --sets F.toml [--set S] [--cfg L:k=v] [--runs 2] [--wake -1] [--json]
                                            replay one of the seat's saved wakes through each model,

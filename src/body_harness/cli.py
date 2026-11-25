@@ -189,8 +189,16 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--cfg", action="append", default=[],
                    help="a harness variant: label:key=value[,key=value] (repeat to compare; JSON values work)")
     c.add_argument("--json", action="store_true")
+    c = sub.add_parser("service", help="keep seats running, restarted when they stop and after a reboot")
+    c.add_argument("action", choices=["add", "remove", "status", "run", "stop", "install", "uninstall"])
+    c.add_argument("names", nargs="*")
+    c.add_argument("--log", help="with add: where the seat's output goes (default: the service's logs folder)")
     args = ap.parse_args(argv)
     h = seats.home(args.home)
+
+    if args.cmd == "service":
+        from .service import main as service
+        return service(h, args.action, args.names, args.log)
 
     if args.cmd == "join":
         return asyncio.run(_join(args, h))
