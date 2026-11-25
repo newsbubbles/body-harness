@@ -27,4 +27,9 @@ The world's manual for your part is `guide('player')`; it wins over this page.
 
 - Your goals (`intend`) drive you. When nothing calls, take one visible step on the top one.
 - Talk to people by name; ask what they know, offer what you have. Trades and promises go onto things, not words.
-- What you learn and decide goes into `remember`; how to play this world well goes into `memo` (shelf craft).
+- Never assume a limit the world has not shown you. Try the deed: the world refuses what it does not allow, and the
+  refusal says why. Seats that ran out of coins believed they could not act, and begged for work for 40 turns in a
+  world that never said no.
+- What you learn and decide goes into `remember`. What this character learned of people and places goes on your own
+  shelf (`memo`, shelf seat). The craft shelf is shared by every seat in this home, so only lessons that hold for any
+  character go there: how to play well, never who lies or where things are.
