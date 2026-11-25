@@ -146,6 +146,24 @@
       },
       "verdict": "<b>结论。</b>固定提供商的 deepseek-v4-flash 继续作为基础模型：实时运行最便宜，而且每次都作出了回应。Claude Haiku 5.5 作为升级的那一级，每回合 3 次调用、7 秒。每个模型运行四次，足以淘汰较弱的模型，但不足以给前三名排序。"
     },
+    "scale": {
+      "title": "每次调用的成本保持不变",
+      "intro": "聊天式智能体每次调用都会发送整段对话,所以每次调用都比上一次更贵。一个席位每次醒来只发送同样简短的指令和一张新的场景卡,所以第一百次调用和第一次一样便宜。我们的 OpenRouter 账单显示了同一模型上的差别。",
+      "stats": [
+        {"v": "8.2k", "t": "席位每次调用的提示词 token,同一模型上的聊天式智能体为 60.4k"},
+        {"v": "$0.31", "t": "deepseek-v4-flash 上每 1,000 次席位调用的费用,聊天式智能体为 $1.99"},
+        {"v": "37,972", "t": "两天内的模型调用(在线席位与测试主目录合计),共 $12.65"}
+      ],
+      "cost_title": "每 1,000 次调用的美元",
+      "tokens_title": "每次调用的提示词 token",
+      "names": ["聊天式智能体,Claude Haiku 5.5", "聊天式智能体,deepseek-v4-flash", "body-harness,deepseek-v4-flash"],
+      "cost_aria": "每 1,000 次调用美元数的条形图:Claude Haiku 5.5 上的聊天式智能体 23.74,deepseek-v4-flash 上的聊天式智能体 1.99,deepseek-v4-flash 上的 body-harness 0.31。",
+      "tokens_aria": "每次调用提示词 token 的条形图:Claude Haiku 5.5 上的聊天式智能体 256k,deepseek-v4-flash 上的聊天式智能体 60.4k,deepseek-v4-flash 上的 body-harness 8.2k。",
+      "tip_cost": "每 1,000 次调用 {v},共 {n} 次调用",
+      "tip_tokens": "每次调用 {v} 提示词 token,其中 {c} 来自缓存",
+      "note": "来自一个 OpenRouter 账户的用量,按密钥和模型统计。聊天式智能体:一个通用聊天式智能体框架,用 Claude Haiku 5.5 运行一个世界的主持智能体,用 deepseek-v4-flash 运行两个角色心智,2026 年 11 月 19 日至 21 日。body-harness:在线席位和测试主目录,11 月 24 日和 25 日。两者的任务不同,所以公平的比较是两行 deepseek-v4-flash。该模型上两者的每 token 价格几乎相同(每百万 $0.033 与 $0.037),不同的只是每次调用的 token 数。",
+      "text": "所以决定账单的是角色的数量,而不是他们的一天有多长。席位的缓存命中率较低(69%,对比 88%),因为每次醒来都会变化的部分在短提示词中占比更大。这是下一个可以省下的地方。"
+    },
     "small": {
       "title": "两个较小的发现",
       "jev_h": "让小型判断模型回答范围很窄的问题",
@@ -238,6 +256,7 @@
     "title": "资料来源",
     "items": [
       "我们自己的数据：各席位的账本和用量日志、校准副本、一组约 60 个已标注时刻的重放集，以及各次想象测试的预测日志，来自 2026 年 11 月 24 日和 25 日。",
+      "我们 OpenRouter 账户的用量,按密钥和模型统计,2026 年 11 月 19 日至 25 日(规模化时每次调用的成本)",
       "Anthropic，the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "关于想象与惊奇：Craik，The Nature of Explanation (1943) · Sutton，Dyna (1991) · Ha 与 Schmidhuber，World Models (2018) · Hafner et al.，Dreamer (2020) · Rescorla 与 Wagner (1972) · Itti 与 Baldi，Bayesian surprise (2009) · Schacter 与 Addis，the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

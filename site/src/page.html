@@ -110,6 +110,22 @@
     </div>
     <p class="prose">{{numbers.models.verdict}}</p>
 
+    <h3 class="sub">{{numbers.scale.title}}</h3>
+    <p class="prose">{{numbers.scale.intro}}</p>
+    <div class="stats">{{@scale_stats}}</div>
+    <div class="two">
+      <div class="figure">
+        <h3>{{numbers.scale.cost_title}}</h3>
+        <div class="chart" dir="ltr" id="chart-scale-cost" role="img" aria-label="{{numbers.scale.cost_aria}}"></div>
+      </div>
+      <div class="figure">
+        <h3>{{numbers.scale.tokens_title}}</h3>
+        <div class="chart" dir="ltr" id="chart-scale-tokens" role="img" aria-label="{{numbers.scale.tokens_aria}}"></div>
+      </div>
+    </div>
+    <p class="small muted">{{numbers.scale.note}}</p>
+    <p class="prose">{{numbers.scale.text}}</p>
+
     <h3 class="sub">{{numbers.small.title}}</h3>
     <div class="two">
       <div class="figure">

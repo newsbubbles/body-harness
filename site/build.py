@@ -80,6 +80,7 @@ def blocks(t, code, lang_map):
         "savings": {k: t["numbers"]["savings"][k] for k in ("phases", "tip")},
         "models": {k: t["numbers"]["models"][k] for k in ("slept_legend", "slept_tip_before", "slept_tip_after", "not_run", "cost_tip", "notes")},
         "jev": {"names": t["numbers"]["small"]["jev_names"], "tip": t["numbers"]["small"]["jev_tip"]},
+        "scale": {k: t["numbers"]["scale"][k] for k in ("names", "tip_cost", "tip_tokens")},
     }
     return {
         "root": root,
@@ -93,6 +94,8 @@ def blocks(t, code, lang_map):
         "lang_options": "".join(
             f'<option value="{c}" lang="{LANGS[c][0]}"{" selected" if c == code else ""}>{lang_map[c]["name"]}</option>' for c in LANGS),
         "stats": "".join(f'<div class="stat"><b>{s["v"]}</b><span>{s["t"]}</span></div>' for s in t["stats"]),
+        "scale_stats": "".join(f'<div class="stat"><b>{s["v"]}</b><span>{s["t"]}</span></div>'
+                               for s in t["numbers"]["scale"]["stats"]),
         "chapters": chapters,
         "guards": cards(t["turn"]["guards"]),
         "ideas": cards(t["ideas"]["items"]),

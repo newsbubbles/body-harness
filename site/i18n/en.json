@@ -146,6 +146,24 @@
       },
       "verdict": "<b>Verdict.</b> deepseek-v4-flash, pinned, stays the base model: the cheapest live, and it answered every time. Claude Haiku 5.5 is the escalation step, at 3 calls and 7 seconds a turn. Four runs per model is enough to drop the weak ones, not enough to rank the top three."
     },
+    "scale": {
+      "title": "The cost of a call stays flat",
+      "intro": "A chat agent sends its whole conversation with every call, so each call costs more than the one before. A seat sends the same short instructions and a fresh scene card at each wake, so its hundredth call costs what its first did. Our OpenRouter bill shows the difference on the same model.",
+      "stats": [
+        {"v": "8.2k", "t": "prompt tokens per call for a seat, against 60.4k for a chat agent on the same model"},
+        {"v": "$0.31", "t": "per 1,000 seat calls on deepseek-v4-flash, against $1.99 for the chat agent"},
+        {"v": "37,972", "t": "model calls in two days, live seats and test homes together, for $12.65"}
+      ],
+      "cost_title": "Dollars per 1,000 calls",
+      "tokens_title": "Prompt tokens per call",
+      "names": ["Chat agent, Claude Haiku 5.5", "Chat agent, deepseek-v4-flash", "body-harness, deepseek-v4-flash"],
+      "cost_aria": "Bar chart of dollars per 1,000 calls: chat agent on Claude Haiku 5.5 23.74, chat agent on deepseek-v4-flash 1.99, body-harness on deepseek-v4-flash 0.31.",
+      "tokens_aria": "Bar chart of prompt tokens per call: chat agent on Claude Haiku 5.5 256 thousand, chat agent on deepseek-v4-flash 60.4 thousand, body-harness on deepseek-v4-flash 8.2 thousand.",
+      "tip_cost": "{v} per 1,000 calls, over {n} calls",
+      "tip_tokens": "{v} prompt tokens per call, {c} of them cached",
+      "note": "One OpenRouter account's activity, by key and model. Chat agent: a general chat-agent harness running a world's host agent on Claude Haiku 5.5 and two character minds on deepseek-v4-flash, 19 to 21 November 2026. body-harness: live seats and test homes, 24 and 25 November. The jobs were not the same, so the fair pair is the two deepseek-v4-flash rows. Price per token on that model was nearly equal for both ($0.033 and $0.037 per million tokens); only the tokens per call differ.",
+      "text": "So the number of characters sets the bill, not how long their days run. The seats' cache hit rate is lower (69% against 88%), because the part that changes at each wake is a bigger share of a short prompt. That is the next saving to find."
+    },
     "small": {
       "title": "Two smaller findings",
       "jev_h": "A tiny judge at narrow questions",
@@ -238,6 +256,7 @@
     "title": "Sources",
     "items": [
       "Our own data: the seats' ledgers and usage logs, calibration copies, a replay set of about 60 labelled moments, and the imagination tests' prediction logs, from 24 and 25 November 2026.",
+      "Our OpenRouter account's activity, by key and model, 19 to 25 November 2026 (the cost of a call at scale)",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "On imagination and surprise: Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha and Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla and Wagner (1972) · Itti and Baldi, Bayesian surprise (2009) · Schacter and Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

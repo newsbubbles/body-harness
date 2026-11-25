@@ -146,6 +146,24 @@
       },
       "verdict": "<b>Urteil.</b> deepseek-v4-flash, fest gebunden, bleibt das Basismodell: live am günstigsten, und es hat jedes Mal geantwortet. Claude Haiku 5.5 ist die Eskalationsstufe, mit 3 Aufrufen und 7 Sekunden pro Zug. Vier Läufe pro Modell reichen, um die schwachen auszusortieren, aber nicht, um die besten drei zu ordnen."
     },
+    "scale": {
+      "title": "Die Kosten eines Aufrufs bleiben flach",
+      "intro": "Ein Chat-Agent schickt bei jedem Aufruf sein ganzes Gespräch mit, also kostet jeder Aufruf mehr als der vorige. Ein Sitz schickt bei jedem Wecken dieselben kurzen Anweisungen und eine frische Szenenkarte, also kostet sein hundertster Aufruf so viel wie sein erster. Unsere OpenRouter-Rechnung zeigt den Unterschied auf demselben Modell.",
+      "stats": [
+        {"v": "8.2k", "t": "Prompt-Tokens pro Aufruf bei einem Sitz, gegen 60.4k bei einem Chat-Agenten auf demselben Modell"},
+        {"v": "$0.31", "t": "pro 1.000 Sitz-Aufrufe auf deepseek-v4-flash, gegen $1.99 beim Chat-Agenten"},
+        {"v": "37,972", "t": "Modellaufrufe in zwei Tagen, Live-Sitze und Test-Homes zusammen, für $12.65"}
+      ],
+      "cost_title": "Dollar pro 1.000 Aufrufe",
+      "tokens_title": "Prompt-Tokens pro Aufruf",
+      "names": ["Chat-Agent, Claude Haiku 5.5", "Chat-Agent, deepseek-v4-flash", "body-harness, deepseek-v4-flash"],
+      "cost_aria": "Balkendiagramm, Dollar pro 1.000 Aufrufe: Chat-Agent auf Claude Haiku 5.5 23.74, Chat-Agent auf deepseek-v4-flash 1.99, body-harness auf deepseek-v4-flash 0.31.",
+      "tokens_aria": "Balkendiagramm, Prompt-Tokens pro Aufruf: Chat-Agent auf Claude Haiku 5.5 256 Tausend, Chat-Agent auf deepseek-v4-flash 60.4 Tausend, body-harness auf deepseek-v4-flash 8.2 Tausend.",
+      "tip_cost": "{v} pro 1.000 Aufrufe, über {n} Aufrufe",
+      "tip_tokens": "{v} Prompt-Tokens pro Aufruf, davon {c} aus dem Cache",
+      "note": "Die Aktivität eines OpenRouter-Kontos, nach Schlüssel und Modell. Chat-Agent: ein allgemeines Chat-Agenten-Harness, das den Host-Agenten einer Welt auf Claude Haiku 5.5 und zwei Figuren-Minds auf deepseek-v4-flash betrieb, 19. bis 21. November 2026. body-harness: Live-Sitze und Test-Homes, 24. und 25. November. Die Aufgaben waren nicht gleich, darum ist das faire Paar die beiden deepseek-v4-flash-Zeilen. Der Preis pro Token war auf diesem Modell für beide fast gleich ($0.033 und $0.037 pro Million); nur die Tokens pro Aufruf unterscheiden sich.",
+      "text": "Die Rechnung hängt also an der Zahl der Figuren, nicht an der Länge ihrer Tage. Die Cache-Trefferquote der Sitze ist niedriger (69% gegen 88%), weil der Teil, der sich bei jedem Wecken ändert, in einem kurzen Prompt mehr Gewicht hat. Das ist die nächste Ersparnis."
+    },
     "small": {
       "title": "Zwei kleinere Ergebnisse",
       "jev_h": "Ein winziger Richter für enge Fragen",
@@ -238,6 +256,7 @@
     "title": "Quellen",
     "items": [
       "Unsere eigenen Daten: die Ledger und Nutzungslogs der Plätze, Kalibrierungskopien, ein Replay-Set von etwa 60 gelabelten Momenten und die Vorhersage-Logs der Vorstellungstests, vom 24. und 25. November 2026.",
+      "Die Aktivität unseres OpenRouter-Kontos, nach Schlüssel und Modell, 19. bis 25. November 2026 (Kosten eines Aufrufs bei vielen Figuren)",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "Zu Vorstellung und Überraschung: Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha und Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla und Wagner (1972) · Itti und Baldi, Bayesian surprise (2009) · Schacter und Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

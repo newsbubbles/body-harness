@@ -146,6 +146,24 @@
       },
       "verdict": "<b>Verdict.</b> deepseek-v4-flash, fixé sur un fournisseur, reste le modèle de base : le moins cher en direct, et il a répondu à chaque fois. Claude Haiku 5.5 est l'étape d'escalade, à 3 appels et 7 secondes par tour. Quatre essais par modèle suffisent pour écarter les plus faibles, pas pour classer les trois premiers."
     },
+    "scale": {
+      "title": "Le coût d'un appel reste plat",
+      "intro": "Un agent de chat envoie toute sa conversation à chaque appel, donc chaque appel coûte plus que le précédent. Un siège envoie les mêmes instructions courtes et une fiche de scène neuve à chaque réveil, donc son centième appel coûte autant que le premier. Notre facture OpenRouter montre l'écart sur le même modèle.",
+      "stats": [
+        {"v": "8.2k", "t": "tokens de prompt par appel pour un siège, contre 60.4k pour un agent de chat sur le même modèle"},
+        {"v": "$0.31", "t": "pour 1 000 appels de siège sur deepseek-v4-flash, contre $1.99 pour l'agent de chat"},
+        {"v": "37,972", "t": "appels au modèle en deux jours, sièges en direct et maisons de test ensemble, pour $12.65"}
+      ],
+      "cost_title": "Dollars pour 1 000 appels",
+      "tokens_title": "Tokens de prompt par appel",
+      "names": ["Agent de chat, Claude Haiku 5.5", "Agent de chat, deepseek-v4-flash", "body-harness, deepseek-v4-flash"],
+      "cost_aria": "Graphique en barres des dollars pour 1 000 appels : agent de chat sur Claude Haiku 5.5 23.74, agent de chat sur deepseek-v4-flash 1.99, body-harness sur deepseek-v4-flash 0.31.",
+      "tokens_aria": "Graphique en barres des tokens de prompt par appel : agent de chat sur Claude Haiku 5.5 256 mille, agent de chat sur deepseek-v4-flash 60.4 mille, body-harness sur deepseek-v4-flash 8.2 mille.",
+      "tip_cost": "{v} pour 1 000 appels, sur {n} appels",
+      "tip_tokens": "{v} tokens de prompt par appel, dont {c} en cache",
+      "note": "L'activité d'un compte OpenRouter, par clé et par modèle. Agent de chat : un harnais d'agent de chat généraliste qui faisait tourner l'agent hôte d'un monde sur Claude Haiku 5.5 et deux esprits de personnage sur deepseek-v4-flash, du 19 au 21 novembre 2026. body-harness : sièges en direct et maisons de test, 24 et 25 novembre. Les tâches n'étaient pas les mêmes, donc la comparaison honnête est celle des deux lignes deepseek-v4-flash. Le prix par token sur ce modèle était presque égal pour les deux (0,033 $ et 0,037 $ par million) ; seuls les tokens par appel diffèrent.",
+      "text": "C'est donc le nombre de personnages qui fait la facture, pas la longueur de leurs journées. Le taux de cache des sièges est plus bas (69 % contre 88 %), car la part qui change à chaque réveil pèse plus dans un prompt court. C'est la prochaine économie à chercher."
+    },
     "small": {
       "title": "Deux découvertes plus modestes",
       "jev_h": "Un tout petit juge pour des questions précises",
@@ -238,6 +256,7 @@
     "title": "Sources",
     "items": [
       "Nos propres données : les registres et journaux d'utilisation des sièges, les copies de calibration, un jeu de rediffusion d'environ 60 moments étiquetés, et les journaux de prédictions des tests d'imagination, des 24 et 25 novembre 2026.",
+      "L'activité de notre compte OpenRouter, par clé et par modèle, du 19 au 25 novembre 2026 (le coût d'un appel à grande échelle)",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "Sur l'imagination et la surprise : Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha et Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla et Wagner (1972) · Itti et Baldi, Bayesian surprise (2009) · Schacter et Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

@@ -147,6 +147,27 @@ world (`remember`, `intend`, `recall`) and in the seat's own notes (`memo`).
 In our seats the model was busy 6 to 11% of the wall clock, and a turn on deepseek-v4-flash, pinned to a provider,
 averaged $0.0003 to $0.0011 (November 2026, from the seats' own ledgers; `bh usage` reports yours).
 
+### The cost of a call stays flat
+
+A chat agent sends its whole conversation with every call, so each call costs more than the one before. A seat sends
+the same short instructions and a fresh scene card at each wake, so its hundredth call costs what its first did. Our
+OpenRouter bill shows it on the same model:
+
+| | Prompt tokens per call | Cached | Dollars per 1,000 calls | Calls |
+|---|---:|---:|---:|---:|
+| Chat agent, Claude Haiku 5.5 | 256.0k | 93% | $23.74 | 969 |
+| Chat agent, deepseek-v4-flash | 60.4k | 88% | $1.99 | 1,846 |
+| **body-harness, deepseek-v4-flash** | **8.2k** | 69% | **$0.31** | 36,082 |
+
+Price per token on deepseek-v4-flash was nearly the same for both ($0.033 and $0.037 per million tokens); only the
+tokens per call differ. So the number of characters sets the bill, not how long their days run: 37,972 calls in two
+days, live seats and test homes together, came to $12.65.
+
+Source: one OpenRouter account's activity by key and model. The chat agent was a general chat-agent harness running a
+world's host agent (Claude Haiku 5.5) and two character minds (deepseek-v4-flash), 19 to 21 November 2026; the seats
+ran 24 and 25 November. The jobs were not the same, so the fair pair is the two deepseek-v4-flash rows. The seats'
+lower cache rate is the next saving to find: on a short prompt, the part that changes at each wake is a bigger share.
+
 More in [how it works](docs/how-it-works.md): the scene card, the wait, the guards learned in play, the two
 memories, the line out to the owner and to you, apps and the sandbox, skills, and what each file in a seat holds.
 

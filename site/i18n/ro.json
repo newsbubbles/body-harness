@@ -146,6 +146,24 @@
       },
       "verdict": "<b>Verdict.</b> deepseek-v4-flash, fixat, rămâne modelul de bază: cel mai ieftin live, și a răspuns de fiecare dată. Claude Haiku 5.5 este treapta de escaladare, cu 3 apeluri și 7 secunde pe tură. Patru rulări per model sunt suficiente ca să le eliminăm pe cele slabe, dar nu ca să le clasăm pe primele trei."
     },
+    "scale": {
+      "title": "Costul unui apel rămâne constant",
+      "intro": "Un agent de chat trimite toată conversația la fiecare apel, deci fiecare apel costă mai mult decât cel dinainte. Un loc trimite aceleași instrucțiuni scurte și o fișă de scenă nouă la fiecare trezire, deci al o sutălea apel costă cât primul. Factura noastră OpenRouter arată diferența pe același model.",
+      "stats": [
+        {"v": "8.2k", "t": "tokeni de prompt pe apel pentru un loc, față de 60.4k pentru un agent de chat pe același model"},
+        {"v": "$0.31", "t": "la 1.000 de apeluri de loc pe deepseek-v4-flash, față de $1.99 pentru agentul de chat"},
+        {"v": "37,972", "t": "apeluri de model în două zile, locuri live și case de test împreună, pentru $12.65"}
+      ],
+      "cost_title": "Dolari la 1.000 de apeluri",
+      "tokens_title": "Tokeni de prompt pe apel",
+      "names": ["Agent de chat, Claude Haiku 5.5", "Agent de chat, deepseek-v4-flash", "body-harness, deepseek-v4-flash"],
+      "cost_aria": "Grafic cu bare, dolari la 1.000 de apeluri: agent de chat pe Claude Haiku 5.5 23.74, agent de chat pe deepseek-v4-flash 1.99, body-harness pe deepseek-v4-flash 0.31.",
+      "tokens_aria": "Grafic cu bare, tokeni de prompt pe apel: agent de chat pe Claude Haiku 5.5 256 de mii, agent de chat pe deepseek-v4-flash 60.4 mii, body-harness pe deepseek-v4-flash 8.2 mii.",
+      "tip_cost": "{v} la 1.000 de apeluri, din {n} apeluri",
+      "tip_tokens": "{v} tokeni de prompt pe apel, {c} din cache",
+      "note": "Activitatea unui cont OpenRouter, pe cheie și model. Agent de chat: un harness general de agent de chat care rula agentul gazdă al unei lumi pe Claude Haiku 5.5 și două minți de personaj pe deepseek-v4-flash, 19-21 noiembrie 2026. body-harness: locuri live și case de test, 24 și 25 noiembrie. Sarcinile nu au fost aceleași, deci perechea corectă sunt cele două rânduri deepseek-v4-flash. Prețul pe token pe acel model a fost aproape egal ($0.033 și $0.037 pe milion); diferă doar tokenii pe apel.",
+      "text": "Deci numărul de personaje face factura, nu lungimea zilelor lor. Rata de cache a locurilor e mai mică (69% față de 88%), pentru că partea care se schimbă la fiecare trezire cântărește mai mult într-un prompt scurt. Aceasta e următoarea economie de găsit."
+    },
     "small": {
       "title": "Două descoperiri mai mici",
       "jev_h": "Un judecător minuscul pentru întrebări înguste",
@@ -238,6 +256,7 @@
     "title": "Surse",
     "items": [
       "Datele noastre: registrele și jurnalele de utilizare ale sloturilor, copiile de calibrare, un set de reluare cu aproximativ 60 de momente etichetate și jurnalele de predicții ale testelor de imaginație, din 24 și 25 noiembrie 2026.",
+      "Activitatea contului nostru OpenRouter, pe cheie și model, 19-25 noiembrie 2026 (costul unui apel la scară)",
       "Anthropic, the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "Despre imaginație și surpriză: Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha și Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla și Wagner (1972) · Itti și Baldi, Bayesian surprise (2009) · Schacter și Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

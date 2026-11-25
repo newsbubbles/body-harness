@@ -146,6 +146,24 @@
       },
       "verdict": "<b>結論。</b>固定した deepseek-v4-flash を引き続きベースモデルにします。ライブで最も安く、毎回答えました。Claude Haiku 5.5 はエスカレーション先で、1ターンあたり呼び出し3回、7秒です。モデルごとに4回の実行は、弱いモデルを外すには十分ですが、上位3つを順位づけるには足りません。"
     },
+    "scale": {
+      "title": "1回の呼び出しのコストは増えない",
+      "intro": "チャット型エージェントは呼び出しのたびに会話全体を送るので、呼び出すごとにコストが増えていきます。シートは起きるたびに同じ短い指示と新しいシーンカードを送るだけなので、100回目の呼び出しも1回目と同じコストです。同じモデルでの違いが、私たちのOpenRouterの請求に表れています。",
+      "stats": [
+        {"v": "8.2k", "t": "シート1回の呼び出しのプロンプトトークン。同じモデルのチャット型エージェントは60.4k"},
+        {"v": "$0.31", "t": "deepseek-v4-flashでのシート呼び出し1,000回あたり。チャット型エージェントは$1.99"},
+        {"v": "37,972", "t": "2日間のモデル呼び出し(稼働中のシートとテスト用ホームの合計)、費用$12.65"}
+      ],
+      "cost_title": "呼び出し1,000回あたりのドル",
+      "tokens_title": "1回あたりのプロンプトトークン",
+      "names": ["チャット型エージェント、Claude Haiku 5.5", "チャット型エージェント、deepseek-v4-flash", "body-harness、deepseek-v4-flash"],
+      "cost_aria": "呼び出し1,000回あたりのドルの棒グラフ:Claude Haiku 5.5のチャット型エージェント23.74、deepseek-v4-flashのチャット型エージェント1.99、deepseek-v4-flashのbody-harness 0.31。",
+      "tokens_aria": "1回あたりのプロンプトトークンの棒グラフ:Claude Haiku 5.5のチャット型エージェント256k、deepseek-v4-flashのチャット型エージェント60.4k、deepseek-v4-flashのbody-harness 8.2k。",
+      "tip_cost": "1,000回あたり{v}({n}回の呼び出し)",
+      "tip_tokens": "1回あたり{v}プロンプトトークン、うちキャッシュ{c}",
+      "note": "1つのOpenRouterアカウントの利用状況を、キーとモデル別に集計。チャット型エージェント:汎用のチャット型エージェントハーネスで、世界のホストエージェントをClaude Haiku 5.5、キャラクターの心2つをdeepseek-v4-flashで動かしたもの(2026年11月19日から21日)。body-harness:稼働中のシートとテスト用ホーム(11月24日と25日)。仕事の内容は同じではないため、公平な比較はdeepseek-v4-flashの2行です。このモデルのトークン単価は両者ほぼ同じ(100万トークンあたり$0.033と$0.037)で、違うのは1回あたりのトークン数だけです。",
+      "text": "つまり請求額を決めるのはキャラクターの数で、その一日の長さではありません。シートのキャッシュヒット率は低め(69%、チャット型は88%)です。起きるたびに変わる部分が、短いプロンプトでは大きな割合になるためです。次に削れるのはここです。"
+    },
     "small": {
       "title": "2つの小さな発見",
       "jev_h": "範囲の狭い質問に使う小さなジャッジ",
@@ -238,6 +256,7 @@
     "title": "出典",
     "items": [
       "私たち自身のデータ：席の台帳と使用ログ、キャリブレーション用のコピー、ラベル付けした約60の場面からなる再生セット、そして想像テストの予測ログ。2026年11月24日と25日のものです。",
+      "私たちのOpenRouterアカウントの利用状況(キーとモデル別、2026年11月19日から25日):規模が大きいときの1回の呼び出しのコスト",
       "Anthropic、the \"think\" tool (2025) · effective harnesses for long-running agents (2025) · context management (2025)",
       "SWE-agent (arXiv 2405.15793) · AI Town (github.com/a16z-infra/ai-town) · Generative Agents (arXiv 2304.03442) · Voyager (arXiv 2305.16291)",
       "想像と驚きについて：Craik, The Nature of Explanation (1943) · Sutton, Dyna (1991) · Ha と Schmidhuber, World Models (2018) · Hafner et al., Dreamer (2020) · Rescorla と Wagner (1972) · Itti と Baldi, Bayesian surprise (2009) · Schacter と Addis, the constructive episodic simulation hypothesis (2007) · Reflexion (arXiv 2303.11366)",

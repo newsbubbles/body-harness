@@ -171,7 +171,45 @@
     el('line', { x1: L, x2: L, y1: top, y2: plotBottom, class: 'axis' }, svg);
   }
 
-  function drawAll() { savings(); slept(); cost(); jevChart(); }
+  // ---------- cost per call at scale (OpenRouter activity, by key and model) ----------
+  // [dollars per 1,000 calls, prompt tokens per call (thousands), calls, cache hit %]; the last row is the harness
+  const scale = [[23.74, 256.0, 969, 93], [1.99, 60.4, 1846, 88], [0.31, 8.2, 36082, 69]];
+  function scaleBars(id, col, max, ticks, label, tipOf) {
+    const S = T.scale;
+    const host = document.getElementById(id); host.innerHTML = '';
+    const { W } = frame(host);
+    const svg = el('svg', {}, host);
+    // these names are long: when one does not fit beside its bar, every name goes above its bar
+    const probe = S.names.map(n => txt(svg, 0, 0, n, 'cat'));
+    const need = Math.max(...probe.map(t => t.getComputedTextLength() + 16));
+    probe.forEach(t => t.remove());
+    const narrow = W < NARROW || need > W * 0.4;
+    const row = narrow ? 42 : 30, bh = 16, top = 8, R = 62;
+    const H = top + scale.length * row + 30;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const L = narrow ? 0 : Math.max(130, need);
+    const x = (v) => L + (v / max) * (W - L - R), plotBottom = top + scale.length * row;
+    ticks.forEach(t => { el('line', { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: 'gridline' }, svg); txt(svg, x(t), plotBottom + 14, label(t), '', narrow && t === 0 ? 'start' : 'middle'); });
+    scale.forEach((r, i) => {
+      const yy = top + i * row + (narrow ? 20 : (row - bh) / 2), v = r[col];
+      if (narrow) txt(svg, 0, yy - 10, S.names[i], 'cat');
+      else txt(svg, L - 10, yy + bh / 2, S.names[i], 'cat', 'end');
+      el('path', { d: barPath(L, yy, Math.max(2, x(v) - L), bh), fill: css(i === scale.length - 1 ? '--s1' : '--s2') }, svg);
+      txt(svg, x(v) + 6, yy + bh / 2, label(v), 'val');
+      const hit = el('rect', { x: 0, y: yy - 4, width: W, height: bh + 8, fill: 'transparent' }, svg);
+      hover(hit, `<b>${S.names[i]}</b><br>${tipOf(r)}`);
+    });
+    el('line', { x1: L, x2: L, y1: top, y2: plotBottom, class: 'axis' }, svg);
+  }
+  function scaleCharts() {
+    const S = T.scale, n = (v) => v.toLocaleString('en-US');
+    scaleBars('chart-scale-cost', 0, 25, [0, 10, 20], (v) => '$' + (Number.isInteger(v) ? v : v.toFixed(2)),
+      (r) => fill(S.tip_cost, { v: '$' + r[0].toFixed(2), n: n(r[2]) }));
+    scaleBars('chart-scale-tokens', 1, 270, [0, 100, 200], (v) => v + 'k',
+      (r) => fill(S.tip_tokens, { v: r[1] + 'k', c: r[3] + '%' }));
+  }
+
+  function drawAll() { savings(); slept(); cost(); jevChart(); scaleCharts(); }
   modelTable();
   // on a phone each table row becomes a card, and each cell names its column (site.css reads data-l)
   document.querySelectorAll('table').forEach(t => {
@@ -179,6 +217,8 @@
     t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-l', heads[i] || '')));
   });
   drawAll();
+  // label columns are measured in the page's font: draw again once it has loaded, or a long name is cut off
+  if (document.fonts) document.fonts.ready.then(drawAll);
   // the charts are drawn to their shown width: draw again when it changes (a phone turned, a window resized)
   let shownW = 0;
   new ResizeObserver(() => {
