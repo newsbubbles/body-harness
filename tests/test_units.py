@@ -543,3 +543,23 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert im.score({"you": {"hp": "5/12"}}, "Ssareth") == [] and "Not scored (" + three["id"] in im.wake_text([])
     # not scored, but still evidence: one wait of three done, hp 12 to 5
     assert any("really -7.0 on average over" in e for e in im.evidence("wait"))
+
+
+def test_hearsay_catches_words_put_in_someones_mouth():
+    from body_harness.loop import _hearsay
+    # Pip, hosted Reach day 62: Ruhl had said none of this, and corrected him in the hall
+    ruhl = ["Marked, Reeve: a shard to Jory for each day's laying, the first before he starts, the course done before "
+            "the moon turns. I'll count the days he lays.",
+            "Reeve, I know no seam and no trade for a shard by morning. The jars stand at twelve now, so Iska filled "
+            "them, nothing taken."]
+    voices = {"Captain Ruhl": ruhl}
+    people = ["Captain Ruhl", "Reeve Ansel Varrick", "Hollis"]
+    pip = ("Morning, Reeve. Night was quiet. Spoke to Captain Ruhl already when you were asleep. He said the Guild's "
+           "sending someone from the star to look at our gate, and that Hollis told you the whole of Dreyer's plan.")
+    who, claim, last = _hearsay(pip, voices, people)
+    assert who == "Captain Ruhl" and "Guild" in claim and "twelve" in last
+    assert _hearsay("Ruhl said the jars stand at twelve now, nothing taken.", voices, people) is None
+    assert _hearsay("Ruhl said the Guild road is watched by a rider from the star.", voices, people)[0] == "Captain Ruhl"
+    assert _hearsay("Hollis said the herald means to leave at dawn with the writ.", voices, people)[2] == ""
+    assert _hearsay("Night was quiet; nobody came through the gate.", voices, people) is None
+    assert _hearsay("He said yes.", voices, people) is None

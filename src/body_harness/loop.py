@@ -289,6 +289,16 @@ class Mind:
                                                        f"turns, with nothing done between",
                                 "hint": "do something (act), or let it rest and sleep on a change (someone arriving, "
                                         "a deed, the hour). If this line truly moves things, say it again"})
+            told = None if turn.get("hearsay_ok") == text else \
+                _hearsay(text, self._voices(), [self.names.by_id.get(i) for i in self.names.people if i != self.me])
+            if told:
+                turn["hearsay_ok"] = text  # the same line again goes through: the seat stands by it
+                last = f" The last you heard from them: {told[2]!r}." if told[2] else \
+                    " You have heard no line from them lately."
+                return compact({"ok": False, "reason": f"not said: your line gives {told[0]} words ({told[1]!r}) that "
+                                                       f"nothing you heard from them carries.{last}",
+                                "hint": "say only what they said, name who you really heard it from, or say it as "
+                                        "your own guess. If they truly said it, say the same line again"})
         if name == "away":
             self.st["away"] = fixed
         fixed = self._drop_unsupported(name, fixed)
@@ -653,9 +663,21 @@ class Mind:
         keep = self.st.get("heard") or []
         have = {h[0] for h in keep}
         asked = self.st.get("unanswered") or {}
+        voices = self.st.setdefault("voices", {})
         for e in events or []:
             if e.get("kind") in ("say", "talked") and e.get("actor") not in (None, self.me):
                 asked.pop(str(self.names.name(e.get("actor"))).lower(), None)  # they spoke: no longer unanswered
+            said = (e.get("payload") or {}).get("text")
+            seen = self.st.setdefault("voice_seqs", [])
+            if e.get("kind") == "say" and e.get("actor") not in (None, self.me) and isinstance(said, str) and \
+                    e.get("seq") not in seen:
+                # every line this seat heard, by speaker, for checking what it later says they said
+                seen.append(e.get("seq"))
+                del seen[:-200]
+                who = str(self.names.name(e.get("actor")))
+                voices[who] = (voices.pop(who, []) + [said[:400]])[-8:]
+                while len(voices) > 40:
+                    voices.pop(next(iter(voices)))
             if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me, self.my_name()):
                 continue
             line = scene.event_line(e, self.me, self.names)
@@ -664,6 +686,14 @@ class Mind:
                              self.names.name(e.get("actor"))])
                 have.add(e.get("seq"))
         self.st["heard"] = keep[-int(self.cfg.get("heard_lines", 6)):]
+
+    def _voices(self) -> dict[str, list[str]]:
+        """What each speaker was heard saying: every line kept, plus the lines to this seat kept before that began."""
+        out = {k: list(v) for k, v in (self.st.get("voices") or {}).items()}
+        for h in self.st.get("heard") or []:
+            if len(h) > 3 and h[2] not in out.get(h[3], []):
+                out.setdefault(str(h[3]), []).append(str(h[2]))
+        return out
 
     def my_name(self) -> str:
         return str((self.bundle.get("you") or {}).get("name") or "")
@@ -944,6 +974,54 @@ def _repeats(text: str, said: list[str], names: Any = ()) -> str | None:
         both = mine & _words(old, skip)
         if len(both) >= 5 and len(both) / len(mine) >= 0.6:
             return old
+    return None
+
+
+_TOLD = r"(?:said|says|told (?:me|you|us|him|her|them)|tells (?:me|you|us)|reckons|swore|claims|claimed|mentioned)"
+_PLAIN = {"that", "this", "with", "from", "have", "were", "they", "them", "their", "there", "what", "when", "will",
+          "would", "about", "your", "just", "been", "some", "someone", "said", "told", "says", "tells", "whole", "also",
+          "only", "here", "back", "like", "into", "over", "then", "than", "know", "come", "coming", "going", "sending"}
+
+
+def _hearsay(text: str, voices: dict[str, list[str]], people: Any = ()) -> tuple[str, str, str] | None:
+    """(who, the words given them, the last line heard from them) when `text` says someone said something that
+    nothing this seat heard from them carries. Pip told the Reeve "Captain Ruhl said the Guild's sending someone from
+    the star to look at our gate"; Ruhl had said nothing of the kind, and corrected him in the hall."""
+    names = sorted({str(n) for n in people if n} | set(voices), key=len, reverse=True)
+    if not names:
+        return None
+    alias = {}  # a name or its last word (Ruhl for Captain Ruhl) -> the full name
+    for n in names:
+        alias.setdefault(n.lower(), n)
+        last = n.split()[-1]
+        if len(last) > 3:
+            alias.setdefault(last.lower(), n)
+    pat = "|".join(re.escape(a) for a in sorted(alias, key=len, reverse=True))
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        m = re.search(rf"^\s*(?:and\s+)?(he|she)\s+{_TOLD}\b(.+)", sentence, re.I)
+        if m:  # "He said ..." is the last person named before it
+            before = text[:text.find(sentence)]
+            found = [(before.lower().rfind(a), alias[a]) for a in alias if re.search(rf"\b{re.escape(a)}\b", before,
+                                                                                     re.I)]
+            if not found:
+                continue
+            who = max(found)[1]
+        else:
+            m = re.search(rf"\b({pat})\b[^.!?]{{0,12}}?\b{_TOLD}\b(.+)", sentence, re.I)
+            if not m:
+                continue
+            who = alias[m.group(1).lower()]
+        claim = m.group(2).strip(" ,:")
+        skip = _PLAIN | {w.lower() for n in names for w in n.split()}
+        words = _words(claim, skip)
+        if len(words) < 3:
+            continue
+        lines = voices.get(who) or []
+        heard = set()
+        for ln in lines:
+            heard |= {w[:5] for w in _words(ln, set())}
+        if not lines or len({w for w in words if w[:5] in heard}) / len(words) < 0.34:
+            return who, claim[:160], (lines[-1][:160] if lines else "")
     return None
 
 
