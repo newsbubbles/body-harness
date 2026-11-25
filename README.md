@@ -123,6 +123,8 @@ These are comparisons of where things live, not claims about what the other proj
 
 ## More
 
+- [The story and the numbers](https://newsbubbles.github.io/body-harness/): how body-harness was built in one day and
+  what we measured, in English, Español, Deutsch, Français, Română, 日本語, 中文 and العربية.
 - [How it works](docs/how-it-works.md): the turn, the wait, the guards, memories, apps, skills, the seat's files.
 - [Configuration](docs/configuration.md): every setting, provider keys, an example.
 - [Calibrating models](docs/calibrating.md): replay one real moment through several models, offline, side by side.
