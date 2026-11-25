@@ -303,6 +303,16 @@ class Imagination:
                 self.spec["rules"].pop(verb) if old is None else self.spec["rules"].__setitem__(verb, old)
                 notes.append(f"rule {verb} not kept: {broke}")
                 continue
+            body = source.split("def apply(ctx):", 1)[-1].split("\ndef ", 1)[0]
+            if not [ln for ln in body.splitlines() if ln.strip() and not ln.strip().startswith("#")
+                    and ln.strip() != "pass"]:
+                # Suri replaced a strike that dealt damage with one that did nothing, and her re-living said her
+                # imagination had got worse without saying why
+                notes.append(f"rule {verb} kept ({self.spec['rules'][verb]['id']}), but its apply does nothing: "
+                             f"everything you imagine with {verb} stays as it was" +
+                             (f". It replaced {old['id']}, which did something: imagine() shows rules"
+                              if old and old["source"] != source else ""))
+                continue
             notes.append(f"rule {verb} kept ({self.spec['rules'][verb]['id']})")
         for name, st in (setup or {}).items():
             who = me if str(name).strip().lower() in ("me", "self", "i") else str(name).strip()

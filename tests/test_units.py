@@ -457,6 +457,10 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert "def check(ctx):\n    return ctx.actor.state.hp > 4" in src and "def apply(ctx):" in src
     two, _ = imagine.rule_source({"apply": "if 1: ctx.target.state.hp -= 1; if 2: ctx.actor.state.hp -= 1"})
     assert "    if 1: ctx.target.state.hp -= 1\n    if 2: ctx.actor.state.hp -= 1" in two
+    empty = im.imagine({"rules": {"attack": {"check": "return True", "apply": "# resolved elsewhere\npass"}}},
+                       card, "Ssareth", 3)
+    assert "its apply does nothing" in " ".join(empty["notes"]) and "replaced" in " ".join(empty["notes"])
+    im.spec["rules"]["attack"] = {"source": imagine.STARTER["attack"], "doc": "", "id": "st"}
     none = im.imagine({"rules": {"spar": {"check": "return True"}}}, card, "Ssareth", 3)
     assert "needs an apply" in " ".join(none["notes"])
     # a rule that crashes is refused when written, not counted as how fights end (Tamsin's ctx.result)
