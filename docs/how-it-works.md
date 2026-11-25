@@ -103,6 +103,16 @@ tried first next time on the same target. A refusal names every hand tried. `bh 
 role and op count, and `bh hand <seat> remove <name>` puts the file aside (the grant itself lives until the world's
 owner revokes it).
 
+## A crew
+
+A world may give one mind grant several bodies: a captain and the riders who go with them. The engine runs one
+sub-principal per body under the one token, each with its own seat and cursor. Name the other bodies in the seat's
+config (`bh config <seat> crew='["Rider One", "Rider Two"]'`), and the deed tools (act, say, gesture, step, cross)
+take `as=`, one of those names. The harness sends that deed with the `x-embody-principal` header and takes the
+body's seat on first use. A name the crew does not have, or a body the grant does not name, comes back as a refusal
+that lists the crew. The seat wakes and watches as its own body only: what happens to a rider far away reaches the
+mind when it inspects the rider, or when the rider is in the same place.
+
 ## Reflexes
 
 A sleeping seat wakes the model for every line its watch catches, also for small things: a greeting, someone passing

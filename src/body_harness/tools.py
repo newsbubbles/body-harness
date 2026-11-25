@@ -328,7 +328,23 @@ class Registry:
             core = core + [PAST]
         if (got := imports.entries(self.m.seat.dir)):
             core = core + [records_tool([e["name"] for e in got])]
-        return core + [s for s in (self.schema(n) for n in loaded) if s]
+        out = core + [s for s in (self.schema(n) for n in loaded) if s]
+        if getattr(self.m, "crew", None):
+            out = [_with_as(t, [c["name"] for c in self.m.crew.values()]) if t["function"]["name"] in CREW_OPS else t
+                   for t in out]
+        return out
+
+
+CREW_OPS = {"act", "say", "gesture", "step", "cross", "act_many"}  # the deeds (loop.DEEDS) a crew body can do
+
+
+def _with_as(t: dict[str, Any], names: list[str]) -> dict[str, Any]:
+    """A deed tool for a crew mind: as= does it as one of the crew's other bodies."""
+    t = json.loads(json.dumps(t))
+    t["function"]["parameters"].setdefault("properties", {})["as"] = {
+        "type": "string", "enum": names,
+        "description": "do this as one of your crew instead of yourself; inspect(entity=<name>) shows where one is"}
+    return t
 
 
 def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any], list[str]]:
@@ -341,7 +357,7 @@ def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any
             notes.append(f"{wrong}= read as {right}=")
     if op == "act":
         sch = mind.registry.world.get("act", {}).get("schema", {}).get("properties", {})
-        stray = {k: v for k, v in args.items() if k not in ("verb", "target", "params") and k not in sch}
+        stray = {k: v for k, v in args.items() if k not in ("verb", "target", "params", "as") and k not in sch}
         if stray:
             args["params"] = {**(args.get("params") or {}), **stray}
             for k in stray:

@@ -61,6 +61,7 @@ class Door:
         self._token = token
         self.client = client
         self.wait_cap = wait_cap  # the server holds a wait at most 120 s, proxies often less
+        self.principal = ""  # a sub-principal of the grant (one body of a crew), sent as x-embody-principal
 
     @classmethod
     def load(cls, path: Path, client: httpx.AsyncClient) -> "Door":
@@ -71,9 +72,18 @@ class Door:
         path.write_text(json.dumps({"base": self.base, "token": self._token, "wait_cap": self.wait_cap}),
                         encoding="utf-8")
 
+    def sub(self, principal: str) -> "Door":
+        """The same grant speaking as one of its sub-principals: a crew mind's grant names several bodies, and the
+        world gives each its own seat and cursor under the one token."""
+        d = Door(self.base, self._token, self.client, self.wait_cap)
+        d.principal = principal
+        return d
+
     def _headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self._token}", "content-type": "application/json",
-                "user-agent": "body-harness"}
+        h = {"Authorization": f"Bearer {self._token}", "content-type": "application/json", "user-agent": "body-harness"}
+        if self.principal:
+            h["x-embody-principal"] = self.principal
+        return h
 
     async def op(self, _op: str, /, _http: float = 60.0, _retries: int = 6, **args: Any) -> Any:
         """Call one op. The op is positional-only so an op's own `name` argument passes through (find(name=)).

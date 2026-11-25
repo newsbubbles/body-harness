@@ -797,3 +797,40 @@ def test_reflexes_answer_small_things_and_wake_the_mind_for_the_rest(tmp_path: P
     m.st["reflexes"]["rules"][1]["fired"] = 3
     m.judge = Judge({})
     assert asyncio.run(m._reflex(greet, "fired")) is False and not m.judge.seen
+
+
+def test_a_crew_mind_acts_as_its_other_bodies_through_sub_principals(tmp_path: Path):
+    # a captain's grant named five riders, but the seat could only speak as the captain: the world now gives each
+    # body named in a mind grant its own sub-principal (x-embody-principal), and as= picks the body
+    import asyncio
+    import httpx
+    from body_harness.door import Door
+    from body_harness.loop import Mind
+    from body_harness.tools import fix_args
+    d = Door("http://w", "tok", httpx.AsyncClient())
+    assert "x-embody-principal" not in d._headers() and d.sub("rider-one")._headers()["x-embody-principal"] == "rider-one"
+
+    class Fake:
+        def __init__(self, refuse_join=False):
+            self.calls, self.refuse_join = [], refuse_join
+
+        async def op(self, op, **a):
+            self.calls.append((op, a))
+            if op == "join" and self.refuse_join:
+                return {"ok": False, "reason": "this grant does not name Rider One"}
+            return {"ok": True}
+
+    m = Mind.__new__(Mind)
+    m.door, m.me, m.bundle, m.hands, m.st = Fake(), "e1", {"you": {"name": "Captain"}}, {}, {}
+    m.crew = {"rider one": {"name": "Rider One", "door": Fake(), "joined": False}}
+    assert asyncio.run(m._op("say", {"text": "Mount up.", "as": "rider one"})) == {"ok": True}
+    assert m.crew["rider one"]["door"].calls == [("join", {"entity": "Rider One"}), ("say", {"text": "Mount up."})]
+    asyncio.run(m._op("say", {"text": "Ride.", "as": "Captain"}))  # as= itself: its own door
+    assert m.door.calls == [("say", {"text": "Ride."})]
+    assert "not one of your crew" in asyncio.run(m._op("say", {"text": "x", "as": "Stray"}))["reason"]
+    m.crew["rider one"] = {"name": "Rider One", "door": Fake(refuse_join=True), "joined": False}
+    assert "could not take Rider One's seat" in asyncio.run(m._op("act", {"verb": "go", "as": "Rider One"}))["reason"]
+    m.registry = type("R", (), {"world": {}})()
+    m.names = scene.Names({})
+    m.present_names = lambda: []
+    assert fix_args("act", {"verb": "go", "as": "Rider One"}, m)[0].get("as") == "Rider One"  # not moved into params

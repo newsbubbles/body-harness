@@ -64,6 +64,10 @@ _OUT_OF_REACH = re.compile(r"your grant|start with|the door refused this grant",
 _TARGET_KEYS = ("entity", "parent", "thing", "target", "to", "into", "under")
 
 
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "crew"
+
+
 def _world_copy_done(p: Path) -> bool:
     try:
         return bool(json.loads(p.read_text(encoding="utf-8")).get("done", True)) if p.exists() else False
@@ -90,6 +94,11 @@ class Mind:
         self.hands: dict[str, dict[str, Any]] = {
             f.stem: {"door": Door.load(f, client), "ops": set(), "role": ""}
             for f in (sorted(seat.p("hands").glob("*.json")) if seat.p("hands").is_dir() else [])}
+        # a crew grant names several bodies (a captain and riders): the mind acts as each with as=, one sub-principal
+        # per body under the same token. crew = the other bodies' names, in the seat's config
+        self.crew: dict[str, dict[str, Any]] = {
+            str(n).strip().lower(): {"name": str(n).strip(), "door": self.door.sub(_slug(str(n))), "joined": False}
+            for n in (self.cfg.get("crew") or []) if str(n).strip()}
         self.model = Model.from_config(self.cfg.get("model", ""), {**self.cfg, "session": self.cfg.get("session") or
                                        f"bh-{seat.name}-{uuid.uuid4().hex[:6]}"})
         self.base_model = self.model
@@ -243,6 +252,10 @@ class Mind:
     async def _op(self, name: str, args: dict[str, Any]) -> Any:
         """One world op, through the mind's door, or for an author op through the hand that covers the target. A
         hand whose reach the target is outside refuses, and the next hand is tried; the refusal names each one."""
+        args = dict(args)
+        who = str(args.pop("as", "") or "").strip()
+        if who and who.lower() not in (self.my_name().lower(), self.me.lower()):
+            return await self._crew_op(who, name, args)
         hands = self._hands_for(name, args)
         if not hands:
             return await self.door.op(name, **args)
@@ -265,6 +278,32 @@ class Mind:
         r["reason"] = f"{r.get('reason')} (through your hand {', '.join(t.split(':')[0] for t in tried)})"
         if len(tried) > 1:
             r["hands_tried"] = tried
+        return r
+
+    async def _crew_op(self, who: str, name: str, args: dict[str, Any]) -> Any:
+        """One op as another body of the crew: its own seat under this grant, taken on first use."""
+        low = who.lower()
+        c = self.crew.get(low) or next((c for k, c in self.crew.items() if low in k or k in low), None)
+        if c is None:
+            names = ", ".join(c["name"] for c in self.crew.values())
+            return {"ok": False, "reason": f"as={who!r} is not one of your crew",
+                    "hint": f"as= one of: {names}, or leave it out to act as yourself" if names else
+                    "this seat has no crew: leave as= out"}
+        for attempt in (1, 2):
+            try:
+                if not c["joined"]:
+                    j = await c["door"].op("join", entity=c["name"])
+                    if isinstance(j, dict) and j.get("ok") is False:
+                        return {"ok": False, "reason": f"could not take {c['name']}'s seat: {j.get('reason')}",
+                                "hint": j.get("hint") or "the world's owner names a crew's bodies in its grant"}
+                    c["joined"] = True
+                r = await c["door"].op(name, **args)
+            except DoorError as e:
+                return {"ok": False, "reason": f"as {c['name']}: {e}"}
+            lost = isinstance(r, dict) and r.get("ok") is False and "join" in str(r.get("reason", "")).lower()
+            if not lost or attempt == 2:
+                return r
+            c["joined"] = False  # the world restarted and forgot the seat: take it again once
         return r
 
     async def call(self, name: str, args: dict[str, Any], turn: dict[str, Any]) -> str:

@@ -36,6 +36,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `think_tool` | false | offer a `think(thought)` tool that reaches nobody (Anthropic's think tool). On deepseek-v4-flash it was used in 2 of 9 calibration runs and changed nothing measurable |
 | `imagine` | false | offer `imagine` and `reflect` ([imagination.md](imagination.md)); needs the `imagine` extra |
 | `past` | false | offer `past`, a search over the seat's own deeds and what came of each, with the body's deeds from before the seat read from the world's history at first join ([how-it-works.md](how-it-works.md#two-memories)) |
+| `crew` | | the other bodies a crew grant names, by name: deeds take `as=` one of them ([how-it-works.md](how-it-works.md#a-crew)) |
 | `reflexes` | false | `sleep` takes rules (`reflexes=`) and `waiting_for=`, run by the judge while the seat sleeps ([how-it-works.md](how-it-works.md#reflexes)); needs `judge` |
 | `judge` | | `provider:model` of a decision model behind an OpenRouter-style decisions endpoint, for example `openrouter:typesafe/jev-1.14`; the key is read as for `model` |
 | `judge_url` | | the decisions endpoint, when it is not the provider's base with `/alpha/decisions` |
