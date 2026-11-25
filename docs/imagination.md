@@ -171,6 +171,21 @@ Nine seats, the same three groups as the Purse, 40 turns each:
   last turns, and he digs only when the seat acts. The description now says so. Another read and searched far more
   than it dug (3 digs in 40 turns), as the imagining seats did in the Purse.
 
+### The second run: one notebook for all
+
+Fifteen seats, five a group, 50 turns each. Every group came out the same: rounds won 150 of 183 asked to imagine,
+142 of 176 with no imagination, 161 of 195 with `past`; about one dig a round in all three. Seats now did what no seat
+did in the first run: 3 to 7 of each seat's winning digs went where a liar had said the box was not.
+
+They did not each learn that. One seat of the first run had written who lies and who tells the truth to the craft
+shelf, the notebook every seat in one harness home shares, and its index rides every wake. All fifteen seats started
+the second run with it, and seven of them added to it. So the run measured a shared notebook, not the three ways of
+thinking: a seat with the answer in its index needs neither imagining nor search. Two lessons:
+
+- **A test gives each group its own harness home,** so nothing one seat writes reaches another group.
+- **The craft shelf spreads a lesson fast.** Here the lesson was true and every seat used it. A false one would
+  spread as fast, and craft is meant for lessons about playing well, not for facts about one world's people.
+
 ## Re-living
 
 `relive()` re-lives every moment the seat lived (up to the last 40): an imagining it acted on, from the numbers it
