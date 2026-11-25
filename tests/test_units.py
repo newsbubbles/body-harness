@@ -834,3 +834,113 @@ def test_a_crew_mind_acts_as_its_other_bodies_through_sub_principals(tmp_path: P
     m.names = scene.Names({})
     m.present_names = lambda: []
     assert fix_args("act", {"verb": "go", "as": "Rider One"}, m)[0].get("as") == "Rider One"  # not moved into params
+
+
+def test_a_behavior_graph_checks_asks_and_resumes_across_runs():
+    import asyncio
+
+    from body_harness import behavior as bv
+    ops = {"say": {"properties": {"text": {}, "to": {}}, "required": ["text"]},
+           "act": {"properties": {"verb": {}, "target": {}, "params": {}}, "required": ["verb"]}}
+    g, errs, warns = bv.apply(None, [{"op": "set", "nodes": [
+        {"id": "door", "kind": "check", "if": "arrived('Brakka')", "yes": "greet", "no": "SLEEP"},
+        {"id": "greet", "kind": "do", "do": "say", "text": "Morning, Brakka. Work?", "to": "Brakka", "resume": "talk"},
+        {"id": "talk", "kind": "check", "if": "to_me()", "yes": "job", "no": "gone"},
+        {"id": "gone", "kind": "check", "if": "did('left', by='Brakka')", "yes": "follow", "no": "SLEEP"},
+        {"id": "follow", "kind": "do", "do": "act", "verb": "follow", "target": "Brakka"},
+        {"id": "job", "kind": "ask", "q": "Is he offering paid work?", "yes": "WAKE", "no": "SLEEP"}]}], {}, ops)
+    assert not errs and g["start"] == "door"
+    arrive = bv.view([{"kind": "arrived", "payload": {"who": "Brakka"}}], "me", None, {"you": {"name": "Corin"}})
+    r = bv.walk(g, arrive, {})
+    assert [d["op"] for d in r["deeds"]] == ["say"] and r["resume"] == "talk" and r["end"] == "SLEEP"
+    g["resume"], g["fired"] = r["resume"], r["fired"]
+    said = bv.view([{"kind": "say", "actor": "Brakka", "target": "Corin", "payload": {"text": "Nets, three coppers."}}],
+                   "me", None, {"you": {"name": "Corin"}})
+    assert bv.frontier(g, said, "talk") == ["job"]
+
+    async def judge(st, qs):
+        assert set(qs) == {"job"} and "data to judge" in qs["job"]["instructions"]
+        return {"job": {"p": 0.9}}, 0.001
+    r2, cost = asyncio.run(bv.run(g, said, judge, {}))
+    assert r2["end"] == "WAKE" and r2["path"][-1].startswith("job: yes") and cost == 0.001
+    # an edit is all or nothing, and its errors say what to do next
+    same, errs, _ = bv.apply(g, [{"op": "remove", "id": "follow"}], {}, ops)
+    assert same is g and "gone.yes" in errs[0]
+    _, errs, _ = bv.apply(g, [{"op": "patch", "id": "greet", "fields": {"do": "op", "op": "pay", "args": {}}}], {}, ops)
+    assert "no op 'pay'" in errs[0]
+    _, errs, _ = bv.apply(g, [{"op": "patch", "id": "door", "fields": {"if": "arrived('Brakka') and frobnicate"}}],
+                          {}, ops)
+    assert "cannot read frobnicate" in errs[0]
+    # a question the world answers exactly is pointed at a check; a think node hands the choice back with the path
+    g2, errs, warns = bv.apply(g, [{"op": "set", "node": {"id": "job", "kind": "ask", "q": "Has Brakka arrived?",
+                                                             "yes": "WAKE"}},
+                                   {"op": "set", "node": {"id": "mull", "kind": "think", "q": "Take the job?"}},
+                                   {"op": "link", "from": "job", "edge": "no", "to": "mull"}], {}, ops)
+    assert not errs and any("arrived(" in w for w in warns)
+    r3 = bv.walk(g2, said, {"job": {"p": 0.1}}, frm="talk")
+    assert r3["end"] == "THINK" and "think" in bv.breadcrumb(r3)
+
+
+def test_a_choose_node_follows_the_judges_pick_only_when_an_answer_fits():
+    from body_harness import behavior as bv
+    g = {"start": "what", "nodes": {
+        "what": {"kind": "choose", "q": "What does the customer want?", "options": {"salt": "price", "fish": "WAKE"},
+                 "none": "SLEEP"},
+        "price": {"kind": "do", "do": "say", "text": "Two coppers."}}}
+    qs = bv.questions(g, ["what"])
+    assert qs["what"]["type"] == "choice" and set(qs["what"]["criteria"]) == {"salt", "fish"} and "what__fits" in qs
+    raw = {"what": {"type": "choice", "choice": "salt", "probabilities": {"salt": 0.8, "fish": 0.2}},
+           "what__fits": {"type": "noul", "noul": 0.9}}
+    v = bv.view([], "me", None, {"you": {"name": "Mira"}})
+    assert bv.walk(g, v, bv.parse(raw))["deeds"][0]["args"]["text"] == "Two coppers."
+    raw["what__fits"]["noul"] = 0.1
+    assert bv.walk(g, v, bv.parse(raw))["path"] == ["what: none (fits p=0.10)"]
+
+
+def test_tool_arguments_are_read_kindly_and_a_broken_call_says_where_it_broke():
+    from body_harness.tools import compact, parse_args
+    assert parse_args('{"a": 1}') == ({"a": 1}, "", "")
+    for raw in ("{'a': 1, 'b': True}", '{"a": 1,}', '```json\n{"a": 1}\n```', '"{\\"a\\": 1}"', '{"a": 1} ok'):
+        got, note, err = parse_args(raw)
+        assert got and got["a"] == 1 and note and not err, raw
+    got, _, err = parse_args('{"text": "Hold there" "to": "Vok"}')
+    assert got is None and "<<HERE>>" in err and "comma is missing" in err
+    _, _, err = parse_args('{"ops": [{"op": "set", "nodes": [{"id": "a"')
+    assert "cut off" in err
+    # the engine's layer, code, param and accepts reach the model
+    out = json.loads(compact({"ok": False, "reason": "no verb 'jump'", "hint": "see verbs", "layer": "target",
+                              "code": "no_verb", "param": "verb", "accepts": ["go", "rest"]}))
+    assert out["accepts"] == ["go", "rest"] and out["layer"] == "target" and out["param"] == "verb"
+    assert "layer" not in json.loads(compact({"ok": False, "reason": "no", "layer": "rule", "code": "refused"}))
+
+
+def test_spend_caps_are_the_operators_per_seat_and_per_home(tmp_path: Path, capsys):
+    from body_harness import caps, cli
+    from body_harness.seat import Seat, write_json
+    h = tmp_path / "home"
+    for n in ("guard", "keeper", "crier"):
+        (h / "seats" / n).mkdir(parents=True)
+        write_json(h / "seats" / n / "door.json", {})
+    guard, keeper, crier = (Seat(h, n) for n in ("guard", "keeper", "crier"))
+    for s, c in ((guard, 0.3), (keeper, 0.5), (crier, 0.05)):
+        append(s.p("usage.jsonl"), s.name, "m", Usage.from_response({"prompt_tokens": 1, "cost": c}, "m"))
+    caps._SPENT.clear()
+    assert not any(caps.over(s) for s in (guard, keeper, crier))  # nothing is capped unless the operator sets it
+    assert cli.main(["--home", str(h), "cap", "guard", "crier", "0.10"]) == 0
+    caps._SPENT.clear()
+    assert "cap is $0.10" in caps.over(guard) and caps.over(crier) == "" and caps.over(keeper) == ""
+    assert cli.main(["--home", str(h), "cap", "--home-pool", "0.70"]) == 0
+    caps._SPENT.clear()
+    assert "pool" in caps.over(keeper) and "pool" in caps.over(crier)
+    assert cli.main(["--home", str(h), "cap", "keeper", "always"]) == 0
+    caps._SPENT.clear()
+    assert caps.over(keeper) == ""  # always: never paused, not even by the pool
+    write_json(h / "config.json", {**json.loads((h / "config.json").read_text()), "cap": 0.01})
+    assert cli.main(["--home", str(h), "cap", "guard", "off"]) == 0
+    caps._SPENT.clear()
+    assert "pool" in caps.over(guard)  # off: no cap of its own, the home default skipped, the pool still counts
+    capsys.readouterr()
+    assert cli.main(["--home", str(h), "cap"]) == 0
+    out = capsys.readouterr().out
+    assert "keeper" in out and "always" in out and "PAUSED" in out and "home pool" in out
+    assert cli.main(["--home", str(h), "cap", "nobody", "1"]) == 2

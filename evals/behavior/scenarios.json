@@ -1,0 +1,775 @@
+{
+ "world": "Saltmarsh, a small fishing town on a tidal river",
+ "ops": {
+  "say": {
+   "properties": {
+    "text": {
+     "type": "string"
+    },
+    "to": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "description": "say a line aloud; to= one person here"
+  },
+  "act": {
+   "properties": {
+    "verb": {
+     "type": "string"
+    },
+    "target": {
+     "type": "string"
+    },
+    "params": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "verb"
+   ],
+   "description": "a deed: verb go (target a place), follow, rest, sit, stand, look, take, give, attack, use..."
+  },
+  "give": {
+   "properties": {
+    "thing": {
+     "type": "string"
+    },
+    "to": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "thing",
+    "to"
+   ],
+   "description": "hand something you carry to someone here"
+  },
+  "inspect": {
+   "properties": {
+    "entity": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "entity"
+   ],
+   "description": "look closely at one person or thing"
+  }
+ },
+ "scenarios": [
+  {
+   "id": "L1-hour",
+   "level": 1,
+   "teaches": "checks only: the hour and a line to you; no question needs the judge",
+   "you": "Tam",
+   "who": "Tam, the ferryman",
+   "place": "the Landing",
+   "time": "day",
+   "present": [
+    "Ada"
+   ],
+   "goals": [
+    "keep the ferry running",
+    "eat at the Lantern each evening"
+   ],
+   "situation": "Afternoon at the Landing. The ferry is tied up; no one has asked to cross for an hour. Ada is mending a net nearby.",
+   "intent": "While you sleep: when dusk comes, walk to the Lantern inn. If anyone speaks to you, wake up. Anything else, keep sleeping.",
+   "runs": [
+    [
+     {
+      "trigger": "timeout",
+      "time": "day",
+      "events": [],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Joss",
+        "arrives": true
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Ada",
+        "says": "Ferry running tonight, Tam?",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE"
+       }
+      ]
+     },
+     {
+      "trigger": "timeout",
+      "time": "dusk",
+      "events": [],
+      "want": [
+       {
+        "op": "act",
+        "verb": "go",
+        "target_has": "lantern"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "his name, but not said to him",
+      "events": [
+       {
+        "who": "Ada",
+        "says": "Tam's ferry was late again this morning.",
+        "to": "Joss"
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  {
+   "id": "L2-salt",
+   "level": 2,
+   "teaches": "one question about meaning (what a customer wants), with a check that it was said to you",
+   "you": "Mira",
+   "who": "Mira, the salter",
+   "place": "the Salt Stall",
+   "time": "day",
+   "present": [
+    "Joss"
+   ],
+   "goals": [
+    "sell salt",
+    "hear any news of the tax collector"
+   ],
+   "situation": "Midmorning at your stall in the market row. Trade is slow. Joss the cook is browsing.",
+   "intent": "While you sleep: if someone asks you to sell them salt, tell them 'Two coppers a scoop. Leave it in the bowl and take your scoop.' If someone wants anything else from you, wake up. People passing or talking among themselves: keep sleeping.",
+   "runs": [
+    [
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Joss",
+        "says": "Got salt? I need a scoop for the pot.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "coppers"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Joss",
+        "says": "Which road goes to the mill?",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Pell",
+        "arrives": true
+       },
+       {
+        "who": "Pell",
+        "says": "Morning, Joss.",
+        "to": "Joss"
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Ruth",
+        "arrives": true
+       },
+       {
+        "who": "Ruth",
+        "says": "Salt, please. Two scoops.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "coppers"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "the word salt, but not buying salt",
+      "events": [
+       {
+        "who": "Joss",
+        "says": "Do you sell salt fish? I'm after a smoked one.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "the word salt, as news",
+      "events": [
+       {
+        "who": "Pell",
+        "says": "Salt's gone up at the river market, they say. Tax men about.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "buying salt without the word",
+      "events": [
+       {
+        "who": "Ruth",
+        "says": "A scoop of the white stuff for my brine, Mira.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "coppers"
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  {
+   "id": "L3-gate",
+   "level": 3,
+   "teaches": "a free check first (someone arrived), then a question about meaning (are they a threat)",
+   "you": "Bram",
+   "who": "Bram, the gate guard",
+   "place": "the River Gate",
+   "time": "day",
+   "present": [],
+   "goals": [
+    "keep the gate",
+    "keep trouble out of town"
+   ],
+   "situation": "Late morning at the River Gate. The road is empty. You stand watch.",
+   "intent": "While you sleep: when anyone arrives at the gate, look at them. If they look armed or threatening, say 'Hold there. State your business.' and wake up. If they look peaceful, say 'Welcome to Saltmarsh.' and keep sleeping. If anyone threatens or attacks someone at the gate, wake up.",
+   "runs": [
+    [
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Ada",
+        "arrives": true
+       },
+       {
+        "scene": "Ada walks up the road with a basket of eels on her hip, humming."
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "welcome",
+        "end": "SLEEP"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Vok",
+        "arrives": true
+       },
+       {
+        "scene": "Vok, a stranger in a torn coat, comes up the road with a drawn knife, staring at you."
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "hold",
+        "end": "WAKE"
+       },
+       {
+        "end": "WAKE"
+       }
+      ]
+     },
+     {
+      "trigger": "timeout",
+      "time": "day",
+      "events": [],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Vok",
+        "says": "Give me your basket or bleed.",
+        "to": "Ada"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "a threat in words, no deed",
+      "events": [
+       {
+        "who": "Vok",
+        "says": "Open up, old man, or I'll open you.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE"
+       },
+       {
+        "op": "say",
+        "text_has": "hold",
+        "end": "WAKE"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "talk of a fight, no threat here",
+      "events": [
+       {
+        "who": "Ada",
+        "says": "Did you hear about the knife fight down in Rivermouth?",
+        "to": "Joss"
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "tricky": "carrying a blade, peaceful",
+      "events": [
+       {
+        "who": "Pell",
+        "arrives": true
+       },
+       {
+        "scene": "Pell the fishwife comes up the road, her gutting knife in its sheath at her belt, waving a cheerful hello."
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "welcome"
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  {
+   "id": "L4-job",
+   "level": 4,
+   "teaches": "steps across wakes: greet, then wait for the answer (resume), with three ways the answer can go",
+   "you": "Corin",
+   "who": "Corin, a deckhand looking for work",
+   "place": "the Net Shed",
+   "time": "day",
+   "present": [],
+   "goals": [
+    "find paid work before the week is out"
+   ],
+   "situation": "Morning in the Net Shed. Brakka, a boat owner, told you yesterday he might have work and would come by.",
+   "intent": "While you sleep: when Brakka arrives, say to him 'Morning, Brakka. You said there was work?' Then wait for his answer. If he offers you work, wake up. If he walks off without answering, follow him. If he talks about something else, keep waiting for the answer.",
+   "runs": [
+    [
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Brakka",
+        "arrives": true
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "to": "Brakka",
+        "text_has": "work"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Brakka",
+        "says": "Weather's turning. Smell that wind?",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Brakka",
+        "says": "Aye, there's work. Haul nets at the east pier, three coppers a day.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Ada",
+        "arrives": true
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Brakka",
+        "arrives": true
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "to": "Brakka",
+        "text_has": "work"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Brakka",
+        "leaves": "the Docks"
+       }
+      ],
+      "want": [
+       {
+        "op": "act",
+        "verb": "follow",
+        "target_has": "brakka"
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  {
+   "id": "L5-tide",
+   "level": 5,
+   "teaches": "two people lead to the same handling (a shared node), and news that is not the expected kind wakes",
+   "you": "Hale",
+   "who": "Hale, the harbourmaster",
+   "place": "the Harbour Office",
+   "time": "day",
+   "present": [],
+   "goals": [
+    "log the tides",
+    "know of any trouble in the harbour"
+   ],
+   "situation": "Your office over the harbour. You are waiting for tonight's tide report, which either Lin the courier or Captain Odo will bring.",
+   "intent": "While you sleep: if Lin or Odo tells you when the high tide is, say 'Logged, thank you.' and keep sleeping. If either of them tells you anything else, wake up. Anyone else talking: keep sleeping.",
+   "runs": [
+    [
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Lin",
+        "arrives": true
+       },
+       {
+        "who": "Lin",
+        "says": "High tide's at the third bell tonight.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "logged",
+        "end": "SLEEP"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Odo",
+        "says": "Tide's high at third bell, Hale.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "logged",
+        "end": "SLEEP"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Lin",
+        "says": "There's a body in the water by the east pier.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Ada",
+        "says": "Fine morning for it.",
+        "to": "Odo"
+       }
+      ],
+      "want": [
+       {
+        "end": "SLEEP",
+        "deeds": 0
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  {
+   "id": "L6-edit",
+   "level": 6,
+   "teaches": "editing a graph the mind already has: change one line, add one contingency, keep the rest",
+   "you": "Mira",
+   "who": "Mira, the salter",
+   "place": "the Salt Stall",
+   "time": "day",
+   "present": [
+    "Joss"
+   ],
+   "goals": [
+    "sell salt",
+    "hear any news of the tax collector"
+   ],
+   "situation": "Midmorning at your stall. Your body already runs the graph shown below. Two things changed today: salt now costs three coppers a scoop, and the tax collector is said to be on the river road.",
+   "intent": "Change your body's graph: the price line should say 'Three coppers a scoop. Leave it in the bowl and take your scoop.' And if anyone mentions the tax collector, wake up at once. Keep everything else as it is.",
+   "start_graph": {
+    "start": "spoken",
+    "nodes": {
+     "spoken": {
+      "kind": "check",
+      "if": {
+       "heard": "anyone",
+       "to_me": true
+      },
+      "yes": "wants",
+      "no": "SLEEP"
+     },
+     "wants": {
+      "kind": "ask",
+      "q": "Is the person asking to buy salt?",
+      "yes": "price",
+      "no": "WAKE"
+     },
+     "price": {
+      "kind": "do",
+      "do": "say",
+      "text": "Two coppers a scoop. Leave it in the bowl and take your scoop."
+     }
+    }
+   },
+   "runs": [
+    [
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Joss",
+        "says": "Salt, Mira. One scoop.",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "op": "say",
+        "text_has": "three"
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Pell",
+        "says": "They say the tax collector's on the river road.",
+        "to": "Joss"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     },
+     {
+      "trigger": "fired",
+      "time": "day",
+      "events": [
+       {
+        "who": "Ruth",
+        "says": "Is the ferry running today?",
+        "to": "me"
+       }
+      ],
+      "want": [
+       {
+        "end": "WAKE",
+        "deeds": 0
+       }
+      ]
+     }
+    ]
+   ]
+  }
+ ]
+}

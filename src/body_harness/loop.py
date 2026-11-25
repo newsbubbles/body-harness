@@ -22,14 +22,14 @@ from typing import Any
 
 import httpx
 
-from . import imagine, imports, past, prompts, sandbox, scene
+from . import caps, imagine, imports, past, prompts, sandbox, scene
 from . import reflexes as rx
 from .door import Door, DoorError
 from .memory import Shelf, memo
 from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 from .skills import Skills
-from .tools import EXTRAS, Registry, compact, fix_args, route
+from .tools import EXTRAS, Registry, compact, fix_args, parse_args, route
 from .usage import Usage, append as usage_append
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
@@ -416,6 +416,7 @@ class Mind:
                                         "your own guess. If they truly said it, say the same line again"})
         if name == "away":
             self.st["away"] = fixed
+        sent = fixed
         fixed = self._drop_unsupported(name, fixed)
         r = await self._op(name, fixed)
         bad = re.search(r"unexpected keyword argument '(\w+)'", str(r)) if isinstance(r, dict) else None
@@ -425,6 +426,10 @@ class Mind:
             self.st.setdefault("unsupported", {}).setdefault(name, []).append(bad.group(1))
             fixed = self._drop_unsupported(name, fixed)
             r = await self._op(name, fixed)
+        if (dropped := sorted(set(sent) - set(fixed))):
+            notes.append(f"this world's {name} takes no {', '.join(dropped)}: sent without it" +
+                         (" (the gesture went into the line as *...*)" if "gesture" in dropped and name == "say"
+                          else ""))
         if isinstance(r, dict) and r.get("ok") is False and "join" in str(r.get("reason", "")).lower() \
                 and "seat" in str(r.get("reason", "")).lower():
             await self.join()
@@ -747,7 +752,7 @@ class Mind:
         wake the mind (no rule, an unsure judge, a refused deed, or a rule that says wake). Every look is logged."""
         r = self.st.get("reflexes") or {}
         live = [(i, x) for i, x in enumerate(r.get("rules") or []) if x["when"] == trigger and x["fired"] < x["max"]]
-        if not live:
+        if not live or caps.over(self.seat):  # the judge is spend too: a capped seat calls no model at all
             return False
         rec: dict[str, Any] = {"ts": time.time(), "turn": self.turns, "trigger": trigger,
                                "waiting_for": r.get("waiting_for", "")}
@@ -865,6 +870,24 @@ class Mind:
                 if verb and not (done & set(cands)):
                     return what, verb
         return None
+
+    def _takes(self, name: str) -> set[str] | None:
+        """The argument names a tool offered to the model takes (None: not a tool it was offered)."""
+        for t in self.registry.tools(self.loaded_tools()):
+            if t["function"]["name"] == name:
+                return set((t["function"].get("parameters") or {}).get("properties") or {})
+        s = self.registry.schema(name)
+        return set((s["function"].get("parameters") or {}).get("properties") or {}) if s else None
+
+    def _ignored_keys(self, name: str, args: dict[str, Any]) -> str:
+        """Keys a harness tool silently passed over: say so, or the model thinks they did something. World ops are
+        not checked here: fix_args moves stray keys and the world refuses what it does not take."""
+        if name in self.registry.world or name in DEEDS or name in ("remember", "intend"):
+            return ""
+        takes = self._takes(name)
+        extra = sorted(k for k in args if takes and k not in takes and k != "as")
+        return f"{name} takes no {', '.join(extra)}, so that was ignored; it takes {', '.join(sorted(takes))}" \
+            if extra else ""
 
     def _drop_unsupported(self, op: str, args: dict[str, Any]) -> dict[str, Any]:
         gone = set((self.st.get("unsupported") or {}).get(op) or [])
@@ -1078,7 +1101,7 @@ class Mind:
                 break
             # a thinking model's reasoning goes back with its tool calls: DeepSeek requires it, OpenRouter asks for
             # reasoning_details unmodified; dropping it left the model to call tools without its own thread
-            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls,
+            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": clean_calls(calls),
                              **{k: msg[k] for k in ("reasoning", "reasoning_details", "reasoning_content")
                                 if msg.get(k)}})
             for c in calls:
@@ -1086,22 +1109,36 @@ class Mind:
                 name = f.get("name", "")
                 args: dict[str, Any] = {}
                 try:
-                    args = json.loads(f.get("arguments") or "{}") if isinstance(f.get("arguments"), str) \
-                        else (f.get("arguments") or {})
-                    if not isinstance(args, dict):
-                        raise ValueError("arguments are not an object")
+                    got, note, err = parse_args(f.get("arguments"))
+                    if got is None:
+                        raise ValueError(err)
+                    args = got
                     if choice and name != "sleep":
                         # some models call a tool they were not offered; the last step runs only sleep
                         turn["cut"] = f"{name}({_short(args)})"[:160]
                         out = "(harness: not run; the turn is over)"
                     else:
                         out = await self.call(name, args, turn)
+                    extra = self._ignored_keys(name, args)
+                    if extra:
+                        note = "; ".join(x for x in (note, extra) if x)
+                    if note:
+                        out = f"(harness: {note})\n" + out
                 except (ValueError, TypeError) as e:
-                    out = compact({"ok": False, "reason": f"bad arguments for {name}: {e}"})
+                    takes = self._takes(name)
+                    out = compact({"ok": False, "reason": f"bad arguments for {name}: {e}",
+                                   **({"hint": f"{name} takes {', '.join(sorted(takes)) or 'no arguments'}"}
+                                      if takes is not None else {})})
                 except DoorError as e:
                     if e.status in (401, 403):
                         raise
                     out = compact({"ok": False, "reason": f"the server did not answer: {e}; try again or sleep"})
+                except Exception as e:  # a fault in the harness, not the call: the turn goes on, and it is logged
+                    _log(self.seat.name, f"{name} failed inside the harness: {e}\n{traceback.format_exc()}")
+                    out = compact({"ok": False, "reason": f"{name} failed inside the harness ({type(e).__name__}: "
+                                                          f"{str(e)[:200]})",
+                                   "hint": "not your call's fault, and it is logged for the harness's maintainer: "
+                                           "do it another way, or go on without it"})
                 turn["calls"].append({"tool": name, "args": _short(args if isinstance(args, dict) else {}),
                                       "out": out[:240]})
                 # the whole of what the world said, for checking a character's claims later (bh log --full)
@@ -1160,6 +1197,27 @@ class Mind:
         events: list[dict[str, Any]] = []
         while not self.stop:
             try:
+                capped = caps.over(self.seat)
+                if capped:
+                    # the operator's cap (bh cap): no model call; the body sleeps on its watch, and the wakes it
+                    # passes are counted so the next turn knows it missed them
+                    if self.st.get("cap_said") != capped:
+                        self.st["cap_said"] = capped
+                        self.seat.outbox(f"paused by your spend cap: {capped}. It plays again when the window has "
+                                         f"room, or raise the cap (bh cap {self.seat.name} <dollars>, or always)",
+                                         "error")
+                        _log(self.seat.name, f"paused: {capped}")
+                    self.st["cap_missed"] = int(self.st.get("cap_missed", 0)) + 1
+                    self.save()
+                    t0 = time.time()
+                    reason, events = await self.wait_for_wake()
+                    if time.time() - t0 < 30:
+                        await asyncio.sleep(30)  # a wake that returns at once (an operator line) must not spin
+                    continue
+                if self.st.pop("cap_said", None):
+                    missed = int(self.st.pop("cap_missed", 0))
+                    reason = (f"{reason} (your operator's spend cap paused you for {missed} wake"
+                              f"{'s' if missed != 1 else ''}; things moved without you: look before you act)")
                 await self.turn(reason, events)
                 reason, events = await self.wait_for_wake()
             except DoorError as e:
@@ -1263,6 +1321,22 @@ def _hearsay(text: str, voices: dict[str, list[str]], people: Any = ()) -> tuple
         if not lines or len({w for w in words if w[:5] in heard}) / len(words) < 0.34:
             return who, claim[:160], (lines[-1][:160] if lines else "")
     return None
+
+
+def clean_calls(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The calls as they go back in the history: arguments that are not a JSON object become {} (the tool result
+    already says they were bad). Sent back raw, they made a provider refuse the whole next request (qwen3.7-flash,
+    400 "function.arguments must be in JSON format", in the behavior curriculum 11-25)."""
+    out = []
+    for c in calls:
+        f = c.get("function") or {}
+        a = f.get("arguments")
+        try:
+            ok = isinstance(json.loads(a), dict) if isinstance(a, str) else isinstance(a, dict)
+        except ValueError:
+            ok = False
+        out.append(c if ok else {**c, "function": {**f, "arguments": "{}"}})
+    return out
 
 
 def _short(args: dict[str, Any]) -> dict[str, Any]:

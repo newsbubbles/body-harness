@@ -210,6 +210,36 @@ def _calibrate(args: argparse.Namespace, s: seats.Seat) -> int:
     return 0
 
 
+def _cap(args: argparse.Namespace, h: Path) -> int:
+    from . import caps
+    names, value = list(args.args), None
+    if names:
+        try:
+            value = caps.parse(names[-1])
+            names = names[:-1]
+        except ValueError:
+            value = "show"  # only names: show those seats
+    if args.pool is not None:
+        try:
+            caps.set_home(h, caps.parse(args.pool) if args.pool.lower() != "off" else None, args.hours)
+        except ValueError as e:
+            print(f"--home-pool takes dollars or off ({e})", file=sys.stderr)
+            return 2
+    if names and value != "show":
+        for n in names:
+            s = seats.Seat(h, n)
+            if not s.exists:
+                print(f"no seat {n}; bh seats lists them", file=sys.stderr)
+                return 2
+            caps.set_seat(s, value, args.hours)
+    elif args.args and value != "show":
+        print("name the seats first: bh cap <seat> [<seat>...] 0.50 | off | always", file=sys.stderr)
+        return 2
+    shown = [seats.Seat(h, n) for n in names] if names else seats.all_seats(h)
+    print("\n".join(caps.table(h, shown)))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -245,6 +275,13 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--full", action="store_true", help="each tool call with everything the world answered")
     c = sub.add_parser("usage", help="spend by seat and model")
     c.add_argument("--since", default="", help="30m, 24h, 7d")
+    c = sub.add_parser("cap", help="spend caps, yours to set per seat or for the home: bh cap (all), bh cap <seat> "
+                                   "0.50 | off | always, bh cap --home 3.00 | off")
+    c.add_argument("args", nargs="*", help="seat names, then the cap: dollars, off (none of its own) or always "
+                                           "(never paused, not even by the home's pool)")
+    c.add_argument("--hours", type=float, help="the window the cap counts over (default 24)")
+    c.add_argument("--home-pool", dest="pool", metavar="DOLLARS",
+                   help="one pool for every seat in this home together, or off")
     c = sub.add_parser("config", help="show or set a seat's settings: key=value (JSON values work)")
     c.add_argument("name")
     c.add_argument("pairs", nargs="*")
@@ -313,6 +350,8 @@ def main(argv: list[str] | None = None) -> int:
         for s in seats.all_seats(h):
             print(s.name)
         return 0
+    if args.cmd == "cap":
+        return _cap(args, h)
     if args.cmd == "usage":
         rows = fold([x.p("usage.jsonl") for x in seats.all_seats(h)], _since(args.since))
         for name, u in sorted(rows.items(), key=lambda kv: kv[0] != "all"):

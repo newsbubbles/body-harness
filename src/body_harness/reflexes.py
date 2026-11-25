@@ -109,9 +109,9 @@ class Judge:
         self.spec, self.model, self._key = spec, m.model, m.key
         self.url = cfg.get("judge_url") or m.base.rsplit("/v1", 1)[0] + "/alpha/decisions"
 
-    async def decide(self, client: httpx.AsyncClient, st: dict[str, Any],
-                     qs: dict[str, Any]) -> tuple[dict[str, float], float, float]:
-        """{question: p(yes)}, dollars, seconds."""
+    async def answers(self, client: httpx.AsyncClient, st: dict[str, Any],
+                      qs: dict[str, Any]) -> tuple[dict[str, Any], float, float]:
+        """The raw answers by question, dollars, seconds."""
         t0 = time.time()
         r = await client.post(self.url, json={"model": self.model, "state": json.dumps(st), "questions": qs},
                               headers={"Authorization": f"Bearer {self._key}", "content-type": "application/json"},
@@ -119,12 +119,18 @@ class Judge:
         if r.status_code != 200:
             raise ModelError(f"judge {r.status_code}: {r.text[:200]}")
         d = r.json()
+        return dict(d.get("answers") or {}), float((d.get("usage") or {}).get("cost") or 0), time.time() - t0
+
+    async def decide(self, client: httpx.AsyncClient, st: dict[str, Any],
+                     qs: dict[str, Any]) -> tuple[dict[str, float], float, float]:
+        """{question: p(yes)}, dollars, seconds."""
+        got, cost, secs = await self.answers(client, st, qs)
         ps = {}
-        for k, a in (d.get("answers") or {}).items():
+        for k, a in got.items():
             v = a.get("noul") if isinstance(a, dict) else None
             if isinstance(v, (int, float)):
                 ps[k] = float(v)
-        return ps, float((d.get("usage") or {}).get("cost") or 0), time.time() - t0
+        return ps, cost, secs
 
 
 def choose(rules: list[dict[str, Any]], ps: dict[str, float], fire: float = FIRE,

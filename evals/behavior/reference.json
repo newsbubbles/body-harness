@@ -1,0 +1,36 @@
+{
+  "note": "Hand-written graphs for each scenario: the ceiling a model's graph is read against. A miss here is the judge's or the scenario's, not the author's.",
+  "L1-hour": {"start": "spoken", "nodes": {
+    "spoken": {"kind": "check", "if": "to_me()", "yes": "WAKE", "no": "dusk"},
+    "dusk": {"kind": "check", "if": "ambient.get('time_of_day') == 'dusk'", "yes": "inn", "no": "SLEEP"},
+    "inn": {"kind": "do", "do": "act", "verb": "go", "target": "the Lantern"}}},
+  "L2-salt": {"start": "spoken", "nodes": {
+    "spoken": {"kind": "check", "if": "to_me()", "yes": "wants", "no": "SLEEP"},
+    "wants": {"kind": "ask", "q": "Is the person speaking to Mira asking to buy salt?", "yes": "price", "no": "WAKE"},
+    "price": {"kind": "do", "do": "say", "text": "Two coppers a scoop. Leave it in the bowl and take your scoop."}}},
+  "L3-gate": {"start": "quiet", "nodes": {
+    "quiet": {"kind": "check", "if": "woke == 'timeout'", "yes": "SLEEP", "no": "came"},
+    "came": {"kind": "check", "if": "arrived('')", "yes": "armed", "no": "trouble"},
+    "armed": {"kind": "ask", "q": "Does the person who just arrived look armed or threatening?", "yes": "hold", "no": "welcome"},
+    "hold": {"kind": "do", "do": "say", "text": "Hold there. State your business.", "then": "up"},
+    "up": {"kind": "do", "do": "wake", "why": "an armed stranger at the gate"},
+    "welcome": {"kind": "do", "do": "say", "text": "Welcome to Saltmarsh."},
+    "trouble": {"kind": "ask", "q": "Is anyone threatening or attacking someone at the gate?", "yes": "WAKE", "no": "SLEEP"}}},
+  "L4-job": {"start": "door", "nodes": {
+    "door": {"kind": "check", "if": "arrived('Brakka')", "yes": "greet", "no": "SLEEP"},
+    "greet": {"kind": "do", "do": "say", "to": "Brakka", "text": "Morning, Brakka. You said there was work?", "resume": "answer"},
+    "answer": {"kind": "check", "if": "to_me()", "yes": "work", "no": "gone"},
+    "work": {"kind": "ask", "q": "Is Brakka offering Corin work?", "yes": "WAKE", "no": "SLEEP"},
+    "gone": {"kind": "check", "if": "did('left', by='Brakka')", "yes": "after", "no": "SLEEP"},
+    "after": {"kind": "do", "do": "act", "verb": "follow", "target": "Brakka"}}},
+  "L5-tide": {"start": "lin", "nodes": {
+    "lin": {"kind": "check", "if": "to_me() and heard('', by='Lin')", "yes": "tide", "no": "odo"},
+    "odo": {"kind": "check", "if": "to_me() and heard('', by='Odo')", "yes": "tide", "no": "SLEEP"},
+    "tide": {"kind": "ask", "q": "Is the speaker telling Hale when the high tide is?", "yes": "logged", "no": "WAKE"},
+    "logged": {"kind": "do", "do": "say", "text": "Logged, thank you."}}},
+  "L6-edit": {"start": "tax", "nodes": {
+    "tax": {"kind": "check", "if": "heard('tax collector')", "yes": "WAKE", "no": "spoken"},
+    "spoken": {"kind": "check", "if": {"heard": "anyone", "to_me": true}, "yes": "wants", "no": "SLEEP"},
+    "wants": {"kind": "ask", "q": "Is the person asking to buy salt?", "yes": "price", "no": "WAKE"},
+    "price": {"kind": "do", "do": "say", "text": "Three coppers a scoop. Leave it in the bowl and take your scoop."}}}
+}

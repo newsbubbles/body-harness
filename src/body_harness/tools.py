@@ -9,7 +9,9 @@ a refusal read as noise. A wrapper never invents a deed: what it sends is what t
 
 from __future__ import annotations
 
+import ast
 import json
+import re
 from typing import TYPE_CHECKING, Any
 
 from . import imports
@@ -385,6 +387,81 @@ def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any
     return args, notes
 
 
+_JSON_HINTS = [
+    ("Expecting ',' delimiter", "a comma is missing between two items, or a quote inside a string is not escaped "
+                                "(write \\\" inside a string)"),
+    ("Expecting ':' delimiter", "a key needs a colon before its value"),
+    ("Expecting property name", "keys go in double quotes, and there is no comma after the last item"),
+    ("Unterminated string", "a string is not closed"),
+    ("Invalid control character", "a raw line break or tab inside a string: write it as \\n or \\t"),
+    ("Invalid \\escape", "a backslash inside a string must be doubled (\\\\)"),
+    ("Expecting value", "a value is missing or is not JSON (true, false and null are lowercase; no comments)"),
+]
+
+
+def parse_args(raw: Any) -> tuple[dict[str, Any] | None, str, str]:
+    """A tool call's arguments: (args, note, error). Strict JSON first; then the slips a model makes that can be read
+    safely (code fences, a trailing comma, Python's quotes and True/None, a JSON string inside the string, text after
+    the object), with a note saying what was read; else an error that quotes the place it broke, since the call goes
+    back into the history as {} and the model cannot see its own text there."""
+    if isinstance(raw, dict):
+        return raw, "", ""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return {}, "", ""
+    if not isinstance(raw, str):
+        return None, "", f"arguments are a {type(raw).__name__}, not an object"
+    text = raw.strip()
+    first: json.JSONDecodeError | None = None
+    try:
+        got = json.loads(text)
+    except json.JSONDecodeError as e:
+        first, got = e, None
+    if first is None:
+        if isinstance(got, str):  # the object sent as a JSON string
+            inner, _, err = parse_args(got)
+            if inner is not None:
+                return inner, "your arguments came as a JSON string holding the object; send the object itself", ""
+            return None, "", f"arguments are a string, not an object: {err}"
+        if isinstance(got, dict):
+            return got, "", ""
+        return None, "", f"arguments are a {type(got).__name__}, not an object {{...}}"
+    tries = []
+    fenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    if fenced != text:
+        tries.append((fenced, "code fences around the JSON"))
+    tries.append((re.sub(r",\s*([}\]])", r"\1", fenced), "a comma before a closing bracket"))
+    tries.append((fenced, "a raw line break or tab inside a string"))
+    for k, (t, what) in enumerate(tries):
+        try:
+            got = json.loads(t, strict=k < len(tries) - 1)  # the last try lets raw control characters in strings
+            if isinstance(got, dict):
+                return got, f"your arguments were not strict JSON ({what}); read them anyway", ""
+        except json.JSONDecodeError:
+            pass
+    try:
+        got, end = json.JSONDecoder().raw_decode(fenced)
+        if isinstance(got, dict) and end < len(fenced):
+            return got, f"text after the arguments' object was ignored: {fenced[end:end + 60]!r}", ""
+    except json.JSONDecodeError:
+        pass
+    try:
+        got = ast.literal_eval(fenced)
+        if isinstance(got, dict) and all(isinstance(k, str) for k in got):
+            return json.loads(json.dumps(got, default=str)),                 "your arguments were Python, not JSON (single quotes or True/None); read them anyway: JSON uses "                 "double quotes and true/false/null", ""
+    except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
+        pass
+    pos = first.pos
+    near = text[max(0, pos - 50):pos] + " <<HERE>> " + text[pos:pos + 25]
+    why = next((h for k, h in _JSON_HINTS if first.msg.startswith(k)), "")
+    cut = not text.rstrip().endswith("}") and pos >= len(text) - 2
+    if cut:
+        why = ("the arguments stop before their last }: the reply was likely cut off for length. Send a shorter "
+               "call (fewer items in one go)")
+    return None, "", (f"arguments are not valid JSON: {first.msg} at character {pos} of {len(text)}, near: {near!r}"
+                      + (f". Likely: {why}" if why else "") + ". Nothing was run; send the call again as one JSON "
+                      "object")
+
+
 def compact(result: Any, limit: int = 5000) -> str:
     """A world answer for the model: refusals as reason, hint and what would work; big answers cut with a note."""
     if isinstance(result, dict) and result.get("ok") is False:
@@ -393,6 +470,16 @@ def compact(result: Any, limit: int = 5000) -> str:
             r["hint"] = result["hint"]
         if result.get("alternatives"):
             r["instead"] = result["alternatives"]
+        # the engine says which part to change (layer: call, target or rule), the param at fault and what it would
+        # take instead (11-24): dropped here, the model never saw accepts=, and CALL_TROUBLE's layer test never matched
+        if result.get("layer") and result["layer"] != "rule":
+            r["layer"] = result["layer"]
+        if result.get("code") and result["code"] != "refused":
+            r["code"] = result["code"]
+        if result.get("param"):
+            r["param"] = result["param"]
+        if result.get("accepts") is not None:
+            r["accepts"] = result["accepts"]
         for k in ("present", "names", "how", "kinds"):
             if k in result:
                 r[k] = result[k]

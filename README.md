@@ -187,6 +187,7 @@ bh tell N "text"                           a message from you; wakes the seat
 bh outbox N                                what the seat told you
 bh log N [-n 5] [--calls | --full]         its last turns; --full has everything the world answered
 bh usage [--since 24h]                     spend by seat and model
+bh cap [<seat>... <dollars|off|always>]    spend caps per seat, --home-pool for the home
 bh service add|remove N                    keep a seat running, restarted when it stops (see below)
 bh service status | run | stop             what the supervisor keeps; run it; stop it and its seats
 bh service install | uninstall             Windows: a scheduled task that starts the supervisor at logon

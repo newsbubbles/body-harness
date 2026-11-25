@@ -45,6 +45,23 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `imagine_trials`, `surprise_bits` | 40, 4 | trials per imagining (at least 20); surprise at or over which the wake asks the seat to reflect |
 | `keep_wakes` | 5 | wakes kept in `cache/wakes.json` for `bh calibrate` (0 keeps none) |
 | `extra_prompt` | | your own words to this seat, appended to its instructions |
+| `cap`, `cap_hours` | none, 24 | dollars this seat may spend per window, or `"always"` (never paused, not even by the pool). Set in the home's config it is the default for every seat; `null` in a seat's own config means no cap of its own. A capped seat calls no model (turns and judge alike) and its body sleeps on its watch until the window has room. `bh cap` sets it |
+| `cap_home`, `cap_home_hours` | none, 24 | home config only: one pool for every seat in the home together |
+
+## Spend caps
+
+The harness never decides which seats matter; whoever runs the home does. Nothing is capped until you set it.
+
+```
+bh cap                          every seat: spent, cap, left, paused or not; then the home pool
+bh cap crier guard 0.50         these seats: $0.50 per 24 h each
+bh cap keeper always            never paused, not even by the pool
+bh cap crier off                no cap of its own (the pool still counts)
+bh cap crier 2 --hours 168      $2 per week
+bh cap --home-pool 3.00         one pool for the whole home; --home-pool off removes it
+```
+
+A change counts at once, without a restart. A paused seat says so once in its outbox, and when it plays again its wake tells it how many wakes it missed.
 
 ## Provider keys
 
