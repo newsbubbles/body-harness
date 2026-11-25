@@ -200,6 +200,11 @@ class Mind:
             if name == "relive":
                 return compact(await asyncio.to_thread(self.imagination.relive, args, self.my_name()), 6000)
             turn["imagined"] = turn.get("imagined", 0) + 1
+            if turn["deeds"] > turn.get("deeds_seen", 0):
+                # the card was read before this turn's deeds: Tomo imagined from Oren at 11 hp when he was at 6, and
+                # Suri from a cooldown of 3 that was 1, then each was told it had been surprised
+                await self.perceive()
+                turn["deeds_seen"] = turn["deeds"]
             # a few hundred small worlds: off the event loop, so the other seats in this process keep waiting
             return compact(await asyncio.to_thread(self.imagination.imagine, args, self.bundle, self.my_name(),
                                                    self.turns, self.verb_names()), 6000)
