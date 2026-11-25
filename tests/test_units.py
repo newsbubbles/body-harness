@@ -944,3 +944,17 @@ def test_spend_caps_are_the_operators_per_seat_and_per_home(tmp_path: Path, caps
     out = capsys.readouterr().out
     assert "keeper" in out and "always" in out and "PAUSED" in out and "home pool" in out
     assert cli.main(["--home", str(h), "cap", "nobody", "1"]) == 2
+
+
+def test_the_supervisor_counts_only_outside_runs_of_its_own_home(tmp_path: Path, monkeypatch):
+    from body_harness.service import parse_run, same_home
+    main, pilot = tmp_path / "main", tmp_path / "pilot home"
+    monkeypatch.setenv("BH_HOME", str(main))
+    # a pilot's run --all in another home held back every seat in the main one (Glass Reach, 25 Nov)
+    other = parse_run(f'bash -c "bh --home {tmp_path}/pilot run --all"')
+    assert other and other[1] == ["--all"] and not same_home(other[0], main)
+    spaced = parse_run(f'C:/py/python.exe -m body_harness.cli --home "{pilot}" run guard keeper')
+    assert spaced and spaced[1] == ["guard", "keeper"] and same_home(spaced[0], pilot)
+    assert same_home(parse_run("bh run guard")[0], main)  # no --home: the default home
+    assert same_home(parse_run(f"bh --home={main} run --all")[0], main)
+    assert parse_run(f"bh --home {main} service run") is None and parse_run("python other.py run") is None

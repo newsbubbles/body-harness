@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -128,7 +129,9 @@ class Service:
                 if now < k["next"]:
                     continue
                 others = bh_runs() if others is None else others
-                dup = [pid for pid, names in others if pid not in mine and (n in names or "--all" in names)]
+                # only runs of this home: a run --all of another home (a pilot's) must not hold these seats back
+                dup = [pid for pid, home, names in others if pid not in mine and same_home(home, self.home)
+                       and (n in names or "--all" in names)]
                 if dup:
                     if k.get("dup") != dup:
                         self.log(f"{n}: already run by pid {dup[0]} outside the supervisor; left alone (stop that "
@@ -193,8 +196,31 @@ class Service:
         return r.returncode
 
 
-def bh_runs() -> list[tuple[int, list[str]]]:
-    """Every running `bh run ...` on this machine (bh, bh.exe or python -m body_harness.cli): [(pid, names)]."""
+def default_home() -> Path:
+    return Path(os.environ.get("BH_HOME") or Path.home() / ".body-harness")
+
+
+def same_home(a: Path | None, b: Path) -> bool:
+    """Whether a run's --home (None: it named none, so the default) is this home."""
+    norm = lambda x: os.path.normcase(os.path.abspath(str(x)))
+    return norm(a if a is not None else default_home()) == norm(b)
+
+
+def parse_run(cmd: str) -> tuple[Path | None, list[str]] | None:
+    """A command line's `bh [--home H] run ...`: (its home or None, the seats it names and --all), or None if it is
+    not a bh run. The home is read from the line as written, so a quoted path with spaces survives."""
+    words = cmd.replace('"', " ").split()
+    bh = next((i for i, w in enumerate(words) if Path(w).stem.lower() == "bh" or w == "body_harness.cli"), None)
+    if bh is None or "run" not in words[bh + 1:] or "service" in words[bh + 1:]:
+        return None
+    m = re.search(r'--home(?:=|\s+)(?:"([^"]+)"|\'([^\']+)\'|(\S+))', cmd)
+    home = Path(next(g for g in m.groups() if g)) if m else None
+    rest = words[words.index("run", bh + 1) + 1:]
+    return home, [x for x in rest if not x.startswith("-") or x == "--all"]
+
+
+def bh_runs() -> list[tuple[int, Path | None, list[str]]]:
+    """Every running `bh run ...` on this machine (bh, bh.exe or python -m body_harness.cli): [(pid, home, names)]."""
     if WIN:
         ps = ("Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'body_harness|bh(\\.exe)?' } | "
               "ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }")
@@ -208,12 +234,9 @@ def bh_runs() -> list[tuple[int, list[str]]]:
         if "\t" not in line:
             continue
         pid, cmd = line.split("\t", 1)
-        words = cmd.replace('"', " ").split()
-        bh = next((i for i, w in enumerate(words) if Path(w).stem.lower() == "bh" or w == "body_harness.cli"), None)
-        if bh is None or "run" not in words[bh + 1:] or "service" in words[bh + 1:]:
-            continue
-        rest = words[words.index("run", bh + 1) + 1:]
-        rows.append((int(pid), [x for x in rest if not x.startswith("-") or x == "--all"]))
+        run = parse_run(cmd)
+        if run:
+            rows.append((int(pid), *run))
     return rows
 
 
