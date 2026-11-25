@@ -973,3 +973,18 @@ def test_params_sent_as_a_json_string_are_read_as_the_object():
     args, _ = fix_args("act", {"verb": "spool_card", "params": "{'answer': 'yes',}"}, m)
     assert args["params"] == {"answer": "yes"}
     assert fix_args("say", {"text": "{not json, just words"}, m)[0]["text"] == "{not json, just words"
+
+
+def test_a_lead_that_keeps_going_nowhere_is_named_once_its_notes_repeat_it():
+    # Ongo chased an "archive runner at South Cluster gate" that other minds had made up, for 2.5 hours
+    from body_harness.loop import stuck_on
+    chase = ["Asked the Doc for the archive runner who bought the spools. Waiting.",
+             "Asked Zayinth about the archive runner. Waiting on her answer.",
+             "The archive runner is somewhere past the South gate, they say.",
+             "Stopped a drinker, asked about the archive runner and the gate route.",
+             "Asked the bookie about the archive runner, red hair, chewed nails.",
+             "Still no word on the archive runner."]
+    assert stuck_on(chase, {"doc", "zayinth"}) == "archive runner"
+    assert stuck_on(chase[:5], set()) == ""  # too few notes to say
+    friends = [f"Talked with Varn Erixx about the {x}." for x in ("weather", "yoke", "plate", "fight", "bar", "rent")]
+    assert stuck_on(friends, {"varn", "erixx"}) == ""  # a friend's name is not a lead

@@ -1051,6 +1051,18 @@ class Mind:
             user += (f"\n\n(harness: you and {', '.join(long_talk)} have traded lines {chat[long_talk[0]]} turns in a "
                      "row with nothing done between. Unless this line changes something, answer in a few words or "
                      "not at all, and sleep on what would move things: a deed, someone arriving, the hour.)")
+        need = int(self.cfg.get("stuck_notes", 5))
+        known = {w for n in self.names.by_id.values() for w in re.findall(r"[a-z][a-z'-]{2,}", str(n).lower())}
+        lead = stuck_on(self.st.get("notes") or [], known, need) if need else ""
+        if lead and lead not in (self.st.get("stuck_told") or []):
+            # once per lead: a nudge, not a nag
+            self.st["stuck_told"] = ((self.st.get("stuck_told") or []) + [lead])[-8:]
+            nudges.append(f"stuck: '{lead}' in {need} of the last 6 notes")
+            # replayed on a pilot's notes it also caught routines ("grill shift"), so it asks rather than tells
+            user += (f"\n\n(harness: '{lead}' runs through your last {need} notes. If it is a lead that has not paid "
+                     "off, it may not exist in this world: someone may have made it up. Try something else, or ask "
+                     "the world's owner whether it is real: tell(to='owner', kind='quest', ...). If it is your "
+                     "routine, carry on.)")
         if self.turns == 1 and not self.st.get("read_handbook"):
             guide = "mind" if self.role == "mind" else "player"
             user += (f"\n\nThis is your first turn in this seat: read skill('{guide}'), and the world's handbook for "
@@ -1187,6 +1199,7 @@ class Mind:
         note = turn["note"] or "(no note)"
         talkers = speakers if turn["deeds"] and not turn.get("done") else set()
         self.st["chat"] = {p: (self.st.get("chat") or {}).get(p, 0) + 1 for p in talkers}
+        self.st["notes"] = (self.st.get("notes", []) + [note])[-8:]
         self.st["recent"] = (self.st.get("recent", []) +
                              [f"t={float(b.get('t') or 0):.0f} woke ({reason[:80]}): {note}"])[-8:]
         append_jsonl(self.seat.p("ledger.jsonl"), {"ts": time.time(), "t": b.get("t"), "turn": self.turns,
@@ -1351,6 +1364,31 @@ def clean_calls(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
             ok = False
         out.append(c if ok else {**c, "function": {**f, "arguments": "{}"}})
     return out
+
+
+_PLAIN = set("""about after again also asked asking back been before being came come could did does doing done down
+each even from going have here into just know last like look looked made make more much next only other over said
+same says some still than that their them then there they this told turn turns very wait waiting want wants went
+were what when where which while will with would your""".split())
+
+
+def stuck_on(notes: list[str], known: set[str], need: int = 5, of: int = 6) -> str:
+    """A two-word phrase (not a name the seat knows) in at least `need` of its last `of` notes: a lead it keeps
+    chasing. Ongo asked five people over 2.5 hours for an "archive runner at South Cluster gate" that other minds
+    had made up; nothing refused him, so nothing told him he was stuck (Niiro Cradle, 25 Nov)."""
+    last = notes[-of:]
+    if len(last) < of:
+        return ""
+    counts: dict[str, int] = {}
+    for n in last:
+        words = [w for w in re.findall(r"[a-z][a-z'-]{2,}", n.lower())]
+        pairs = {f"{a} {b}" for a, b in zip(words, words[1:])
+                 if a not in _PLAIN and b not in _PLAIN and len(a) > 3 and len(b) > 3
+                 and a not in known and b not in known}
+        for x in pairs:
+            counts[x] = counts.get(x, 0) + 1
+    best = max(counts.items(), key=lambda kv: (kv[1], kv[0]), default=("", 0))
+    return best[0] if best[1] >= need else ""
 
 
 def _short(args: dict[str, Any]) -> dict[str, Any]:

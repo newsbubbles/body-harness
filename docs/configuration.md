@@ -45,6 +45,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `imagine_trials`, `surprise_bits` | 40, 4 | trials per imagining (at least 20); surprise at or over which the wake asks the seat to reflect |
 | `keep_wakes` | 5 | wakes kept in `cache/wakes.json` for `bh calibrate` (0 keeps none) |
 | `extra_prompt` | | your own words to this seat, appended to its instructions |
+| `stuck_notes` | 5 | a two-word phrase (not a known name) in this many of the last 6 notes gets one wake note: a lead that keeps going nowhere may not exist, so ask the owner (`tell(to='owner', kind='quest')`). 0 turns it off |
 | `cap`, `cap_hours` | none, 24 | dollars this seat may spend per window, or `"always"` (never paused, not even by the pool). Set in the home's config it is the default for every seat; `null` in a seat's own config means no cap of its own. A capped seat calls no model (turns and judge alike) and its body sleeps on its watch until the window has room. `bh cap` sets it |
 | `cap_home`, `cap_home_hours` | none, 24 | home config only: one pool for every seat in the home together |
 

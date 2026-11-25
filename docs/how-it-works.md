@@ -41,6 +41,9 @@ Each of these came from a seat doing the wrong thing in a real world, and is now
 - **Nobody home.** After a few lines to someone with no answer, the seat is told some people keep to themselves and
   may not answer, so it asks someone else or waits to be spoken to. It is never told who has a mind: seats copied
   "X has no mind" into their notes, and from there it could reach what they say in the world.
+- **A lead that goes nowhere.** When one phrase runs through 5 of a seat's last 6 notes, its next wake says the lead
+  may not exist and points to the owner. A pilot's seat chased a made-up "archive runner" for 2.5 hours: nothing
+  refused it, so nothing said it was stuck. Once per phrase, and it says "if it is your routine, carry on".
 - **Cut-off replies get room.** A thinking model cut off before it said anything gets more tokens, once.
 - **Escalation.** After repeated wrong calls in one turn, or many reads with no deed, the rest of the turn goes to the
   next model on the seat's list; the next turn starts on its own model again.
