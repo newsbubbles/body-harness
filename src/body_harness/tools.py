@@ -149,12 +149,18 @@ IMAGINE = fn("imagine", "Try a plan in your imagination before you do it: a priv
                         "step for someone else is your guess of what they would do. Unsure, give odds, drawn afresh "
                         "each trial: {actor: 'Oren', verb: {'guard': 3, 'strike': 1}}; or, when both choose at "
                         "once, a choice inside your own step: {verb: 'strike', target: 'Oren', odds: {'his': "
-                        "{'guard': 3, 'throw': 1}}}, which your rule reads as ctx.params.his. It answers how things "
-                        "came out over the trials. When you then "
+                        "{'guard': 3, 'throw': 1}}}, which your rule reads as ctx.params.his. When you learn how "
+                        "someone chooses, keep it as their mind, kept for next time like a rule: minds= {'Oren': "
+                        "{choose: 'if ctx.params.theirs[-2:] == [\"strike\", \"strike\"]: return \"guard\"\\nreturn "
+                        "{\"guard\": 2, \"throw\": 1}', as: 'his'}}: it returns a move or odds; ctx.actor is them, "
+                        "ctx.target who they face, ctx.params.theirs what that one did lately (your real deeds "
+                        "first), ctx.params.mine what they did. A step for them with no verb is then theirs to "
+                        "choose, and your rules' ctx.params.his comes from it when you give none. It answers how "
+                        "things came out over the trials. When you then "
                         "really do the plan's first step, the harness compares what happens with what you imagined "
                         "and tells you how surprised to be. With nothing given, it shows your rules and beliefs (and "
                         "a starter).",
-             {"rules": {"type": "object"}, "setup": {"type": "object"},
+             {"rules": {"type": "object"}, "setup": {"type": "object"}, "minds": {"type": "object"},
               "plan": {"type": "array", "items": {"type": "object"}}, "rounds": {"type": "integer"},
               "trials": {"type": "integer"}})
 REFLECT = fn("reflect", "Look back on what you imagined against what really happened. With no id: your biggest "
@@ -165,7 +171,8 @@ REFLECT = fn("reflect", "Look back on what you imagined against what really happ
                         "with imagine() too; the lesson is shown on your next imaginings.",
              {"id": S, "verdict": {"type": "string", "enum": ["belief", "rule", "luck"]}, "lesson": S})
 RELIVE = fn("relive", "Live a past moment again in your imagination: the numbers you saw then and what you really "
-                      "did, played through the rules and beliefs you have now. With no id, every moment you lived "
+                      "did, played through the rules, beliefs and minds you have now (a mind you keep for someone "
+                      "chooses for them in place of the guess you made then). With no id, every moment you lived "
                       "is re-lived: how many your imagination now sees coming, against when you lived them. With "
                       "id (a plan you imagined and then did), after=N of your real steps and instead=[{actor, verb, "
                       "target}], imagine what would have happened had you done something else from there.",

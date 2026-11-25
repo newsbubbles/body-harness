@@ -31,9 +31,9 @@ from typing import Any
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 
 try:
-    from embody.script import ScriptError
+    from embody.script import Script, ScriptError
     from embody.store import Store
-    from embody.world import Rejected, World
+    from embody.world import Ctx, Rejected, World
 except ImportError:  # the extra is not installed: the tools are not offered
     World = None  # type: ignore
 
@@ -155,8 +155,24 @@ def _draw(rng: Any, odds: dict[str, float]) -> str:
 
 
 def _verbs(v: Any) -> list[str]:
-    """The verbs a step may take: one, or each one its odds name."""
-    return list(v) if isinstance(v, dict) else [v]
+    """The verbs a step may take: one, or each one its odds name (none yet for a step a mind will choose)."""
+    return list(v) if isinstance(v, dict) else [] if v is None else [v]
+
+
+def mind_source(m: Any) -> tuple[str, str]:
+    """(script source, the param its choice reaches rules as) from what a model sends: a whole script with def
+    choose(ctx), a bare body, or {choose|source: ..., as: 'his'}."""
+    if isinstance(m, dict):
+        src = str(m.get("choose") or m.get("source") or m.get("script") or "")
+        return mind_source(src)[0], re.sub(r"\W", "", str(m.get("as") or ""))
+    s = str(m or "").strip()
+    if s and "def choose(" not in s:
+        return "def choose(ctx):\n" + _body(s, returns=True), ""
+    return s, ""
+
+
+class MindError(Exception):
+    """A kept mind could not choose: what it returned, said so the seat can fix it."""
 
 
 def crashed(reason: str) -> bool:
@@ -203,8 +219,9 @@ class Imagination:
         self.log = seat.p("predictions.jsonl")
         self.partials: list[str] = []  # plans not scored on the last score(), because what was done differed
         self.spec: dict[str, Any] = read_json(self.path, {}) or {}
-        for k, v in (("rules", {}), ("beliefs", {}), ("lessons", []), ("open", []), ("bound", [])):
+        for k, v in (("rules", {}), ("beliefs", {}), ("minds", {}), ("lessons", []), ("open", []), ("bound", [])):
             self.spec.setdefault(k, v)
+        self._scripts: dict[str, Any] = {}  # parsed minds, by rule id
 
     def save(self) -> None:
         write_json(self.path, self.spec)
@@ -223,7 +240,7 @@ class Imagination:
                         actions={v: {"script": v, "doc": r.get("doc") or v} for v, r in self.spec["rules"].items()})
         here = w.spawn("place", w.root_id, "Here")
         ids = {me: w.spawn("being", here, me, state={**self.spec["beliefs"].get(me, {}), **mine})}
-        for name in dict.fromkeys([*self.spec["beliefs"], *seen]):
+        for name in dict.fromkeys([*self.spec["beliefs"], *self.spec["minds"], *seen]):
             if name != me:
                 ids[name] = w.spawn("being", here, name, state={**self.spec["beliefs"].get(name, {}),
                                                                 **seen.get(name, {})})
@@ -238,21 +255,113 @@ class Imagination:
         hits = [k for k in ids if n.lower() in k.lower() or k.lower() in n.lower()]
         return hits[0] if hits else None
 
+    def _calls(self, tail: int | None = 400_000) -> list[dict[str, Any]]:
+        """The seat's call log, or its last `tail` bytes: what it really did, for its kept minds to read."""
+        p = self.seat.p("calls.jsonl")
+        if tail is None or not p.exists() or p.stat().st_size <= tail:
+            return read_jsonl(p)
+        with open(p, "rb") as f:
+            f.seek(-tail, 2)
+            lines = f.read().decode("utf-8", "replace").splitlines()[1:]
+        out = []
+        for ln in lines:
+            try:
+                out.append(json.loads(ln))
+            except ValueError:
+                continue
+        return out
+
     @staticmethod
-    def _choose(rng: Any, actor: str, verb: Any, params: dict[str, Any], odds: dict[str, dict[str, float]],
+    def past(calls: list[dict[str, Any]], before: float | None = None) -> list[str]:
+        """The seat's real deeds (verbs) before a moment, oldest first: what a kept mind reads as what it did lately."""
+        out = []
+        for c in calls:
+            if c.get("tool") != "act" or (before is not None and float(c.get("ts") or 0) >= before):
+                continue
+            v = _key(str((c.get("args") or {}).get("verb") or ""))
+            if v and v != "talk" and '"ok": false' not in str(c.get("out", ""))[:600]:
+                out.append(v)
+        return out
+
+    def _mind_name(self, v: Any) -> str | None:
+        if not isinstance(v, str):
+            return None
+        return next((n for n in self.spec["minds"] if n.lower() == v.strip().lower()), None)
+
+    def _ask(self, w: Any, ids: dict[str, str], name: str, facing: str | None, moves: dict[str, list[str]],
+             past: list[str], me: str, seed: int, against: str | None = None) -> dict[str, float]:
+        """A kept mind's odds for what its character does next, in this trial's world: ctx.actor is the character,
+        ctx.target the one it faces, ctx.params.theirs what that one did lately (for the seat, its real deeds before
+        this moment, then this trial's), ctx.params.n how many deeds that is in all, ctx.params.mine what the
+        character did in this trial, and ctx.params.against the move it answers, when it chooses inside someone's
+        step (the Dojo's Oren reads the student's move as it comes)."""
+        m = self.spec["minds"].get(name)
+        if not m:
+            raise MindError(f"no mind kept for {name}")
+        if name not in ids:
+            raise MindError(f"your mind for {name} has nobody to play: add {name} with setup={{'{name}': {{...}}}}")
+        try:
+            s = self._scripts.get(m["id"]) or self._scripts.setdefault(m["id"], Script(m["source"], f"mind {name}"))
+            theirs = (past if facing == me else []) + moves.get(facing or "", [])
+            ctx = Ctx(w, actor=ids[name], target=ids.get(facing or ""), owner=None,
+                      # a long history: Oren's cycle counts every exchange, and a mind that saw 12 played him wrong
+                      params={"theirs": theirs[-200:], "n": len(theirs), "mine": moves.get(name, [])[-200:],
+                              "against": against or ""}, event=None, verb=None, caused_by=None, seed=seed)
+            got = ctx.run(s, "choose", [ctx], fuel=20_000)
+        except (ScriptError, Rejected) as e:
+            raise MindError(f"your mind for {name} breaks: {getattr(e, 'reason', e)}") from None
+        odds = {_key(got): 1.0} if isinstance(got, str) and got.strip() else \
+            {_key(k): x for k, x in o.items()} if (o := _odds(got)) else None
+        if not odds:
+            raise MindError(f"your mind for {name} returned {got!r}: return a move, or odds like "
+                            "{'guard': 3, 'strike': 1}")
+        return odds
+
+    def _choose(self, rng: Any, w: Any, ids: dict[str, str], me: str, past: list[str], moves: dict[str, list[str]],
+                actor: str, verb: Any, target: str | None, params: dict[str, Any], odds: dict[str, Any],
                 drawn: Counter | None = None) -> tuple[str, dict[str, Any]]:
-        """One trial's draw of a step's guesses: the verb from its odds, and each param given as odds."""
-        if isinstance(verb, dict):
-            verb = _draw(rng, verb)
+        """One trial's draw of a step's guesses: the verb from its odds or the actor's kept mind, and each param given
+        as odds or by the mind of whoever it stands for."""
+        if verb is None or isinstance(verb, dict):
+            minded = verb is None
+            verb = _draw(rng, self._ask(w, ids, actor, target or me, moves, past, me, rng.randrange(1 << 30))
+                         if minded else verb)
+            if minded and verb not in self.spec["rules"]:
+                raise MindError(f"your mind for {actor} chose {verb!r}, and you have no rule for it")
             if drawn is not None:
                 drawn[f"{actor} {verb}"] += 1
         if odds:
             params = dict(params)
             for k, o in odds.items():
-                params[k] = _draw(rng, o)
+                if isinstance(o, str):  # a kept mind's name: what that one chooses at the same moment
+                    params[k] = _draw(rng, self._ask(w, ids, o, actor, moves, past, me, rng.randrange(1 << 30), verb))
+                    moves.setdefault(o, []).append(params[k])
+                else:
+                    params[k] = _draw(rng, o)
                 if drawn is not None:
                     drawn[f"{k}={params[k]}"] += 1
         return verb, params
+
+    def _with_minds(self, actor: str, verb: Any, params: dict[str, Any], odds: dict[str, Any], me: str,
+                    today: bool = False) -> tuple[Any, dict[str, Any], dict[str, Any], set[str]]:
+        """A step with the kept minds in it: a step for someone with a mind and no verb is theirs to choose, and a
+        choice a rule reads as ctx.params.<as>, not given, comes from the mind kept for it. today=True (re-living)
+        puts today's minds in place of the guesses made then."""
+        minds, used = self.spec["minds"], set()
+        if actor != me and actor in minds and (verb in (None, "", "mind") or (today and isinstance(verb, dict))):
+            verb = None
+            used.add(actor)
+        odds = dict(odds)
+        for name, m in minds.items():
+            a_ = m.get("as")
+            if not a_ or name == actor or a_ in params:
+                continue
+            reads = any(re.search(r"ctx\.params\W+" + a_ + r"\b", self.spec["rules"][v]["source"])
+                        for v in _verbs(verb) if v in self.spec["rules"])
+            if (a_ in odds and today) or (a_ not in odds and reads):
+                odds[a_] = name
+        used |= {o for o in odds.values() if isinstance(o, str)}
+        return verb, params, odds, used
 
     def _dry_run(self, verb: str, me: str, mine: dict[str, Any], seen: dict[str, dict[str, Any]]) -> str:
         """Why a rule cannot run, or "": it is built, then tried a few times on someone. A refusal by its own check
@@ -271,7 +380,8 @@ class Imagination:
         return ""
 
     def _write(self, rules: dict[str, Any] | None, setup: dict[str, Any] | None, me: str,
-               mine: dict[str, Any], seen: dict[str, dict[str, Any]] | None = None) -> list[str]:
+               mine: dict[str, Any], seen: dict[str, dict[str, Any]] | None = None,
+               minds: dict[str, Any] | None = None) -> list[str]:
         seen = seen or {}
         notes = []
         for verb, r in (rules or {}).items():
@@ -292,8 +402,12 @@ class Imagination:
             key = re.search(r"key '(\w+)' not found", broke)
             if key and re.search(r"ctx\.params\W+" + key.group(1), source):
                 # tried with no params, a rule that reads a choice made in the step is missing only that choice
+                giver = next((n for n, m in {**self.spec["minds"], **(minds or {})}.items()
+                              if isinstance(m, dict) and m.get("as") == key.group(1)), None)
                 notes.append(f"rule {verb} kept ({self.spec['rules'][verb]['id']}); it reads ctx.params."
-                             f"{key.group(1)}: give it in each step, as params= or as odds=")
+                             f"{key.group(1)}: " + (f"your mind for {giver} gives it" if giver else
+                                                    "give it in each step, as params= or as odds=, or keep a mind "
+                                                    f"for who chooses it with as='{key.group(1)}'"))
                 continue
             if "NoneType" in broke:  # a number nobody has yet: a belief to set, not a broken rule
                 notes.append(f"rule {verb} kept ({self.spec['rules'][verb]['id']}), but it reads a number someone "
@@ -322,6 +436,43 @@ class Imagination:
             elif isinstance(st, dict):
                 self.spec["beliefs"].setdefault(who, {}).update({_key(k): v for k, v in st.items()})
                 notes.append(f"{who}: {json.dumps(self.spec['beliefs'][who])}")
+        # after the beliefs, so a mind is tried on what the seat believes of its character now
+        return notes + (self._write_minds(minds, me, mine, seen) if minds else [])
+
+    def _write_minds(self, minds: Any, me: str, mine: dict[str, Any],
+                     seen: dict[str, dict[str, Any]]) -> list[str]:
+        """Keep a mind for each character the seat plays: its own rule for what they do next. The Dojo's students
+        learned Oren in their guesses, written fresh each time, so re-living, which keeps a guess as it was made,
+        could not see what they had learned."""
+        notes = []
+        if not isinstance(minds, dict):
+            return ["minds is {name: 'def choose(ctx): ...'}"]
+        past = self.past(self._calls())
+        for name, m in minds.items():
+            who = str(name).strip()
+            old = self.spec["minds"].get(who)
+            if m is None:
+                self.spec["minds"].pop(who, None)
+                notes.append(f"mind for {who} dropped")
+                continue
+            source, as_ = mind_source(m)
+            if not re.search(r"^def choose\(", source, re.M):
+                notes.append(f"mind for {who} not kept: it needs def choose(ctx), returning a move or odds like "
+                             "{'guard': 3, 'strike': 1}")
+                continue
+            self.spec["minds"][who] = {"source": source, "as": as_ or (old or {}).get("as", ""),
+                                       "id": _rule_id(source)}
+            try:
+                w, ids = self._build(0, me, mine, {who: {}, **seen})
+                tried = self._ask(w, ids, who, me, {}, past, me, 0)
+            except (MindError, ScriptError) as e:
+                self.spec["minds"].pop(who) if old is None else self.spec["minds"].__setitem__(who, old)
+                notes.append(f"mind for {who} not kept: {e}")
+                continue
+            m_ = self.spec["minds"][who]
+            notes.append(f"mind for {who} kept ({m_['id']}): now it would pick {json.dumps(tried)}" +
+                         (f"; its choice reaches your rules as ctx.params.{m_['as']}" if m_["as"] else
+                          "; a step for them with no verb is theirs to choose"))
         return notes
 
     def show(self, me: str, mine: dict[str, Any], seen: dict[str, dict[str, Any]] | None = None,
@@ -333,6 +484,9 @@ class Imagination:
             "rules": {v: {"id": r["id"], "doc": r.get("doc", ""), "source": r["source"]}
                       for v, r in self.spec["rules"].items()},
         }
+        if self.spec["minds"]:
+            out["minds"] = {n: {"id": m["id"], "as": m.get("as", ""), "source": m["source"]}
+                            for n, m in self.spec["minds"].items()}
         if not self.spec["rules"]:
             # named after the seat's own verb: Tamsin copied a starter called attack, her world's verb was spar, and
             # her imagining could never be compared with what happened
@@ -363,7 +517,7 @@ class Imagination:
     def imagine(self, a: dict[str, Any], bundle: dict[str, Any], me: str, turn_no: int,
                 verbs: set[str] | None = None) -> dict[str, Any]:
         mine, seen = body_state(bundle), others(bundle, me)
-        notes = self._write(a.get("rules"), a.get("setup"), me, mine, seen)
+        notes = self._write(a.get("rules"), a.get("setup"), me, mine, seen, a.get("minds"))
         plan = a.get("plan")
         if isinstance(plan, dict):
             plan = [plan]
@@ -375,12 +529,12 @@ class Imagination:
             # the plan would run the old rule, and its error would hide what was wrong with the new one
             self.save()
             return {"ok": False, "reason": "; ".join(refused),
-                    "hint": "fix the rule and imagine again: nothing was run or recorded", "notes": notes}
+                    "hint": "fix it and imagine again: nothing was run or recorded", "notes": notes}
         # a spread needs trials: Tamsin asked for 3 and got three stories, not odds
         trials = max(MIN_TRIALS, min(MAX_TRIALS, int(a.get("trials") or self.cfg.get("imagine_trials", 40))))
         rounds = max(1, min(MAX_ROUNDS, int(a.get("rounds") or 1)))
         w0, ids0 = self._build(0, me, mine, seen)
-        steps = []
+        steps, minds_used = [], set()
         for s in plan:
             if not isinstance(s, dict):
                 continue
@@ -389,14 +543,10 @@ class Imagination:
             # the seat owns this world: whoever else is in it does what the seat guesses they would, and a guess it is
             # unsure of comes as odds, drawn afresh each trial (Rin could not say what Oren would pick, only guess)
             vo = _odds(s.get("verb"))
-            verb: Any = {_key(k): w for k, w in vo.items()} if vo else _key(str(s.get("verb") or ""))
-            odds = {str(k): o for k, v in (s.get("odds") or {}).items() if (o := _odds(v))} \
+            verb: Any = {_key(k): w for k, w in vo.items()} if vo else (_key(str(s["verb"])) if s.get("verb") else None)
+            # a guess may also name the kept mind that makes it: odds={'his': 'Oren'}
+            odds = {str(k): o for k, v in (s.get("odds") or {}).items() if (o := _odds(v) or self._mind_name(v))} \
                 if isinstance(s.get("odds"), dict) else {}
-            unknown = [v for v in _verbs(verb) if v not in self.spec["rules"]]
-            if unknown:
-                return {"ok": False, "reason": f"no rule for {unknown[0]!r} in your imagination",
-                        "hint": "write it first: imagine(rules={'" + unknown[0] + "': 'def check(ctx): ...'}); "
-                                "imagine() with nothing shows a starter", "notes": notes}
             if actor is None or (s.get("target") and target is None):
                 return {"ok": False, "reason": f"nobody called {s.get('actor') if actor is None else s.get('target')!r}"
                                                " in your imagination",
@@ -404,7 +554,19 @@ class Imagination:
             if vo and actor == me:
                 return {"ok": False, "reason": "your own steps take one verb: odds are for what others might do",
                         "hint": "imagine each of your choices as its own plan, and compare them", "notes": notes}
-            steps.append((actor, verb, target, s.get("params") or {}, odds))
+            verb, params, odds, used = self._with_minds(actor, verb, s.get("params") or {}, odds, me)
+            minds_used |= used
+            if verb is None and actor not in self.spec["minds"]:
+                return {"ok": False, "reason": f"a step for {actor} needs a verb" +
+                                               ("" if actor == me else ", odds, or a mind kept for them"),
+                        "hint": "imagine(minds={'Name': 'def choose(ctx): ...'}) keeps a mind for someone",
+                        "notes": notes}
+            unknown = [v for v in _verbs(verb) if v not in self.spec["rules"]]
+            if unknown:
+                return {"ok": False, "reason": f"no rule for {unknown[0]!r} in your imagination",
+                        "hint": "write it first: imagine(rules={'" + unknown[0] + "': 'def check(ctx): ...'}); "
+                                "imagine() with nothing shows a starter", "notes": notes}
+            steps.append((actor, verb, target, params, odds))
         mine_first = next((s for s in steps if s[0] == me), None)
         if verbs and mine_first and mine_first[1] not in verbs:
             notes.append(f"{mine_first[1]!r} is not a verb you really have (you have: {', '.join(sorted(verbs))}): "
@@ -415,15 +577,22 @@ class Imagination:
         endings: Counter = Counter()
         drawn: Counter = Counter()
         t0, done = time.time(), 0
+        past = self.past(self._calls()) if minds_used else []
         for seed in range(trials):
             w, ids = self._build(1000 + seed + 7919 * turn_no, me, mine, seen)
             rng = random.Random(seed + 7919 * turn_no)
             end = "the plan ran to its end"
+            moves: dict[str, list[str]] = {}
             try:
                 for _ in range(rounds):
                     for actor, verb, target, params, odds in steps:
-                        verb, params = self._choose(rng, actor, verb, params, odds, drawn)
+                        verb, params = self._choose(rng, w, ids, me, past, moves, actor, verb, target, params, odds,
+                                                    drawn)
                         w.act(ids[actor], verb, ids[target] if target else None, params)
+                        moves.setdefault(actor, []).append(verb)
+            except MindError as e:
+                return {"ok": False, "reason": str(e), "hint": "fix it with imagine(minds=...); nothing was recorded",
+                        "notes": notes}
             except Rejected as e:
                 if crashed(e.reason):  # a broken rule is not how things end: nothing is recorded
                     return {"ok": False, "reason": f"your rule {verb} breaks: {e.reason}",
@@ -461,6 +630,7 @@ class Imagination:
                "values": kept, "start": {k: start[k] for k in kept if k in start},
                "endings": dict(endings.most_common(5)),
                "rules": {v: self.spec["rules"][v]["id"] for s in steps for v in _verbs(s[1])},
+               **({"minds": {n: self.spec["minds"][n]["id"] for n in sorted(minds_used)}} if minds_used else {}),
                "beliefs": {n: self.spec["beliefs"].get(n, {}) for n in {x for s in steps for x in (s[0], s[2]) if x}}}
         append_jsonl(self.log, rec)
         if first[0] == me:
@@ -675,11 +845,11 @@ class Imagination:
             return self._relive_one(r, me, a.get("after"), a.get("instead"))
         if not lived:
             return {"ok": False, "reason": "nothing lived yet: imagine a plan, then do it, and it can be re-lived"}
-        rows, t0 = [], time.time()
+        rows, failed, t0 = [], [], time.time()
+        calls = self._calls(None) if self.spec["minds"] else []
         for r in reversed(lived[-40:]):
-            x = self._relive_one(r, me)
-            if x.get("ok"):
-                rows.append(x)
+            x = self._relive_one(r, me, calls=calls)
+            (rows if x.get("ok") else failed).append(x)
             if time.time() - t0 > 2 * BUDGET_S:
                 break
         if not rows:
@@ -694,12 +864,20 @@ class Imagination:
             line += (f". Of the {len(then)} scored when you lived them: then {sum(x['then_inside'] for x in then)} "
                      f"inside at {statistics.mean(x['then_bits'] for x in then):.1f} bits, now "
                      f"{sum(x['now_inside'] for x in then)} at {statistics.mean(x['now_bits'] for x in then):.1f}")
+        minded = Counter(n for x in rows for n in x.get("minds", []))
+        if minded:
+            line += ". Your minds chose for " + ", ".join(f"{n} in {c}" for n, c in minded.items())
+        if failed:
+            # Aiko's rules came to read ctx.params.his, and 29 of her 35 moments, from before she gave odds, could not
+            # be re-lived; saying so keeps the learning curve honest about what it leaves out
+            line += f". {len(failed)} could not be re-lived ({failed[0].get('reason')})"
         worst = sorted(rows, key=lambda x: -x["now_bits"])[:5]
         return {"ok": True, "summary": line, "worst_now": worst,
                 "next": "relive(id, after=N, instead=[{actor, verb, target}]): from a moment, after N of your real "
                         "steps, imagine another way"}
 
-    def _relive_one(self, r: dict[str, Any], me: str, after: Any = None, instead: Any = None) -> dict[str, Any]:
+    def _relive_one(self, r: dict[str, Any], me: str, after: Any = None, instead: Any = None,
+                    calls: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         got = r.get("scored") or r.get("partial")
         then_me = r.get("me") or me
         mine: dict[str, Any] = {}
@@ -707,9 +885,19 @@ class Imagination:
         for k, v in r["start"].items():
             n, f = k.split(".", 1)
             (mine if n == then_me else seen.setdefault(n, {}))[f] = v
-        # the guesses about others stay as the seat made them then; only its rules and beliefs are today's
-        plan = [(s["actor"], s["verb"], s.get("target"), s.get("params") or {}, s.get("odds") or {})
-                for s in r.get("plan") or []]
+        # the rules, beliefs and minds are today's; a guess about someone the seat keeps no mind for stays as it was
+        # made then (the Dojo's students learned Oren in their guesses, and with those frozen re-living came out flat)
+        plan, used = [], set()
+        for s in r.get("plan") or []:
+            v, p_, o_, u = self._with_minds(s["actor"], s["verb"], s.get("params") or {}, s.get("odds") or {},
+                                            then_me, today=True)
+            plan.append((s["actor"], v, s.get("target"), p_, o_))
+            used |= u
+        if any(s[1] is None and s[0] not in self.spec["minds"] for s in plan) or \
+                any(isinstance(o, str) and o not in self.spec["minds"] for s in plan for o in s[4].values()):
+            return {"ok": False, "id": r["id"], "reason": "a mind this moment used is no longer kept",
+                    "hint": "imagine() shows your minds"}
+        past = self.past(calls if calls is not None else self._calls(None), r.get("ts")) if self.spec["minds"] else []
         own = [s for s in plan if s[0] == (r.get("first") or {}).get("actor")]
         done = max(1, int(got.get("done") or len(own) * int(r.get("rounds") or 1)))
         # the deeds as really done: the binding one and each logged after it; older records logged only a count, and
@@ -723,9 +911,10 @@ class Imagination:
         for s in (instead if isinstance(instead, list) else [instead] if isinstance(instead, dict) else []):
             if isinstance(s, dict):
                 vo = _odds(s.get("verb"))
-                odds = {str(k): o for k, v in (s.get("odds") or {}).items() if (o := _odds(v))}                     if isinstance(s.get("odds"), dict) else {}
+                odds = {str(k): o for k, v in (s.get("odds") or {}).items() if (o := _odds(v) or self._mind_name(v))} \
+                    if isinstance(s.get("odds"), dict) else {}
                 branch.append((s.get("actor") or "me", {_key(k): w for k, w in vo.items()} if vo else
-                               _key(str(s.get("verb") or "")), s.get("target"), s.get("params") or {}, odds))
+                               (_key(str(s["verb"])) if s.get("verb") else None), s.get("target"), s.get("params") or {}, odds))
         missing = sorted({v for v in [*(v for s in plan for v in _verbs(s[1])), *(d[0] for d in deeds[:cut]),
                                       *(v for b in branch for v in _verbs(b[1]))] if v not in self.spec["rules"]})
         if missing:
@@ -735,6 +924,7 @@ class Imagination:
         for seed in range(MIN_TRIALS):
             w, ids = self._build(5000 + seed, then_me, mine, seen)
             rng = random.Random(5000 + seed)
+            moves: dict[str, list[str]] = {}
             try:
                 # the plan's order with the real deeds in the seat's places; the others' steps after the last deed
                 # still happen, as they did before the card was read
@@ -748,8 +938,12 @@ class Imagination:
                         verb, real_t = deeds[k]
                         target = self._who(real_t, then_me, ids) or target
                         k += 1
-                    verb, params = self._choose(rng, actor, verb, params, odds)
+                        # the deed as really done may read a choice the planned one did not
+                        verb, params, odds, u = self._with_minds(actor, verb, params, odds, then_me, today=True)
+                        used |= u
+                    verb, params = self._choose(rng, w, ids, then_me, past, moves, actor, verb, target, params, odds)
                     w.act(ids[actor], verb, ids.get(target) if target else None, params)
+                    moves.setdefault(actor, []).append(verb)
                     if i > 4 * len(plan) * (done + 1):
                         break
                 for actor, verb, target, params, odds in branch:
@@ -758,8 +952,12 @@ class Imagination:
                     if a_ is None or (target and t_ is None):
                         return {"ok": False, "id": r["id"],
                                 "reason": f"nobody called {actor if a_ is None else target!r} was there"}
-                    verb, params = self._choose(rng, a_, verb, params, odds)
+                    verb, params, odds, _ = self._with_minds(a_, verb or None, params, odds, then_me)
+                    verb, params = self._choose(rng, w, ids, then_me, past, moves, a_, verb, t_, params, odds)
                     w.act(ids[a_], verb, ids[t_] if t_ else None, params)
+                    moves.setdefault(a_, []).append(verb)
+            except MindError as e:
+                return {"ok": False, "id": r["id"], "reason": str(e), "hint": "fix it with imagine(minds=...)"}
             except Rejected as e:
                 if crashed(e.reason):
                     return {"ok": False, "id": r["id"], "reason": f"a rule breaks: {e.reason}",
@@ -776,7 +974,8 @@ class Imagination:
         if branch:
             return {"ok": True, "id": r["id"], "moment": moment,
                     "replayed": f"{cut} of your {done} real steps, then what you gave instead (imagined, not scored)",
-                    "came_out": {k: spread(v) for k, v in values.items() if k in real}, "really": real}
+                    "came_out": {k: spread(v) for k, v in values.items() if k in real}, "really": real,
+                    **({"minds": sorted(used)} if used else {})}
         now = {}
         for k, v in real.items():
             if k in values:
@@ -788,7 +987,8 @@ class Imagination:
         return {"ok": True, "id": r["id"], "moment": moment, "now": now,
                 "now_inside": all(x["inside"] for x in now.values()), "now_bits": max(x["bits"] for x in now.values()),
                 "then_inside": all(s["inside"].get(k, True) for k in now) if s else None,
-                "then_bits": max(s["bits"].get(k, 0) for k in now) if s else None}
+                "then_bits": max(s["bits"].get(k, 0) for k in now) if s else None,
+                **({"minds": sorted(used)} if used else {})}
 
     def reflect(self, a: dict[str, Any]) -> dict[str, Any]:
         recs = self.records()

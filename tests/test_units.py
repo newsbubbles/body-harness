@@ -451,6 +451,27 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert gr["domain"] == "strike" and gr["first"]["verb"] == "strike"  # bound by the seat's own deed
     assert im.bind("strike", "Marlo") == guess["id"]
     assert im.imagine({"plan": [{"verb": {"guard": 1, "strike": 1}}]}, card, "Ssareth", 5)["ok"] is False
+    # a kept mind: the seat's own rule for how Marlo chooses, asked for every guess it gives none for, and by
+    # re-living in place of the guess made then (the Dojo's students learned Oren in guesses written fresh each time)
+    for v in ("strike", "strike"):
+        imagine.append_jsonl(s.p("calls.jsonl"), {"ts": 1.0, "tool": "act", "args": {"verb": v}, "out": '{"ok": true}'})
+    bad = im.imagine({"minds": {"Marlo": "return 5"}}, card, "Ssareth", 6)
+    assert "mind for Marlo not kept" in " ".join(bad["notes"]) and "Marlo" not in im.spec["minds"]
+    kept = im.imagine({"minds": {"Marlo": {"choose": "if ctx.params.theirs[-2:] == ['strike', 'strike']:\n"
+                                                     "    return 'guard'\nreturn {'guard': 1, 'throw': 1}",
+                                           "as": "his"}}}, card, "Ssareth", 6)
+    assert 'now it would pick {"guard": 1.0}' in " ".join(kept["notes"])  # it read the seat's two real strikes
+    read = im.imagine({"plan": [{"verb": "strike", "target": "Marlo"}]}, card, "Ssareth", 6)
+    assert read["your_guesses_drawn"] == {"his=guard": 50} and im.records()[read["id"]]["minds"]
+    assert read["came_out"]["Ssareth.hp"]["median"] == 9
+    puppet = im.imagine({"plan": [{"actor": "Marlo"}, {"verb": "rest"}]}, card, "Ssareth", 6)
+    assert puppet.get("your_guesses_drawn") == {"Marlo guard": 50}, puppet  # a step with no verb is the mind's to choose
+    im.spec["minds"]["Marlo"]["source"] = imagine.mind_source("return 'throw'")[0]
+    im.spec["minds"]["Marlo"]["id"] = "throws"
+    assert "no rule for it" in im.imagine({"plan": [{"actor": "Marlo"}]}, card, "Ssareth", 6)["reason"]
+    assert im._with_minds("Ssareth", "strike", {}, {"his": {"guard": 1}}, "Ssareth", today=True)[2] == \
+        {"his": "Marlo"}  # re-living asks today's mind
+    im.spec["minds"], im.spec["open"] = {}, []
     assert imagine.surprise([5] * 20, 5) == (0.0, True)
     # the shape cheap models send: bodies with no def lines; a check given as one condition returns it
     src, _ = imagine.rule_source({"check": "ctx.actor.state.hp > 4", "apply": "ctx.target.state.hp -= 2"})

@@ -40,7 +40,9 @@ dependencies of its own). Without it the three tools (`imagine`, `reflect`, `rel
    calls a new rule from fewer than 3 real tries a guess. The last 4 lessons per kind of plan ride on every later
    imagining, and a calibration line per kind of plan says how often reality fell inside the imagined 80% band.
 8. **Re-living.** `relive()` plays every moment the seat lived again, from the numbers it saw then and its deeds as
-   it did them, through the rules and beliefs it has now. See below.
+   it did them, through the rules, beliefs and minds it has now. See below.
+9. **Kept minds.** What the seat learns of how someone chooses it can keep as that one's mind, a rule of its own
+   that picks their next move. Imagining and re-living ask it. See below.
 
 ## An example
 
@@ -132,11 +134,22 @@ re-lived 20 moments with your imagination now: 11 of 20 came out inside your ima
 That is a learning curve the harness measures from the seat's own past, not one the seat reports. A changed belief
 that does not move it was not the fix. The line above is a real one, from a Dojo seat after its 50 turns.
 
-It came out flat for all four Dojo seats, while their forward numbers improved. The reason is what re-living keeps:
-a past guess about someone else is replayed as it was made, and those seats did their learning in their guesses about
-Oren (the odds), not in their rules. Re-living also cannot replay a moment from before a seat gave odds once its rules
-read `ctx.params.his`: for one seat that was 29 of 35 moments. The next build keeps each character's mind as a rule of
-its own, so re-living can ask today's mind what Oren would have done.
+It came out flat for all four Dojo seats, while their forward numbers improved. Re-living replays a past guess about
+someone else as it was made, so the first idea was that the seats had learned Oren in their guesses, which re-living
+froze. A kept mind (below) tested that, and it was wrong. The seats' own rules were what held them back:
+
+- **With each seat's own rules,** no mind moved its re-living, not even one that plays Oren's real policy. The rules
+  wrote damage as fixed tables, some matchups missing, and those decide the hit points.
+- **With the Dojo's exact rules and damage numbers,** and the seats' own guesses as they made them, about 17 moments
+  each: one seat went from 1 of 17 inside the band when it lived them to 12 of 17 now; another from 3 of 14 to 10.
+- **With exact rules and a mind that plays Oren's real policy,** the mean surprise was the lowest of the three ways
+  for three of the four seats (0.6 bits against 1.1 for a mind that picks any move evenly, for one of them). For the
+  fourth it was 1.0 against 0.9.
+
+So the next lesson for a seat is its rules first. Re-living says where a rule is off; a mind only helps once the rules
+are right. Re-living also cannot replay a moment whose rule reads a choice the moment did not give: for one seat, 29
+of 35 moments from before it gave odds. The answer now says how many it could not re-live, and why. A kept mind gives
+that choice to those moments too.
 
 A seat's own mistake can show here too. One seat's re-live came out worse than its first try, because its newest
 strike rule did nothing. A kept rule whose apply is empty now says so, and names the rule it replaced.
@@ -144,8 +157,39 @@ strike rule did nothing. A kept rule whose apply is empty now says so, and names
 `relive(id, after=N, instead=[{actor, verb, target}])` replays one moment for N of the seat's real steps and then
 imagines another way from there: what if it had guarded instead. That part is imagined, not scored.
 
+## Kept minds
+
+A guess about someone, given as odds, is made fresh each time. When the seat learns how someone chooses, it can keep
+that as their mind, the way it keeps a rule:
+
+```python
+imagine(minds={"Oren": {"as": "his", "choose": """
+beats = {"strike": "guard", "throw": "strike", "guard": "throw", "special": "guard"}
+t = ctx.params.theirs
+if len(t) >= 2 and t[-1] == t[-2] == ctx.params.against:
+    return beats[t[-1]]
+return {"guard": 2, "strike": 1, "throw": 1}"""}})
+```
+
+A mind is an embody script, `def choose(ctx)` or just its body, that returns a move or odds. It sees:
+
+| | |
+|---|---|
+| `ctx.actor` | the character, as the seat believes and sees them |
+| `ctx.target` | the one they face |
+| `ctx.params.theirs` | what that one did lately: for the seat, its real deeds before this moment, then this trial's |
+| `ctx.params.n` | how many deeds that is in all |
+| `ctx.params.mine` | what the character did in this trial |
+| `ctx.params.against` | the move it answers, when it chooses inside someone's step |
+
+A step for them with no verb is then theirs to choose. With `as`, a rule that reads `ctx.params.his` gets the mind's
+choice whenever a step gives none. A mind is tried before it is kept, and the note says what it would pick now.
+
+Re-living asks today's minds in place of the guesses made then, and the answer says which minds chose and how often.
+A mind is a belief about someone written as a rule, so it can be checked the same way: re-live with it, and see.
+
 ## What is kept
 
-`imagination.json` in the seat holds the rules, beliefs and lessons. `predictions.jsonl` holds each imagining (the
+`imagination.json` in the seat holds the rules, beliefs, minds and lessons. `predictions.jsonl` holds each imagining (the
 plan, every trial's numbers, the rules and beliefs it used), when it was acted on, how it scored, and what the seat
 made of it. Imagined outcomes never reach the world.
