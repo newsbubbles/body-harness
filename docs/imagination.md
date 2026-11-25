@@ -120,6 +120,31 @@ each exchange first, play Oren with odds and change them as you learn, reflect o
   special's 9. One kept a belief about where Oren was in his cycle, which is the policy itself.
 - They called `relive` once among them. Re-living was in the brief; they reached for reflection instead.
 
+## What the Purse taught
+
+Predicting well is not playing well. The Purse is the Dojo with stakes: put Oren down and earn 5 coins, go down and
+pay 5, and the bench costs 1. Nine seats on deepseek-v4-flash, 40 turns each, the same goal (end with as many coins
+as you can), in three groups of three. One group was briefed to imagine every exchange first, one had no imagination,
+and one had no imagination but `past` (a search over its own deeds and what came of each, see
+[how-it-works.md](how-it-works.md#two-memories)):
+
+| | Coins (from 20) | Exchanges | Bouts won | Went down | Model cost |
+|---|---|---|---|---|---|
+| imagine every exchange | 28, 64, 28 | 115 | 13 | 0 | $0.38 |
+| no imagination | 64, 40, 54 | 316 | 34 | 9 | $0.27 |
+| `past` search | 91, 74, 97 | 351 | 45 | 2 | $0.22 |
+
+- **Lining up the past paid most.** The `past` seats called it 39 to 68 times each, found Oren's pattern early, and
+  won 48 to 57 of their last 52 to 66 exchanges. They also spent the least.
+- **Imagining made each exchange good and the seat slow.** The imagining seats never went down, and earned about as
+  much per exchange as the `past` seats, but each exchange cost an imagining, so they fought a third as often. Here
+  Oren waits and trying is cheap, so that is a bad trade. Imagination should pay where a mistake costs more than a
+  turn, or cannot be undone.
+- One imagining seat did as well as the best plain seat (64 coins); two fought 22 and 30 exchanges in 40 turns.
+
+Three seats a group, one model and one opponent with a fixed pattern is a small test. A world where the others have
+minds of their own, lie, and want things is the next one.
+
 ## Re-living
 
 `relive()` re-lives every moment the seat lived (up to the last 40): an imagining it acted on, from the numbers it
