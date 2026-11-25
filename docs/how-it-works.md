@@ -70,7 +70,7 @@ around each match, `last=` only recent deeds. A field that does not exist answer
 
 A body can live in a world before it gets a seat. On its first join with `past=true`, the seat reads that body's
 own deeds from the world's `history(touching=<body>)` into `past_world.json`, with what each caused, so `past`
-searches them too (turn `d61` is world day 61). `bh past-import N` reads them again. Where the seat's own log
+searches them too (turn `d61` is world day 61). It reads the log a window of seqs at a time and saves after each, so a run that stops keeps what it read, and `bh past-import N` goes on from there (`--fresh` starts over); run again on a finished copy, it reads only what is new. Where the seat's own log
 starts inside the world's copy, the harness finds its first line said, word for word, so no deed counts twice.
 
 A body can also come with notes from before: a digest of its old sessions, its memory files, a start brief.

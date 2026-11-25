@@ -29,7 +29,7 @@ from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 from .skills import Skills
 from .tools import EXTRAS, Registry, compact, fix_args, route
-from .usage import Usage, append as usage_append
+from .usage import Usage, append as usage_append, fold
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
 # a call the model got wrong, not a world that said no: these move a turn up the escalate list (a rule refusal, like
@@ -61,6 +61,26 @@ def _brief(args: dict[str, Any]) -> str:
 # the engine's refusals for a limited grant's reach (its under, types, scripts): another hand may cover it
 _OUT_OF_REACH = re.compile(r"your grant|start with|the door refused this grant", re.I)
 _TARGET_KEYS = ("entity", "parent", "thing", "target", "to", "into", "under")
+
+
+_SPENT: dict[str, tuple[float, float]] = {}  # usage file -> (when read, dollars in the last 24 h)
+
+
+def _spent_day(p: Path, now: float) -> float:
+    """Dollars a usage log shows for the last 24 hours, read at most once a minute per file."""
+    k = str(p)
+    if k in _SPENT and now - _SPENT[k][0] < 60:
+        return _SPENT[k][1]
+    v = fold([p], now - 86400)["all"].cost
+    _SPENT[k] = (now, v)
+    return v
+
+
+def _world_copy_done(p: Path) -> bool:
+    try:
+        return bool(json.loads(p.read_text(encoding="utf-8")).get("done", True)) if p.exists() else False
+    except (OSError, ValueError):
+        return False
 
 
 def _target_of(args: dict[str, Any]) -> str:
@@ -210,14 +230,36 @@ class Mind:
                                   [p for p in (hb.get("pages") or []) if isinstance(p, dict)]
         except DoorError:
             pass
-        if self.cfg.get("past") and self.me and not self.seat.p(past.WORLD_FILE).exists():
-            # a body that lived before this harness ran it keeps its deeds searchable: the world's log is the source
-            try:
-                _log(self.seat.name, "past: " + await past.import_world(self.door, self.me, self.names.by_id,
-                                                                        self.seat.dir))
-            except (DoorError, OSError, ValueError) as e:
-                _log(self.seat.name, f"past: could not read the world's history ({e}); bh past-import tries again")
+        if self.cfg.get("past") and self.me and not _world_copy_done(self.seat.p(past.WORLD_FILE)):
+            # a body that lived before this harness ran it keeps its deeds searchable: the world's log is the source.
+            # In the background: on a busy world it takes minutes, and the seat plays meanwhile
+            self._past_task = asyncio.create_task(self._import_past())
         self.save()
+
+    async def _import_past(self) -> None:
+        try:
+            _log(self.seat.name, "past: " + await past.import_world(self.door, self.me, self.names.by_id,
+                                                                    self.seat.dir))
+        except (DoorError, OSError, ValueError) as e:
+            _log(self.seat.name, f"past: the world's history stopped ({e}); what was read is kept, and the next "
+                                 f"start or bh past-import goes on from there")
+
+    def _over_budget(self) -> str:
+        """Why this seat may not call its model now, or "". budget_day caps one seat's spend over the last 24 hours;
+        budget_home_day (in the home's config.json) caps every seat in the home together. A test day spent $9 on one
+        account before anyone looked; the seats now stop themselves instead."""
+        now = time.time()
+        cfg = self.seat.config()  # read fresh: a raised budget counts without a restart
+        mine, home = cfg.get("budget_day"), cfg.get("budget_home_day")
+        if mine is not None:
+            spent = _spent_day(self.seat.p("usage.jsonl"), now)
+            if spent >= float(mine):
+                return f"this seat spent ${spent:.2f} in the last 24 hours, its budget_day is ${float(mine):.2f}"
+        if home is not None:
+            spent = sum(_spent_day(p, now) for p in sorted((self.seat.home / "seats").glob("*/usage.jsonl")))
+            if spent >= float(home):
+                return f"the seats in this home spent ${spent:.2f} in the last 24 hours, budget_home_day is "                        f"${float(home):.2f}"
+        return ""
 
     # ---------- tools ----------
 
@@ -1005,6 +1047,18 @@ class Mind:
                    "your history again"))
         events: list[dict[str, Any]] = []
         while not self.stop:
+            over = self._over_budget()
+            if over:
+                # no model call at all: the wake waits, and plays when the day's window has room again
+                if self.st.get("budget_said") != over:
+                    self.st["budget_said"] = over
+                    self.seat.outbox(f"paused: {over}. It plays again when the last 24 hours have room, or raise "
+                                     f"the budget (bh config)", "error")
+                    self.save()
+                _log(self.seat.name, f"paused: {over}")
+                await asyncio.sleep(float(self.cfg.get("budget_check_minutes", 15)) * 60)
+                continue
+            self.st.pop("budget_said", None)
             try:
                 await self.turn(reason, events)
                 reason, events = await self.wait_for_wake()

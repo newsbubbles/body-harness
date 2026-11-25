@@ -9,6 +9,7 @@ Deterministic, bounded, and it costs no model call.
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from collections import Counter
@@ -200,14 +201,16 @@ def search(moments: list[dict[str, Any]], verb: str = "", where: dict[str, Any] 
 
 
 WORLD_FILE = "past_world.json"
-PAGE, MAX_PAGES = 500, 200
+PAGE, WINDOW, MAX_CALLS = 500, 25_000, 4000
 
 
-def world_deeds(events: list[dict[str, Any]], me: str, names: dict[str, str]) -> list[dict[str, Any]]:
+def world_deeds(events: list[dict[str, Any]], me: str, names: dict[str, str],
+                prior: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """The body's own deeds from the world's history, in the shape deeds() gives, with what each caused: what a body
     did before this harness ran it. A body that lived weeks in a world before it got a seat would otherwise start with
-    an empty past."""
-    out, by_seq = [], {}
+    an empty past. prior: deeds already read, so what an earlier window's deed caused in this one still joins it."""
+    out = list(prior or [])
+    by_seq = {m.get("seq"): m for m in out[-PAGE:] if m.get("seq") is not None}
     for e in sorted(events, key=lambda e: e.get("seq") or 0):
         kind, p = e.get("kind"), e.get("payload") or {}
         if e.get("actor") == me and kind in ("act", "say"):
@@ -232,28 +235,56 @@ def world_deeds(events: list[dict[str, Any]], me: str, names: dict[str, str]) ->
     return out
 
 
-async def import_world(door: Any, me: str, names: dict[str, str], seat_dir: Path) -> str:
-    """Page through history(touching=me) and keep the body's own deeds in past_world.json. Run again, it starts over:
-    the world's log is the source, the file a copy. Deeds the seat logs after the import come from calls.jsonl."""
-    events, since, pages = [], 0, 0
-    while pages < MAX_PAGES:
-        r = await door.op("history", since=since, touching=me, limit=PAGE)
-        if isinstance(r, dict):
-            if r.get("ok") is False:
-                return f"the world refused history: {r.get('reason')}"
-            r = r.get("events") or r.get("result") or []
-        if not isinstance(r, list) or not r:
-            break
-        events += [e for e in r if isinstance(e, dict)]
-        top = max(int(e.get("seq") or 0) for e in r if isinstance(e, dict))
-        if top <= since:
-            break
-        since, pages = top, pages + 1  # a short page is not the end: the engine's own kinds are skipped in it
-    moments = world_deeds(events, me, names)
-    (seat_dir / WORLD_FILE).write_text(json.dumps({"at": time.time(), "until": since, "events": len(events),
-                                                   "moments": moments}), encoding="utf-8")
-    more = " (stopped at the page limit: older deeds are in)" if pages >= MAX_PAGES else ""
-    return f"{len(moments)} deeds from {len(events)} events in the world's history, up to seq {since}{more}"
+def _events(r: Any) -> list[dict[str, Any]]:
+    if isinstance(r, dict):
+        if r.get("ok") is False:
+            raise ValueError(f"the world refused history: {r.get('reason')}")
+        r = r.get("events") or r.get("result") or []
+    return [e for e in r if isinstance(e, dict)] if isinstance(r, list) else []
+
+
+def _save(path: Path, d: dict[str, Any]) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d), encoding="utf-8")
+    os.replace(tmp, path)  # whole or not at all: a seat may be reading it
+
+
+async def import_world(door: Any, me: str, names: dict[str, str], seat_dir: Path, fresh: bool = False,
+                       progress: Any = None) -> str:
+    """Read the body's own deeds from history(touching=me) into past_world.json, a window of seqs at a time, saved
+    after each. A run that dies keeps what it read, and the next one goes on from there; a finished copy run again
+    reads only what is new. fresh=True starts over. The engine reads every event after `since` for a touching query,
+    so a page from seq 0 cost a read of the whole log: on the hosted world two bodies ran out of 300 s with nothing
+    saved. A window (since, until] keeps each call to WINDOW events."""
+    path = seat_dir / WORLD_FILE
+    d: dict[str, Any] = {}
+    if path.exists() and not fresh:
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            d = {}
+    since, moments_, count = int(d.get("until") or 0), list(d.get("moments") or []), int(d.get("events") or 0)
+    head_r = _events(await door.op("history", _http=300, since=since, touching=me, limit=1, newest=True))
+    head = max([int(e.get("seq") or 0) for e in head_r] + [since])
+    start, calls = since, 0
+    while since < head and calls < MAX_CALLS:
+        until = min(since + WINDOW, head)
+        r = _events(await door.op("history", _http=300, since=since, until=until, touching=me, limit=PAGE))
+        calls += 1
+        count += len(r)
+        moments_ = world_deeds(r, me, names, moments_)
+        top = max([int(e.get("seq") or 0) for e in r] + [since])
+        since = top if len(r) >= PAGE and top > since else until  # a full page: more in this window
+        _save(path, {"at": time.time(), "until": since, "head": head, "done": since >= head, "events": count,
+                     "moments": moments_})
+        if progress:
+            progress(f"seq {since} of {head}, {len(moments_)} deeds so far")
+    if not path.exists():
+        _save(path, {"at": time.time(), "until": since, "head": head, "done": True, "events": count,
+                     "moments": moments_})
+    left = "" if since >= head else f" (stopped after {calls} calls at seq {since}: run it again to go on)"
+    return (f"{len(moments_)} deeds from {count} events in the world's history, up to seq {since}"
+            f"{' (went on from ' + str(start) + ')' if start else ''}{left}")
 
 
 def moments(p: Path) -> list[dict[str, Any]]:

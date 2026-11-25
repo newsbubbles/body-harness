@@ -684,3 +684,71 @@ def test_import_links_folders_and_records_searches_through_them(tmp_path: Path):
         zf.writestr("notes/a.md", "the kiln was cold")
     imports.add(seat, str(z), "unzip")
     assert "old/notes/a.md:1" in imports.records(seat, {"match": "kiln"})
+
+
+def test_world_import_saves_as_it_goes_and_resumes(tmp_path: Path):
+    # on the hosted world two bodies ran out of 300 s with nothing saved: every page re-read the whole log
+    import asyncio
+    from body_harness import past
+
+    log = []
+    for seq in range(1, 60_001, 50):
+        log.append({"seq": seq, "t": seq, "kind": "say", "actor": "e1", "payload": {"text": f"line {seq}"}})
+        log.append({"seq": seq + 1, "t": seq, "kind": "heard", "actor": "e2", "caused_by": seq, "payload": {}})
+
+    class Door:
+        def __init__(self, die_after=None):
+            self.calls, self.die_after = [], die_after
+
+        async def op(self, op, _http=60, since=0, until=None, limit=50, newest=False, touching=None):
+            self.calls.append((since, until))
+            if self.die_after is not None and len(self.calls) > self.die_after:
+                raise ValueError("server went away")
+            rows = [e for e in log if e["seq"] > since and (until is None or e["seq"] <= until)]
+            return rows[-limit:] if newest else rows[:limit]
+
+    d = Door(die_after=2)  # the head, one window, then it dies
+    try:
+        asyncio.run(past.import_world(d, "e1", {}, tmp_path))
+        raise AssertionError("the dying door did not stop it")
+    except ValueError:
+        pass
+    saved = json.loads((tmp_path / past.WORLD_FILE).read_text(encoding="utf-8"))
+    assert not saved["done"] and saved["until"] > 0 and saved["moments"]
+    lines, d = [], Door()
+    out = asyncio.run(past.import_world(d, "e1", {}, tmp_path, progress=lines.append))
+    assert "1200 deeds" in out and "went on from" in out and lines
+    saved = json.loads((tmp_path / past.WORLD_FILE).read_text(encoding="utf-8"))
+    ms = saved["moments"]
+    assert saved["done"] and len({m["seq"] for m in ms}) == len(ms) == 1200
+    assert all(m.get("outcome") == "heard" for m in ms)
+    assert all(u is None or u - s <= past.WINDOW for s, u in d.calls) and len(d.calls) > 3
+    d = Door()
+    assert "1200 deeds" in asyncio.run(past.import_world(d, "e1", {}, tmp_path)) and len(d.calls) == 1  # nothing new
+
+
+def test_budget_pauses_a_seat_before_its_model_is_called(tmp_path: Path):
+    # a test day spent $9 on one account before anyone looked: seats stop themselves at a day budget
+    import time as _t
+    from body_harness import loop
+    from body_harness.loop import Mind
+    from body_harness.seat import Seat
+    home = tmp_path
+    for name, cost in (("a", 0.30), ("b", 0.50)):
+        d = home / "seats" / name
+        d.mkdir(parents=True)
+        (d / "usage.jsonl").write_text(json.dumps({"ts": _t.time() - 60, "seat": name, "model": "x:y", "calls": 1,
+                                                   "cost": cost}) + "\n" +
+                                       json.dumps({"ts": _t.time() - 90000, "seat": name, "model": "x:y", "calls": 1,
+                                                   "cost": 5.0}) + "\n", encoding="utf-8")
+    m = Mind.__new__(Mind)
+    m.seat = Seat(home, "a")
+    loop._SPENT.clear()
+    assert m._over_budget() == ""  # no budget set: never paused
+    (home / "seats" / "a" / "config.json").write_text(json.dumps({"budget_day": 0.25}), encoding="utf-8")
+    assert "$0.30" in m._over_budget() and "budget_day" in m._over_budget()  # yesterday's $5 does not count
+    (home / "seats" / "a" / "config.json").write_text(json.dumps({"budget_day": 1}), encoding="utf-8")
+    (home / "config.json").write_text(json.dumps({"budget_home_day": 0.75}), encoding="utf-8")
+    assert "$0.80" in m._over_budget() and "budget_home_day" in m._over_budget()
+    (home / "config.json").write_text(json.dumps({"budget_home_day": 2}), encoding="utf-8")
+    assert m._over_budget() == ""

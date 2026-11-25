@@ -245,8 +245,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="a harness variant: label:key=value[,key=value] (repeat to compare; JSON values work)")
     c.add_argument("--json", action="store_true")
     c = sub.add_parser("past-import", help="copy the body's own deeds from the world's history, so past() reaches "
-                                           "back before this harness ran it")
+                                           "back before this harness ran it; run again, it goes on from where it stopped")
     c.add_argument("name")
+    c.add_argument("--fresh", action="store_true", help="start over from the body's first event")
     c = sub.add_parser("import", help="give a seat files or folders to search with records(): linked by default, "
                                       "so nothing is duplicated and nothing moves")
     c.add_argument("name")
@@ -317,8 +318,14 @@ def main(argv: list[str] | None = None) -> int:
 
         async def go() -> str:
             async with httpx.AsyncClient() as client:
-                return await import_world(Door.load(s.p("door.json"), client), st["me"], st.get("names") or {}, s.dir)
-        print(f"{args.name}: {asyncio.run(go())}")
+                return await import_world(Door.load(s.p("door.json"), client), st["me"], st.get("names") or {},
+                                          s.dir, fresh=args.fresh,
+                                          progress=lambda m: print(f"{args.name}: {m}", flush=True))
+        try:
+            print(f"{args.name}: {asyncio.run(go())}")
+        except (DoorError, ValueError, httpx.HTTPError) as e:
+            print(f"{args.name}: stopped ({e}); what was read is kept, run it again to go on", file=sys.stderr)
+            return 1
         return 0
     if args.cmd == "import":
         from . import imports
