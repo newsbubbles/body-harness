@@ -13,6 +13,10 @@ model turn. body-harness is built around those lessons:
 - **A scene card, not the whole world.** Each turn the model reads a few hundred tokens: the hour, the place, who is
   here, what it holds, the exits, its goals, any line it owes, the verbs it can use, and what happened (a routine's
   bark said twelve times is one line, x12). The full view stays on disk; `look(part=...)` reads any piece of it.
+  For each person here (up to six) the card adds what the world's `knows` holds: met which day, how many exchanges,
+  standing, the last words each way, and the body's newest note that names them; or that no meeting is on record.
+  A seat that keeps a short context still knows whom it has met: Ossa had met Rhosyn Vael twice and later greeted
+  her as new.
 - **The harness owns the wait.** The model ends each turn with `sleep(until=..., note=...)`. The harness then waits
   on the world itself, with no model calls, in pieces under the server's cap, and wakes the model only when the
   condition fires, the time is up, the operator writes, something scheduled comes due, a player has waited on an

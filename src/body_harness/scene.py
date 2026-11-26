@@ -149,6 +149,53 @@ def bare(x: Any) -> str:
     return re.sub(r" x\d+$", "", str(x))
 
 
+def known_lines(b: dict[str, Any], names: Names, me: str, day_seconds: float, people: list[Any]) -> list[str]:
+    """One line for each person here: what the world's `knows` says (met when, how often, standing, the last words
+    each way) and the newest note of this body's that names them, or that the world has no meeting on record.
+    Ossa met Rhosyn Vael twice at the Yard, then hours later asked her "You're new to the Yard?": the world knew,
+    but the card never showed it (Glass Reach, 26 Nov)."""
+    if not isinstance(b.get("knows"), list):
+        return []
+    knows = {k.get("who"): k for k in b["knows"] if isinstance(k, dict)}
+    mem = [str(m.get("text")) for m in ((b.get("you") or {}).get("state") or {}).get("memory") or []
+           if isinstance(m, dict) and m.get("text")]
+    out: list[str] = []
+    order: dict[str, float] = {}
+    for x in people:
+        if not isinstance(x, dict) or not x.get("id"):
+            continue
+        if x["id"] not in knows and x.get("type") not in ("person", "pet") and (x.get("state") or {}).get("hp") is None:
+            continue  # a counter or a sink: nobody to meet
+        name = x.get("name") or names.name(x.get("id"))
+        k = knows.get(x["id"])
+        if not k:
+            out.append(f"  - {name}: no meeting on record")
+            continue
+        day = lambda t: int(float(t or 0) // day_seconds) + 1
+        bits = [f"met day {day(k.get('met_t'))}", f"{k.get('count', 0)} exchange{'' if k.get('count') == 1 else 's'}", f"standing {k.get('standing', 0)}"]
+        ex = [e for e in k.get("last_exchanges") or [] if isinstance(e, dict) and e.get("text")]
+        for mine in (True, False):
+            e = next((e for e in reversed(ex) if (e.get("who") == me) == mine), None)
+            if e:
+                bits.append(f"{'you' if mine else 'they'} last said (day {day(e.get('t'))}): "
+                            f"\"{str(e['text'])[:100]}\"")
+        first = str(name).split()[0].lower() if name else ""
+        note = next((m for m in reversed(mem) if str(name).lower() in m.lower()
+                     or (len(first) > 3 and re.search(rf"\b{re.escape(first)}\b", m.lower()))), None)
+        if note:
+            bits.append(f"your note: {note[:140]}")
+        out.append(f"  - {name}: " + "; ".join(bits))
+        order[out[-1]] = float(k.get("last_t") or 0)
+    # a crowded bar must not fill every wake: the people met most lately first, then the rest by count
+    keep = 6
+    met = sorted((x for x in out if "no meeting on record" not in x), key=lambda x: -order.get(x, 0))
+    rest = [x for x in out if "no meeting on record" in x]
+    shown = (met + rest)[:keep]
+    if len(out) > keep:
+        shown.append(f"  ({len(out) - keep} more here: inspect(entity=<name>) for one)")
+    return (["People here:"] + shown) if shown else []
+
+
 def _names(items: list[Any], names: Names) -> list[str]:
     out = []
     for x in items or []:
@@ -221,6 +268,7 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
                   and x.get("id") != me]
         things = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") in ("thing", "sign")]
     lines.append("Here: " + (", ".join(_names(people, names)) or "nobody else"))
+    lines += known_lines(b, names, me, day_seconds, people)
     if things:
         lines.append("Things: " + ", ".join(_names(things, names)))
     ex = [(x.get("name") or names.name(x.get("to"))) if isinstance(x, dict) else str(x) for x in (b.get("exits") or [])]

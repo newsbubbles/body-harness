@@ -988,3 +988,22 @@ def test_a_lead_that_keeps_going_nowhere_is_named_once_its_notes_repeat_it():
     assert stuck_on(chase[:5], set()) == ""  # too few notes to say
     friends = [f"Talked with Varn Erixx about the {x}." for x in ("weather", "yoke", "plate", "fight", "bar", "rent")]
     assert stuck_on(friends, {"varn", "erixx"}) == ""  # a friend's name is not a lead
+
+
+def test_the_card_says_whom_the_seat_has_met_from_the_worlds_knows():
+    # Ossa met Rhosyn Vael twice at the Yard, then greeted her as new: the world knew, the card never said
+    b = {"t": 90000, "you": {"id": "e1", "name": "Ossa", "state": {"memory": [
+            {"text": "Rhosyn is a Carrier, not new to the Yard"}, *[{"text": f"note {i}"} for i in range(12)]]}},
+         "here": {"name": "The Yard"},
+         "present": [{"id": "e2", "type": "person", "name": "Rhosyn Vael"}, {"id": "e3", "type": "person", "name": "A porter"},
+                     {"id": "e4", "type": "counter", "name": "The Yard's counter"}],
+         "knows": [{"who": "e2", "name": "Rhosyn Vael", "count": 2, "met_t": 100, "standing": 1, "here": True,
+                    "last_exchanges": [{"t": 100, "who": "e1", "kind": "say", "text": "Carrier work today?"},
+                                       {"t": 160, "who": "e2", "kind": "say", "text": "Always."}]}]}
+    c = scene.card(b, scene.Names({}), "e1")
+    line = next(x for x in c.splitlines() if x.strip().startswith("- Rhosyn Vael"))
+    assert "met day 1" in line and "2 exchanges" in line and "standing 1" in line
+    assert 'you last said (day 1): "Carrier work today?"' in line and 'they last said (day 1): "Always."' in line
+    assert "your note: Rhosyn is a Carrier" in line  # an old note, past the newest 8 the card shows
+    assert "- A porter: no meeting on record" in c and "counter: no meeting" not in c
+    assert "People here" not in scene.card({**b, "knows": None}, scene.Names({}), "e1")  # a world without knows
