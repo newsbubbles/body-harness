@@ -68,7 +68,9 @@ class World:
         from embody.ops import AUTHOR, Engine
         from embody.world import World as W
         self.eng = Engine(path)
-        w = W.create(self.eng.store, "Saltmarsh", seed=7)
+        # one World object for the case and the seats alike: a second one on the same store kept its own view, and
+        # meetings made through the seats were lost to it
+        w = self.eng.world(W.create(self.eng.store, "Saltmarsh", seed=7).id)
         w.define_script("go", GO)
         w.define_script("search", SEARCH)
         w.define_schema("room", extends="place")
@@ -108,6 +110,55 @@ class World:
         s = self.eng.session_for_token(inv["token"])
         s.join(entity=who)
         return s
+
+    CROWD = ["Pell", "Dorr", "Ines", "Morrow", "Sabe", "Tamm", "Oake", "Lune", "Vell", "Quen", "Rook", "Brisk"]
+    BARKS = ["Fresh eels! Fat ones, a copper a pair!", "Mind the step, it's wet.", "Another round over here!",
+             "Who left the door open?", "Tide's turning, lads.", "Somebody shut that dog up."]
+    TALK = [("Did you see the sky this morning?", "Red at dawn. Storm by the week's end."),
+            ("Your brother still owes me.", "He'll pay when the boats come in."),
+            ("The stew's thin tonight.", "It's thin every night."),
+            ("Heard the miller's selling.", "He says that every spring."),
+            ("Lost a hook off the jetty.", "Plenty more in the sea.")]
+    NOTES = ["Rain at the second bell.", "Swept the step.", "A gull stole a fish off the rail.",
+             "The Lamp's fire smoked all evening.", "Counted the floats: all there.", "Sharpened the gutting knife.",
+             "A cart went by loaded with rope.", "My left boot still leaks.", "The bell rang late today.",
+             "Mended a float line.", "Fog on the water at dawn.", "Bought a heel of bread.",
+             "Watched the boats come in.", "The dog at the Lamp bit someone.", "Fixed the latch on the shed.",
+             "Salted the morning catch.", "A stranger asked the way to the Chapel.", "Coiled the long rope.",
+             "Wind from the east all day.", "Ma Tully raised the price of ale."]
+
+    def busy(self, people: int = 0, notes: int = 0, met: int = 0) -> None:
+        """A fuller life before the moment: people in the room, more notes of its own, people met days ago. Each
+        dial alone, so one can be turned up at a time and its effect read apart from the others."""
+        place = self.where()
+        crowd = self.CROWD[:max(people, met)]
+        for i, name in enumerate(crowd):
+            self.ids[name] = self.w.spawn("person", self.ids[place if i < people else "Quay"], name,
+                                          state={"description": f"A local, {name} by name."})
+        for i, name in enumerate(crowd[:met]):
+            away = i >= people  # met here days ago, elsewhere now
+            if away:
+                self.move(name, place)
+            self.gm.say_as(name, f"You're new. I'm {name}.", to="Fen")
+            self.say("Fen", "Fen. I fish for Brann.", to=name)
+            if away:
+                self.move(name, "Quay")
+        for i in range(notes):
+            self.fen.remember(self.NOTES[i % len(self.NOTES)])
+            self.later(300)
+
+    def chatter(self, lines: int = 0) -> None:
+        """The room going on around the seat, none of it to the seat: barks and other people's talk."""
+        here = [n for n in self.CROWD if n in self.ids and self.where(n) == self.where()] or ["Ma Tully"]
+        for i in range(lines):
+            a = here[i % len(here)]
+            if i % 3 == 0:
+                self.gm.say_as(a, self.BARKS[i % len(self.BARKS)])
+            else:
+                q, r = self.TALK[i % len(self.TALK)]
+                b = here[(i + 1) % len(here)]
+                self.gm.say_as(a, q, to=b if b != a else None)
+                self.gm.say_as(b, r, to=a if b != a else None)
 
     def say(self, who: str, text: str, to: str | None = None) -> None:
         (self.fen if who == "Fen" else self.players[who]).say(text, to=to)
@@ -209,6 +260,18 @@ class Played:
         parts += [json.dumps(c.get("args") or {}) for c in self.calls
                   if c.get("tool") in ("remember", "intend", "memo", "sleep")]
         return "\n".join(parts)
+
+    def said_to(self, who: str) -> list[str]:
+        return [str((c.get("args") or {}).get("text") or "") for c in self.calls
+                if c.get("tool") in ("say", "act") and who.lower() in
+                str((c.get("args") or {}).get("to") or (c.get("args") or {}).get("target") or "").lower()]
+
+    def fourth_wall(self) -> bool:
+        """Words from outside the fiction in speech (a seat said aloud that someone's "mind gone quiet")."""
+        return has(self.said(), r"\bharness\b|\bnpcs?\b|\bno mind\b|mind (has )?gone|\bentity\b|\btool\b")
+
+    def nudges(self) -> list[str]:
+        return [n for r in self.ledger for n in (r.get("nudges") or [])]
 
     def went(self, place: str) -> bool:
         return any(c.get("tool") == "act" and (c.get("args") or {}).get("verb") == "go" and
@@ -324,6 +387,15 @@ def _dead_lead(w: World, seat: Seat) -> None:
     seat_state(seat, plan="Find the green door on Chandlers' Row.")
 
 
+def _dead_lead_long(w: World, seat: Seat) -> None:
+    """The same lead after five hours of it: the notes say so, as a seat's would."""
+    _dead_lead(w, seat)
+    seat_state(seat, notes=["Walked Chandlers' Row end to end; no green door.", "Asked on the Row about the green "
+                            "door; nobody knew.", "Checked the chandlers' doors again for the green door.",
+                            "Green door still not found; maybe past Ned's house.",
+                            "Searched near the Chapel for the green door."])
+
+
 def _dead_lead_between(w: World, turn: int) -> str:
     w.later(3600)
     return "time is up"
@@ -342,6 +414,54 @@ def _dead_lead_check(p: Played) -> tuple[bool, str]:
     still = bool(hunting) and hunting[-1]
     return closed or owner or not still, (f"closed={closed} owner={owner} hunting_turns={sum(hunting)}/"
                                           f"{len(hunting)} still={still}")
+
+
+def _answered_before(w: World, seat: Seat) -> None:
+    w.say("Fen", "Where's Wren?", to="Brann")
+    w.say("Brann", "At the Net Shed, mending.", to="Fen")
+    w.later(300)
+    w.say("Brann", "Tide's on the turn.", to="Fen")
+    w.say("Fen", "It is.", to="Brann")
+    w.say("Brann", "Keep your hood up out there.", to="Fen")
+    w.say("Fen", "Always.", to="Brann")
+    w.later(300)
+    seat_state(seat, plan="Find Wren and tell her about the torn net.")
+
+
+def _delivered(w: World, seat: Seat) -> None:
+    w.say("Fen", "The Customs men were on the Quay at dawn. Two of them, with a lantern.", to="Brann")
+    w.say("Brann", "Good. Noted. Keep clear of them.", to="Fen")
+    w.later(600)
+    seat_state(seat, plan="Tell Brann the Customs men were on the Quay at dawn.")
+
+
+def _quiet_one(w: World, seat: Seat) -> None:
+    w.move("Old Marl", "The Lamp")
+    for line in ("Old Marl, when does the water cart come?", "Marl? The water cart, when?",
+                 "Do you know when the cart comes, Marl?", "Marl, the cart. Any word?"):
+        w.say("Fen", line, to="Old Marl")
+        w.later(1200)
+    w.fen.intend("learn when the water cart comes", "the crew's casks are nearly dry")
+    seat_state(seat, unanswered={"old marl": 4}, quiet_names={"old marl": "Old Marl"})
+
+
+def _own_walk(w: World, seat: Seat) -> None:
+    for place in ("Quay", "Chandlers' Row", "Chapel", "Chandlers' Row", "Quay", "The Lamp"):
+        w.fen.act("go", place)
+        w.later(900)
+    w.later(86400)
+
+
+def _in_plain_sight(w: World, seat: Seat) -> None:
+    w.move("Wren", "The Lamp")
+    seat_state(seat, plan="Find Wren; nobody has seen her since dawn.",
+               recent=["Looked for Wren at the Quay; not there.", "Asked about Wren on the Row; nobody saw her."])
+
+
+def _routine(w: World, seat: Seat) -> None:
+    w.fen.intend("turn the nets on the drying racks every hour", "Wren asked it of me; wet nets rot")
+    seat_state(seat, notes=[f"{h}: turned the nets on the drying racks." for h in
+                            ("Dawn", "Second bell", "Third bell", "Fourth bell", "Noon", "First afternoon bell")])
 
 
 CASES = [
@@ -385,13 +505,48 @@ CASES = [
     Case("dead-lead", "a lead that does not exist, over 6 quiet hours (Klhyts: 12 h on a green door)",
          _dead_lead, lambda w: "time is up", _dead_lead_check, turns=6, world={"fen_at": "Chandlers' Row"},
          between=_dead_lead_between),
+    Case("dead-lead-long", "the dead lead five hours in, so the stuck-lead check can fire on the first wake",
+         _dead_lead_long, lambda w: "time is up", _dead_lead_check, turns=3, world={"fen_at": "Chandlers' Row"},
+         between=_dead_lead_between),
+    Case("answered-before", "a question already answered a few lines back (Glass Reach: asked where someone was "
+         "five more times; 'I told you before')",
+         _answered_before, lambda w: "time is up",
+         lambda p: (not has(p.said(), r"where") or not has(p.said(), r"wren"),
+                    f"went_shed={p.went('Net Shed')} said={p.said()[:70]!r}")),
+    Case("delivered-once", "news already given and acknowledged, with a stale plan to give it (Glass Reach: the "
+         "same report to the same person ten times)",
+         _delivered, lambda w: "time is up",
+         lambda p: (not has(p.said(), r"custom"), f"said={p.said()[:70]!r}")),
+    Case("quiet-one", "someone who never answers, on the quiet list, still the way to a goal (Glass Reach: 25 "
+         "unanswered lines to one person)",
+         _quiet_one, lambda w: "time is up",
+         lambda p: (not p.said_to("Old Marl"), f"to_marl={len(p.said_to('Old Marl'))} said={p.said()[:60]!r}")),
+    Case("own-walk", "the body's own walk a day ago, asked about after a restart (Glass Reach: denied his own walk, "
+         "'someone used my name')",
+         _own_walk, lambda w: (w.say("Brann", "Someone says they saw you at the Chapel yesterday. Were you there?",
+                                     to="Fen"), ASKED)[1],
+         lambda p: (has(p.said(), r"\b(yes|aye|i was|i went|was there|passed)\b") and
+                    not has(p.said(), r"\b(wasn't|was not|never|not me|someone else)\b"), f"said={p.said()[:80]!r}")),
+    Case("in-plain-sight", "the person a stale plan calls missing is in the room (Glass Reach: 'Taan is missing' "
+         "minutes after talking with her)",
+         _in_plain_sight, lambda w: (w.say("Brann", "Any sign of Wren yet?", to="Fen"), ASKED)[1],
+         lambda p: (bool(p.said_to("Wren")) or has(p.said(), r"\bhere\b|right there|with us|over there|behind you|"
+                                                              r"at the lamp|she's in"), f"said={p.said()[:80]!r}")),
+    Case("routine-not-a-lead", "a routine that runs through every note, which the stuck-lead check reads as a "
+         "dead lead (Glass Reach: 40 misfires; seats doubted real places)",
+         _routine, lambda w: "time is up",
+         lambda p: (not ("tell" in p.tools() or has(p.wrote() + p.said(), r"made up|may not exist|not real|"
+                                                                          r"doesn't exist|does not exist")),
+                    f"told_owner={'tell' in p.tools()} nudged={[n for n in p.nudges() if n.startswith('stuck')]}"),
+         world={"fen_at": "Net Shed"}),
 ]
 
 
 # ---------- running ----------
 
 async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, model: str, env: list[str],
-              spec: dict[str, Any], client: httpx.AsyncClient, gate: asyncio.Semaphore) -> dict[str, Any]:
+              spec: dict[str, Any], client: httpx.AsyncClient, gate: asyncio.Semaphore,
+              scene: dict[str, int] | None = None) -> dict[str, Any]:
     from body_harness.loop import Mind
     async with gate:
         home = out / case.name / (variant or "base") / f"{i:02d}"
@@ -408,14 +563,20 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
         try:
             w = World(home / "world.db", **case.world)
             case.build(w, seat)
+            sc = scene or {}
+            w.busy(int(sc.get("people", 0)), int(sc.get("notes", 0)), int(sc.get("met", 0)))
             w.settle()
+            noise = int(sc.get("chatter", 0))
+            w.chatter(noise // 2)
             m = Mind(seat, client)
             m.door = LocalDoor(w.fen, spec)  # type: ignore[assignment]
             await m.start()
             reason = case.ask(w)
+            w.chatter(noise - noise // 2)
             for t in range(case.turns):
                 if t and case.between:
                     reason = case.between(w, t)
+                    w.chatter(noise // 2)
                 await m.turn(reason, [])
                 m.save()
             p = Played(seat, w)
@@ -423,7 +584,8 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
             u = [r.get("usage") or {} for r in p.ledger]
             calls = [json.loads(x) for x in seat.p("usage.jsonl").read_text(encoding="utf-8").splitlines()] \
                 if seat.p("usage.jsonl").exists() else []
-            row.update(ok=ok, detail=detail, said=p.said()[:300], tools=p.tools(),
+            row.update(ok=ok, detail=detail, said=p.said()[:300], tools=p.tools(), nudges=p.nudges(),
+                       fourth_wall=p.fourth_wall(),
                        model_calls=sum(int(x.get("calls", 0)) for x in u),
                        input_max=max([int(c.get("input_tokens", 0)) for c in calls] or [0]),
                        input_sum=sum(int(x.get("input_tokens", 0)) for x in u),
@@ -457,6 +619,8 @@ async def main() -> None:
     ap.add_argument("--samples", type=int, default=1)
     ap.add_argument("--cases", default="all")
     ap.add_argument("--variant", action="append", default=[], help="name:key=value,key=value (JSON values)")
+    ap.add_argument("--scene", action="append", default=[],
+                    help="name:people=N,notes=N,met=N,chatter=N: a busier moment, one dial or several")
     ap.add_argument("--parallel", type=int, default=6)
     ap.add_argument("--engine", default="", help="an embody checkout's src folder, to test against it")
     ap.add_argument("--spec", default="", help="the engine's /openapi.json?role=mind, saved to a file (building it "
@@ -481,13 +645,17 @@ async def main() -> None:
             except ValueError:
                 cfg[k] = val
         variants[name] = cfg
+    scenes: dict[str, dict[str, int]] = {}
+    for v in a.scene or [""]:
+        name, _, kv = v.partition(":")
+        scenes[name] = {k: int(x) for k, _, x in (p.partition("=") for p in filter(None, kv.split(",")))}
     out = Path(a.out) / time.strftime("%Y%m%d-%H%M%S")
     out.mkdir(parents=True, exist_ok=True)
     spec = read_json(Path(a.spec), {}) if a.spec else openapi_spec(out)
     gate = asyncio.Semaphore(max(1, a.parallel))
     async with httpx.AsyncClient() as client:
-        jobs = [one(c, vn, cfg, i, out, a.model, a.env_file, spec, client, gate)
-                for c in pick for vn, cfg in variants.items() for i in range(a.samples)]
+        jobs = [one(c, "/".join(x for x in (sn, vn) if x), cfg, i, out, a.model, a.env_file, spec, client, gate, sc)
+                for c in pick for sn, sc in scenes.items() for vn, cfg in variants.items() for i in range(a.samples)]
         rows = await asyncio.gather(*jobs)
     with (out / "results.jsonl").open("w", encoding="utf-8") as f:
         for r in rows:
