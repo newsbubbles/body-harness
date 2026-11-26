@@ -27,6 +27,11 @@ STOP = {"what", "when", "where", "which", "about", "your", "have", "with", "that
         "will", "would", "could", "should", "remind", "right", "tonight", "today", "again", "still", "just", "fen"}
 
 
+# what the log keeps of a body that is not a deed it did in the world: its lines, its notes and goals, its seat
+BOOKKEEPING = {"say", "talked", "opinion", "remembered", "intended", "embodied", "unembodied", "joined", "left",
+               "perceived", "waited", "away", "spawned", "linked", "unlinked"}
+
+
 def words(text: str) -> set[str]:
     found = (w.removesuffix("'s").strip("'-") for w in re.findall(r"[a-z][a-z'-]{3,}", str(text).lower()))
     return {w for w in found if len(w) > 3 and w not in STOP}
@@ -297,7 +302,30 @@ class Menu:
         notes = [it for it in self.widgets[[w.title.startswith("Your memory") for w in self.widgets].index(True)].items
                  if words(it.opens[1]) & self.asked] if any(w.title.startswith("Your memory") for w in self.widgets) \
             else []
+        out = out[:3]
         if notes:
             out.append(("your notes that share the words said to you",
                         ("text", "\n".join(f"- {it.opens[1]}" for it in notes[:6]))))
-        return out[:4]
+        first = min([int(e.get("seq") or 0) for e in self.events] or [0])
+        # the older talk with whoever spoke: a job agreed eight exchanges back was only in the log, and no seat of
+        # three models opened it (job-in-old-talk, 2/30 at best, 30/30 when handed the line)
+        speaker = next((e.get("actor") for e in self.told if e.get("actor")), None)
+        if speaker and first:
+            out.append((f"your older talk with {self.names.name(speaker)}",
+                        ("op", "history", {"until": first, "kinds": ["say", "talked"], "limit": 80, "newest": True},
+                         {"with": speaker, "keep": 30})))
+        # what this body did, from the world's log: a deed nobody did leaves no line, and asked "did you use it?",
+        # seats said yes (salve-gone: 13 of 14 misses even when told the pouch was empty)
+        out.append(("your own deeds in the world's log", ("op", "history", {"limit": 120, "newest": True},
+                                                           {"deeds_of": self.me, "keep": 8})))
+        return out
+
+    @staticmethod
+    def pick(events: list[dict[str, Any]], how: dict[str, Any]) -> list[dict[str, Any]]:
+        """The events an open asked for: those between me and one other, or one body's own deeds."""
+        if how.get("with"):
+            o = how["with"]
+            events = [e for e in events if o in (e.get("actor"), e.get("target"), (e.get("payload") or {}).get("to"))]
+        if how.get("deeds_of"):
+            events = [e for e in events if e.get("actor") == how["deeds_of"] and e.get("kind") not in BOOKKEEPING]
+        return events[-int(how.get("keep") or 20):]

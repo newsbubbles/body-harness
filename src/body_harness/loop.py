@@ -545,6 +545,11 @@ class Mind:
         if got[0] == "error":
             return compact({"ok": False, "reason": got[1], "hint": got[2]})
         r = await self._op(got[1], dict(got[2]))
+        if len(got) > 3 and isinstance(r, list):
+            r = menu.Menu.pick([e for e in r if isinstance(e, dict)], got[3])
+            if not r:
+                return ("none: no deed of yours is on record in the world's log" if got[3].get("deeds_of")
+                        else "none further back")
         if isinstance(r, list) and r and all(isinstance(e, dict) and "kind" in e for e in r):
             return "\n".join(scene.event_lines(r, self.me, self.names, 20)) or "(nothing further back)"
         if isinstance(r, dict) and isinstance(r.get("events"), list):
@@ -1097,7 +1102,7 @@ class Mind:
             card = self.menu.render()
             if self.cfg.get("menu_preopen"):
                 for label, opens in self.menu.preopen():
-                    card += f"\nOpened for you, {label}:\n" +(await self._menu_run(opens))[:1500]
+                    card += f"\nOpened for you, {label}:\n" + (await self._menu_run(opens))[:3000]
         else:
             card = scene.card(b, self.names, self.me, self.day_seconds, events=evs)
         agenda = self.agenda()

@@ -58,4 +58,14 @@ def test_preopen_opens_the_speaker_who_is_named_and_what_a_goal_needs():
     got = dict(menu.Menu(bundle(), scene.Names(), "e1").preopen())
     labels = " | ".join(got)
     assert "Brann" in labels and "Ossa" in labels and "Pouch of salve" in labels
-    assert len(got) <= 4
+    assert "your older talk with Brann" in labels and "your own deeds in the world's log" in labels
+    talk = got["your older talk with Brann"]
+    assert talk[:2] == ("op", "history") and talk[3]["with"] == "e2"
+
+
+def test_pick_keeps_talk_with_one_other_and_a_bodys_own_deeds():
+    evs = [{"kind": "say", "actor": "e2", "payload": {"to": "e1"}}, {"kind": "say", "actor": "e4", "payload": {"to": "e1"}},
+           {"kind": "say", "actor": "e1", "payload": {"to": "e2"}}, {"kind": "tended", "actor": "e1", "target": "e2"},
+           {"kind": "remembered", "actor": "e1"}, {"kind": "moved", "actor": "e4"}]
+    assert [e["actor"] for e in menu.Menu.pick(evs, {"with": "e2"})] == ["e2", "e1", "e1"]
+    assert [e["kind"] for e in menu.Menu.pick(evs, {"deeds_of": "e1"})] == ["tended"]
