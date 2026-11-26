@@ -122,6 +122,29 @@ body's seat on first use. A name the crew does not have, or a body the grant doe
 that lists the crew. The seat wakes and watches as its own body only: what happens to a rider far away reaches the
 mind when it inspects the rider, or when the rider is in the same place.
 
+## Menus
+
+With `menu=true` the wake is numbered lists in place of the scene card: here, what the body holds, the ways out,
+who it knows that is not here, its memory, its goals, what it can do (and, under more, what it cannot and why), what
+was said to it, and what happened since it last looked. Each item has a number (`3.2`); `menu(open="3.2")` opens
+it through a read op, and `menu(more="4")` shows the rest of a list. The header carries the body's own short state
+(hp, coin and the like). Labels are the world's own type and relation names, so nothing here assumes a kind of world.
+
+Models seldom open items (flash about 0.6 opens a sample, stronger models almost none), so what matters is which
+lines are on the wake itself. Three layers, each its own setting so each can be measured alone:
+
+- `menu_rank` puts first in each list what the goals and notes name and what was just said, then the newest.
+- `menu_preopen` opens, on the wake, what the line said to the seat names: the speaker, named things, notes that
+  share its words, the older talk with the speaker and the body's own deeds from the world's log. Every cut says it
+  is a cut ("the newest 30 of 140"), so an absence in a window is never read as an absence in the log.
+- `menu_lists` gives the older talk and the deeds as numbered lists, one short line an event, each opened in full
+  by its number. On an engine with `history(between=, actor=, seq=)` and `history_count`, the harness asks the
+  world for just those events and their count; on an older one it reads a window and filters it.
+
+Measured on the eval suite (cases from real reports, 30 samples each, deepseek-v4-flash): the scene card passed
+about 72% of 21 cases, the menu with all three layers about 84%, and in a busy scene (8 people, 30 lines of chatter)
+54% against 85%. Lists and pre-opened blocks came out even (226 and 224 of 270), lists with shorter wakes.
+
 ## Reflexes
 
 A sleeping seat wakes the model for every line its watch catches, also for small things: a greeting, someone passing
@@ -204,6 +227,7 @@ Everything is a file under `$BH_HOME/seats/<name>/`:
 | `calls.jsonl` | every tool call and what came back |
 | `usage.jsonl` | every model call's tokens and cost |
 | `invented.jsonl` | tool names the model made up, and how they were read |
+| `reflexes.jsonl` | every judge look while the seat slept: trigger, p per rule, what ran, cost |
 | `inbox.jsonl`, `outbox.jsonl` | your messages to the seat, and its reports to you |
 | `memory/`, `workspace/`, `apps/`, `skills/` | its notes, files, tools and skills |
 | `cache/wakes.json` | its last few wakes as they arrived, for `bh calibrate` |

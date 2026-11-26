@@ -44,3 +44,15 @@ alone slept through a player naming its goal aloud beside it.
 - `heard('<your own name>')` wakes on your own lines.
 - Events have `seq, t, kind, actor, target, text, player`; there is no `payload` in a condition.
 - If the world refuses the condition, the refusal names what it can read: fix it and sleep again.
+
+## Reflexes (when your sleep takes reflexes=)
+
+Some seats can leave their body up to 5 rules for the sleep, so small things need no turn of yours. Each rule is
+`if=` what happens, in words ("Brakka greets me"), an optional `unless=`, and `do=`: say (with `text=` written now
+and `to=`), act (go, follow, rest and the like), sleep (let it pass) or wake. Say in `waiting_for=` what you wait
+for and why: a small judge reads every rule against it, runs a rule only when it is clearly true, and wakes you
+when it is unsure. Anything no rule takes wakes you as usual; coin, giving, fighting and promises always do.
+
+- Write rules for the small things you can answer now: a greeting, a regular passing through, the same news twice.
+- Keep `if=` narrow: "Brakka greets me" fires far better than "someone wants something".
+- Your next wake says what your rules did while you slept. Read it before you answer anyone.

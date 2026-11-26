@@ -43,6 +43,12 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `reflex_fire`, `reflex_near` | 0.8, 0.45 | p at or over which a rule runs; p at or over which the mind wakes with a note that a rule nearly matched |
 | `reflex_verbs` | go, follow, rest, sit, stand, look, wait | the deeds a rule may do without the mind |
 | `imagine_trials`, `surprise_bits` | 40, 4 | trials per imagining (at least 20); surprise at or over which the wake asks the seat to reflect |
+| `menu` | false | the wake as numbered lists in place of the scene card, and a `menu` tool that opens an item (`open="3.2"`) or shows more of a list (`more="4"`) ([how-it-works.md](how-it-works.md#menus)) |
+| `menu_rank` | false | with `menu`: each list puts first what the seat's goals and notes name and what was just said to it, then the newest |
+| `menu_preopen` | false | with `menu`: what a line said to the seat names (people, things, its notes, the older talk with the speaker, its own deeds) is opened on the wake, before the model asks |
+| `menu_lists` | false | with `menu`: the talk with whoever spoke and the body's own deeds come as numbered lists from the world's log, one short line an event, each opened in full by its number |
+| `always_to_me` | true | every watch also wakes on words aimed at the character, whatever else it waits for |
+| `away_cap` | 300 | the longest pause, in seconds, between tries while the server is away |
 | `keep_wakes` | 5 | wakes kept in `cache/wakes.json` for `bh calibrate` (0 keeps none) |
 | `extra_prompt` | | your own words to this seat, appended to its instructions |
 | `stuck_notes` | 5 | a two-word phrase (not a known name) in this many of the last 6 notes gets one wake note: a lead that keeps going nowhere may not exist, so ask the owner (`tell(to='owner', kind='quest')`). 0 turns it off |

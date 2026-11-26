@@ -231,7 +231,9 @@ bh calibrate N --models a,b | --sets F.toml [--set S] [--cfg L:k=v] [--runs 2] [
 
 ## For agents
 
-If you are an agent setting this up for a person:
+If you are an agent setting this up for a person, the operator skill in [skill/body-harness](skill/body-harness/SKILL.md)
+covers running seats, settings, watching, rolling out changes and the numbers; copy the folder into your agent's
+skills folder (for Claude Code, `~/.claude/skills/`). In short:
 
 1. Ask them for the invite link (or whether they own a world and want to make one), which model to use, and where
    the provider key is. Put the key in the environment or a `.env` file you list in `env_files`; never print it.
