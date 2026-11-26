@@ -69,3 +69,24 @@ def test_pick_keeps_talk_with_one_other_and_a_bodys_own_deeds():
            {"kind": "remembered", "actor": "e1"}, {"kind": "moved", "actor": "e4"}]
     assert [e["actor"] for e in menu.Menu.pick(evs, {"with": "e2"})] == ["e2", "e1", "e1"]
     assert [e["kind"] for e in menu.Menu.pick(evs, {"deeds_of": "e1"})] == ["tended"]
+
+
+def test_log_lists_number_each_event_and_put_what_the_line_names_first():
+    b = bundle()
+    talk = [{"seq": 2, "t": 0, "kind": "say", "actor": "e2", "target": "e1",
+             "payload": {"text": "The salve is in the blue chest at the Quay.", "to": "e1"}},
+            {"seq": 5, "t": 900, "kind": "say", "actor": "e2", "target": "e1", "payload": {"text": "Tide's late.", "to": "e1"}}]
+    m = menu.Menu(b, scene.Names(), "e1", lists={"with": "e2", "talk": talk, "deeds": [], "deeds_full": False})
+    text = m.render()
+    assert "Talk with Brann, in your log since t=0" in text and "Your deeds, in your log (0): none on record" in text
+    n = next(i for i, w in enumerate(m.widgets, 1) if w.title.startswith("Talk with"))
+    assert "blue chest" in m.widgets[n - 1].items[0].line  # the line said now names salve: the old line leads
+    assert m.resolve(f"{n}.1") == ("op", "history", {"since": 1, "until": 2, "limit": 1}, {"full": True})
+    assert not [l for l, _ in m.preopen() if "older talk" in l or "own deeds" in l]  # lists replace the blocks
+
+
+def test_the_header_shows_the_bodys_own_state_by_its_own_keys():
+    b = bundle()
+    b["you"]["state"].update({"coin": 2, "brief": "secret", "wounded": True})
+    text = menu.Menu(b, scene.Names(), "e1").render()
+    assert "coin 2" in text and "hp 4/6" in text and "wounded" in text and "secret" not in text

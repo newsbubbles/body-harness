@@ -350,7 +350,9 @@ class Mind:
                 return compact(scene.part(self.bundle, args["part"]), 8000)
             b = await self.perceive()
             if self.cfg.get("menu"):  # a fresh look is a fresh menu: its numbers replace the wake's
-                self.menu = menu.Menu(b, self.names, self.me, self.day_seconds, rank=bool(self.cfg.get("menu_rank")))
+                evs = b.get("events") or []
+                self.menu = menu.Menu(b, self.names, self.me, self.day_seconds, rank=bool(self.cfg.get("menu_rank")),
+                                      lists=await self._log_windows(evs) if self.cfg.get("menu_lists") else None)
                 return self.menu.render()
             return scene.card(b, self.names, self.me, self.day_seconds)
         if name == "menu" and getattr(self, "menu", None) is not None:
@@ -537,6 +539,27 @@ class Mind:
             out = f"(harness: {'; '.join(notes)})\n" + out
         return out
 
+    async def _log_windows(self, evs: list[dict[str, Any]]) -> dict[str, Any]:
+        """For menu_lists: the talk with whoever spoke to this seat and this body's own deeds, read from the world's
+        log (a mind reads only its own body's). A window that came back full says the log goes further back."""
+        me_name = self.my_name()
+        speaker = next((e.get("actor") for e in evs if scene.to_me(e, self.me, me_name) and e.get("actor")), None)
+        out: dict[str, Any] = {}
+
+        async def read(args: dict[str, Any]) -> list[dict[str, Any]]:
+            try:
+                r = await self._op("history", args)
+            except Exception:
+                return []
+            return [e for e in r if isinstance(e, dict)] if isinstance(r, list) else []
+        if speaker:
+            talk = await read({"kinds": ["say", "talked"], "limit": 80, "newest": True})
+            out.update({"with": speaker, "talk_full": len(talk) >= 80,
+                        "talk": menu.Menu.pick(talk, {"with": speaker, "keep": 30})})
+        deeds = await read({"limit": 120, "newest": True})
+        out.update({"deeds_full": len(deeds) >= 120, "deeds": menu.Menu.pick(deeds, {"deeds_of": self.me, "keep": 30})})
+        return out
+
     async def _menu_run(self, got: tuple[Any, ...]) -> str:
         """What a menu item opens: text the harness holds, or one read op. Read straight through the door, so an
         open loads no tool and the seat's tool list stays what it would be on the scene card."""
@@ -545,11 +568,21 @@ class Mind:
         if got[0] == "error":
             return compact({"ok": False, "reason": got[1], "hint": got[2]})
         r = await self._op(got[1], dict(got[2]))
+        if len(got) > 3 and got[3].get("full"):  # one event, in full: who, what, where, what caused it
+            return compact(r[0], 3000) if isinstance(r, list) and r else "no such event in your log"
         if len(got) > 3 and isinstance(r, list):
-            r = menu.Menu.pick([e for e in r if isinstance(e, dict)], got[3])
+            # an absence is only as wide as the window read: shown 8 of its last deeds, a seat denied the walk to the
+            # Chapel it had made a day before (own-walk, 16/30 to 9/30), so every cut says it is a cut
+            full = len(r) >= int(got[2].get("limit") or 0) > 0
+            mine = menu.Menu.pick([e for e in r if isinstance(e, dict)], {**got[3], "keep": 10 ** 6})
+            r = mine[-int(got[3].get("keep") or 20):]
             if not r:
-                return ("none: no deed of yours is on record in the world's log" if got[3].get("deeds_of")
+                return ("none in the newest part of the world's log; it goes further back" if full else
+                        "none: no deed of yours is on record in the world's log" if got[3].get("deeds_of")
                         else "none further back")
+            head = (f"(the newest {len(r)} of {len(mine)}, since t={float(r[0].get('t') or 0):.0f}; older ones are "
+                    "further back in the log)" if len(mine) > len(r) or full else "")
+            return "\n".join(([head] if head else []) + scene.event_lines(r, self.me, self.names, len(r)))
         if isinstance(r, list) and r and all(isinstance(e, dict) and "kind" in e for e in r):
             return "\n".join(scene.event_lines(r, self.me, self.names, 20)) or "(nothing further back)"
         if isinstance(r, dict) and isinstance(r.get("events"), list):
@@ -1098,11 +1131,18 @@ class Mind:
         self.menu = None
         if self.cfg.get("menu"):
             self.menu = menu.Menu(b, self.names, self.me, self.day_seconds, events=evs,
-                                  rank=bool(self.cfg.get("menu_rank")))
+                                  rank=bool(self.cfg.get("menu_rank")),
+                                  lists=await self._log_windows(evs) if self.cfg.get("menu_lists") else None)
             card = self.menu.render()
             if self.cfg.get("menu_preopen"):
                 for label, opens in self.menu.preopen():
                     card += f"\nOpened for you, {label}:\n" + (await self._menu_run(opens))[:3000]
+                # the seat's own notebook too: with the world's blocks opened, seats read it half as often and said
+                # they had never heard of people it names (notebook-facts, 22/30 to 11/30)
+                hits = list(dict.fromkeys(h for w in sorted(self.menu.asked)
+                                          for h in self.shelves["seat"].search(w, 4)))[:8]
+                if hits:
+                    card += "\nOpened for you, your notebook's lines with the words said to you:\n" + "\n".join(hits)
         else:
             card = scene.card(b, self.names, self.me, self.day_seconds, events=evs)
         agenda = self.agenda()
