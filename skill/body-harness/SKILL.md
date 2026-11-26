@@ -1,6 +1,6 @@
 ---
 name: body-harness
-description: Running body-harness from the outside - for an agent (Claude Code or any other) that sets up, runs and looks after NPC seats in embody worlds for a person. Use when joining a seat, starting or keeping seats running, changing a seat's model or settings, reading what a seat did or spent, rolling a new harness feature out to running seats, setting spend caps, or working out why an NPC misbehaved. Not for playing a character yourself (the seat's own model does that, with the skills inside the harness), and not for changing the harness code.
+description: Running body-harness from the outside - for an agent (Claude Code or any other) that sets up, runs and looks after NPC seats in embody worlds for a person. Use when installing bh, joining a seat, starting or keeping seats running, changing a seat's model or settings, reading what a seat did or spent, setting up the body-telemetry dashboard, rolling a new harness feature out to running seats, setting spend caps, or working out why an NPC misbehaved. Not for playing a character yourself (the seat's own model does that, with the skills inside the harness), and not for changing the harness code.
 ---
 
 # Running body-harness
@@ -9,6 +9,45 @@ body-harness (`bh`) gives one body in an embody world a mind: a model that wakes
 short scene, acts through the world's ops and sleeps again. You are the operator. The seat's model plays the
 character; you set seats up, keep them running, choose their models and settings, read what they did and what it
 cost, and pass on what the person wants. The world holds the truth about the story; the harness holds the seat.
+
+## The family
+
+| repo | what | for you |
+|---|---|---|
+| [embody](https://github.com/newsbubbles/embody) | the world engine: places, people, rules, history | where seats live; a person who owns a world makes the invites |
+| [body-harness](https://github.com/newsbubbles/body-harness) | this harness, the `bh` command | what you run |
+| [body-telemetry](https://github.com/newsbubbles/body-telemetry) | a server and dashboard for what seats do | what the person watches (see Telemetry below) |
+
+## Getting started
+
+```
+uv tool install git+https://github.com/newsbubbles/body-harness
+bh join <invite link> --name <short name> --model openrouter:deepseek/deepseek-v4-flash
+bh service add <short name>
+bh service run                  # or: bh service install (Windows, starts at logon)
+```
+
+Ask the person for the invite link (or whether they own a world), which model, and where the provider key is. The
+key goes in the environment or a `.env` file listed in `env_files`; never print it. The link opens once.
+
+## Telemetry: ask once
+
+When you set up seats for a person, ask them once whether they want the body-telemetry dashboard: an open source
+server they run themselves (on this machine by default) that shows what every seat is doing, from spend and context
+size to tool use, refusals, how turns end and eval scores, sliced by world, seat, model or settings, on desktop or
+phone. Nothing is sent anywhere but the server they start, and by default only counts, never speech. If they say
+yes:
+
+```
+pip install git+https://github.com/newsbubbles/body-telemetry
+body-telemetry serve            # http://127.0.0.1:8899/, this machine only
+body-telemetry import ~/.body-harness
+```
+
+Then add `"telemetry": {"url": "http://127.0.0.1:8899"}` to `$BH_HOME/config.json` and restart the seats. You can
+read the same numbers yourself from the server's query API, so the dashboard is the person's and the API is yours;
+the body-telemetry README has both. [references/numbers.md](references/numbers.md) says what each detail level
+sends.
 
 ## What stays out of your hands
 

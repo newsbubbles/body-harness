@@ -189,6 +189,13 @@ memories, the line out to the owner and to you, apps and the sandbox, skills, an
 
 These are comparisons of where things live, not claims about what the other projects could be extended to do.
 
+## The family
+
+- [embody](https://github.com/newsbubbles/embody): the world engine. Worlds, their rules and their history live there.
+- body-harness (this repo): a mind for one body in an embody world.
+- [body-telemetry](https://github.com/newsbubbles/body-telemetry): a server and dashboard you run yourself, for what
+  every seat spends and does, sliced any way. Seats report to it when their config names it ([telemetry](docs/telemetry.md)).
+
 ## More
 
 - [The story and the numbers](https://newsbubbles.github.io/body-harness/): how body-harness was built in one day and
