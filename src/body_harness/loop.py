@@ -495,19 +495,14 @@ class Mind:
         if ok and name == "say":
             self.st["said"] = (self.st.get("said", []) + [[time.time(), str(fixed.get("to") or ""),
                                                            str(fixed.get("text", ""))]])[-8:]
-            to = str(fixed.get("to") or "").lower()
-            if to:
-                # Ssareth asked Wick where Pepe Papa was five turns running and never heard a word back
-                asked = self.st.setdefault("unanswered", {})
-                asked[to] = asked.get(to, 0) + 1
-                self.st.setdefault("quiet_names", {})[to] = str(fixed["to"])
-                if asked[to] >= int(self.cfg.get("unanswered", 3)):
-                    # the log line is a record of the note this say got back, after the mind's Nth line
-                    turn.setdefault("nudges", []).append(f"unanswered: told after line {asked[to]} to {fixed['to']}")
-                    # no "mind" here: seats copied "X has no mind" into notes, and from notes it can reach speech
-                    notes.append(f"{fixed['to']} has not answered your last {asked[to]} lines to them. Some people "
-                                 f"keep to themselves and may not answer: ask someone else, look for another way, "
-                                 f"or wait until they speak to you")
+            n = self._count_unanswered(str(fixed.get("to") or ""), turn)
+            if n >= int(self.cfg.get("unanswered", 3)):
+                # the log line is a record of the note this say got back, after the mind's Nth turn of lines
+                turn.setdefault("nudges", []).append(f"unanswered: told after turn {n} to {fixed['to']}")
+                # no "mind" here: seats copied "X has no mind" into notes, and from notes it can reach speech
+                notes.append(f"{fixed['to']} has not answered you over your last {n} turns of speaking to them. "
+                             f"Some people keep to themselves and may not answer: ask someone else, look for another "
+                             f"way, or wait until they speak to you")
         if name in self.registry.world:
             self.load_tools([name])
         if isinstance(r, dict) and isinstance(r.get("more"), dict) and r["more"].get("handle") \
@@ -673,6 +668,10 @@ class Mind:
                 return compact({"refused": w.get("reason"), "hint": w.get("hint"),
                                 "fix": "write the condition again (skill('waiting') has the grammar), then sleep"})
         elif isinstance(w, dict) and w.get("fired"):
+            # what came while it decided is heard now: a reply here was shown to the model but never cleared its
+            # speaker from the unanswered list, so the next line to them said they had not answered (Taan and Sefa,
+            # Ruhl and Tobin, Marr and Ossa: 7 pairs in 45 minutes, Glass Reach, 26 Nov)
+            self._keep_heard(w.get("events") or [])
             if forced and w.get("already"):
                 # the old watch is true now (a time that has passed): keeping it would wake the seat at once, every
                 # time; listen for words until the model sets a new one
@@ -797,6 +796,8 @@ class Mind:
         if trigger == "timeout":
             chosen = live[0][0]  # the minutes passing needs no judge
         else:
+            # heard even when a rule answers and the mind sleeps on: the reply clears its speaker's unanswered count
+            self._keep_heard(events)
             lines = scene.event_lines(events, self.me, self.names, 12)
             if not lines:
                 return False
@@ -934,6 +935,22 @@ class Mind:
         if op == "say" and "gesture" in gone and args.get("gesture"):
             out["text"] = f"*{str(args['gesture']).strip('* ')}* {out.get('text', '')}".strip()
         return out
+
+    def _count_unanswered(self, to: str, turn: dict[str, Any]) -> int:
+        """One more turn of lines to `to` with no word back; returns the count. Counted once a turn, not once a line:
+        three lines in a row inside one turn said "has not answered your last 3 lines" before anyone could answer
+        (Glass Reach, 26 Nov). A line from them anywhere (_keep_heard) sets it back to nothing."""
+        key = to.lower()
+        if not key:
+            return 0
+        # Ssareth asked Wick where Pepe Papa was five turns running and never heard a word back
+        asked = self.st.setdefault("unanswered", {})
+        self.st.setdefault("quiet_names", {})[key] = to
+        counted = turn.setdefault("spoke_to", [])
+        if key not in counted:
+            counted.append(key)
+            asked[key] = asked.get(key, 0) + 1
+        return asked.get(key, 0)
 
     def _keep_heard(self, events: list[dict[str, Any]]) -> None:
         keep = self.st.get("heard") or []

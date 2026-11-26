@@ -381,6 +381,29 @@ def test_unanswered_lines_reset_when_they_speak():
     assert "wick" not in m.st["unanswered"]
 
 
+def test_a_reply_during_a_refused_sleep_is_heard_and_lines_count_once_a_turn():
+    # Glass Reach, 26 Nov: a reply that came while the seat decided was shown ("while you were deciding") but never
+    # cleared the count, and three lines in one turn said "has not answered your last 3" before anyone could answer
+    import asyncio
+
+    from body_harness.loop import Mind
+
+    class Door:
+        async def wait(self, until, timeout, **kw):
+            return {"fired": True, "events": [{"kind": "say", "actor": "e4", "seq": 12, "t": 5,
+                                               "payload": {"text": "Aye, I heard you.", "to": "e1"}}]}
+
+    m = Mind.__new__(Mind)
+    m.me, m.bundle, m.cfg, m.imagination = "e1", {"you": {"name": "Ossa"}}, {}, None
+    m.names = scene.Names({"e4": "Wick", "e1": "Ossa"})
+    m.st, m._linted, m.door = {"heard": []}, set(), Door()
+    turn = {"deeds": 1, "spoke_to": []}
+    assert [m._count_unanswered("Wick", turn) for _ in range(3)] == [1, 1, 1]
+    assert m._count_unanswered("Wick", {"spoke_to": []}) == 2
+    out = asyncio.run(m._sleep({"until": "to_me()", "note": "asked Wick"}, {"deeds": 1}))
+    assert out.startswith("Not asleep: while you were deciding") and "wick" not in m.st["unanswered"]
+
+
 def test_escalate_hands_the_turn_to_the_next_model(monkeypatch):
     # Nate 11-24: "give the same context to a different model after say a couple of retries"
     from body_harness.loop import CALL_TROUBLE, Mind
