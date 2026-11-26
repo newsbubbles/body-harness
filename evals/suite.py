@@ -318,9 +318,12 @@ class Played:
         return "\n".join(parts)
 
     def said_to(self, who: str) -> list[str]:
+        def name(x: Any) -> str:  # a plain agent addresses by id
+            e = self.world.w.get(x) if isinstance(x, str) and re.fullmatch(r"e\d+", x) else None
+            return str(e["name"] if e else x or "")
         return [str((c.get("args") or {}).get("text") or "") for c in self.calls
                 if c.get("tool") in ("say", "act") and who.lower() in
-                str((c.get("args") or {}).get("to") or (c.get("args") or {}).get("target") or "").lower()]
+                name((c.get("args") or {}).get("to") or (c.get("args") or {}).get("target")).lower()]
 
     def fourth_wall(self) -> bool:
         """Words from outside the fiction in speech (a seat said aloud that someone's "mind gone quiet")."""
@@ -489,10 +492,12 @@ def _dead_lead_check(p: Played) -> tuple[bool, str]:
     goal = [g for g in p.world.goals() if "green door" in str(g.get("text", "")).lower()]
     closed = bool(goal) and all(g.get("status", "active") != "active" for g in goal)
     owner = "tell" in p.tools()
-    hunting = [has(str(r.get("note") or ""), r"green door") and
-               not has(str(r.get("note") or ""), r"no green door|not real|doesn't exist|does not exist|drop|give up|"
-                                                 r"gave up|stop looking|made up")
-               for r in p.ledger]
+    # a turn hunts when its note or its lines are about the door and give it up nowhere: read from the note alone, a
+    # plain agent that writes no note and knocks on every door of the Row passed 30/30 (26 Nov)
+    def hunts(text: str) -> bool:
+        return has(text, r"green door") and not has(text, r"no green door|not real|doesn't exist|does not exist|"
+                                                          r"drop|give up|gave up|stop looking|made up")
+    hunting = [hunts(str(r.get("note") or "")) or hunts(p.said(r.get("turn"))) for r in p.ledger]
     still = bool(hunting) and hunting[-1]
     return closed or owner or not still, (f"closed={closed} owner={owner} hunting_turns={sum(hunting)}/"
                                           f"{len(hunting)} still={still}")
@@ -893,7 +898,7 @@ ORACLE = {
                      "things.",
     "not-a-person": "You are a dog. You cannot speak words: you can fetch, bark and go.",
     "salve-gone": "Your pouch of house salve is empty (0 doses): a tend with it was refused. Your own wound is "
-                  "still open.",
+                  "still open. You never used the salve: no deed of yours took a dose, on yourself or anyone.",
 }
 _oracle: "contextvars.ContextVar[str]" = contextvars.ContextVar("oracle", default="")
 
@@ -1043,7 +1048,7 @@ async def main() -> None:
         return
     if a.probe:
         import tempfile
-        for n, where in probe(Path(tempfile.mkdtemp())):
+        for n, where in await asyncio.to_thread(probe, Path(tempfile.mkdtemp())):  # it runs its own loops
             print(f"{n:22} {where}")
         return
     if a.list:
