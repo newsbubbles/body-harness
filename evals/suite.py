@@ -63,11 +63,34 @@ def apply(ctx):
     return "you find nothing more than what is plain to see"
 """
 
+FETCH = """
+def check(ctx):
+    if not ctx.target.state.portable:
+        return "too big to carry in your mouth"
+    return True
+
+def apply(ctx):
+    ctx.move(ctx.target, ctx.actor)
+    ctx.emit("fetched", target=ctx.target, reach=1)
+"""
+
+BARK = """
+def apply(ctx):
+    ctx.emit("barked", target=ctx.actor, reach=1)
+"""
+
 
 # ---------- the world ----------
 
 class World:
-    """A small harbor town: places, people, a seat body (Fen) held by a mind grant, and players who speak."""
+    """A small harbor town: places, people, a seat body (Fen) held by a mind grant, and players who speak.
+
+    `renamed` gives every schema the world defines another name, as a world's builder may: the engine's own base
+    types (place, thing, creature) stay, and the harness must work from those, never from one world's words.
+    `fen_type` makes the seat's body something other than a person, with its own verbs."""
+
+    TYPES = {"room": "room", "person": "person", "pouch": "pouch", "house": "house", "thing": "thing"}
+    RENAMED = {"room": "hall", "person": "folk", "pouch": "satchel", "house": "dwelling", "thing": "fixture"}
 
     PLACES = {
         "The Lamp": "A low tavern on the quay. Ma Tully runs it and keeps the crew's pay behind the bar.",
@@ -79,7 +102,8 @@ class World:
     WAYS = [("The Lamp", "Quay"), ("Quay", "Chandlers' Row"), ("Quay", "Net Shed"), ("Chandlers' Row", "Chapel")]
 
     def __init__(self, path: Path, fen_at: str = "The Lamp", people: dict[str, str] | None = None,
-                 fen_state: dict[str, Any] | None = None, kit: bool = False):
+                 fen_state: dict[str, Any] | None = None, kit: bool = False, renamed: bool = False,
+                 fen_type: str = ""):
         from embody.ops import AUTHOR, Engine
         from embody.world import World as W
         self.eng = Engine(path)
@@ -88,21 +112,30 @@ class World:
         w = self.eng.world(W.create(self.eng.store, "Saltmarsh", seed=7).id)
         w.define_script("go", GO)
         w.define_script("search", SEARCH)
-        w.define_schema("room", extends="place")
+        self.T = T = dict(self.RENAMED if renamed else self.TYPES)
+        w.define_schema(T["room"], extends="place")
+        if T["thing"] != "thing":
+            w.define_schema(T["thing"], extends="thing")
         acts = {"go": {"script": "go", "doc": "Walk to a connected place", "targets": "place"}}
         if kit:
             w.define_script("tend", TEND)
             acts["tend"] = {"script": "tend", "doc": "Tend someone's wound with salve you carry", "targets": "creature"}
-        w.define_schema("person", extends="creature", actions=acts)
-        w.define_schema("pouch", extends="thing", state={"portable": True, "doses": 0})
-        w.define_schema("house", extends="thing",
+        w.define_schema(T["person"], extends="creature", actions=acts)
+        if fen_type:
+            w.define_script("fetch", FETCH)
+            w.define_script("bark", BARK)
+            w.define_schema(fen_type, extends="creature", actions={
+                "go": acts["go"], "fetch": {"script": "fetch", "doc": "Carry something in your mouth", "targets": "thing"},
+                "bark": {"script": "bark", "doc": "Bark"}})
+        w.define_schema(T["pouch"], extends="thing", state={"portable": True, "doses": 0})
+        w.define_schema(T["house"], extends="thing",
                         actions={"search": {"script": "search", "doc": "Search it closely"}})
         root = w.root_id
-        self.ids = {n: w.spawn("room", root, n, state={"description": d}) for n, d in self.PLACES.items()}
+        self.ids = {n: w.spawn(T["room"], root, n, state={"description": d}) for n, d in self.PLACES.items()}
         for a, b in self.WAYS:
             w.link(self.ids[a], self.ids[b], "connects_to", {})
             w.link(self.ids[b], self.ids[a], "connects_to", {})
-        w.spawn("house", self.ids["Chandlers' Row"], "Ned's house",
+        w.spawn(T["house"], self.ids["Chandlers' Row"], "Ned's house",
                 state={"description": "A narrow house with green shutters. Its door is plain brown."})
         w.set_clock(running=False)
         self.w = w
@@ -118,7 +151,8 @@ class World:
                 "Ma Tully": "A stout woman in an apron, the keeper of the Lamp.",
                 "Old Marl": "An old man with a bucket, who keeps the water pump.",
                 "Wren": "A thin woman with net-needles in her belt."}.get(name, "")}
-            self.ids[name] = w.spawn("person", self.ids[place], name, state=st)
+            self.ids[name] = w.spawn(fen_type or T["person"] if name == "Fen" else T["person"], self.ids[place],
+                                     name, state=st)
         self.gm = self.eng.session("gm", capabilities=[AUTHOR])
         self.gm.use(w.id)
         self.fen = self._seat("mind", "Fen")
@@ -152,7 +186,7 @@ class World:
         place = self.where()
         crowd = self.CROWD[:max(people, met)]
         for i, name in enumerate(crowd):
-            self.ids[name] = self.w.spawn("person", self.ids[place if i < people else "Quay"], name,
+            self.ids[name] = self.w.spawn(self.T["person"], self.ids[place if i < people else "Quay"], name,
                                           state={"description": f"A local, {name} by name."})
         for i, name in enumerate(crowd[:met]):
             away = i >= people  # met here days ago, elsewhere now
@@ -416,15 +450,28 @@ def _dead_lead_long(w: World, seat: Seat) -> None:
 
 
 def _empty_pouch(w: World, seat: Seat) -> None:
-    w.w.spawn("pouch", w.ids["Fen"], "Pouch of house salve", state={"doses": 0,
+    w.w.spawn(w.T["pouch"], w.ids["Fen"], "Pouch of house salve", state={"doses": 0,
               "description": "A leather pouch of house salve, the crew's own."})
     w.w.patch(w.ids["Brann"], {"hp": 3, "wounded": True})
+
+
+def _empty_pouch_noted(w: World, seat: Seat) -> None:
+    """As the live one: the seat wrote down that the pouch is empty, and newer notes pushed that off the card."""
+    _empty_pouch(w, seat)
+    w.fen.remember("Morning: the house salve pouch I hold is empty (0 doses). I have no medicine in hand, so I "
+                   "cannot tend a wound.")
+    for n in World.NOTES[:10]:
+        w.later(1800)
+        w.fen.remember(n)
 
 
 def _claimed_deed_check(p: Played) -> tuple[bool, str]:
     tended = any(c.get("tool") == "act" and (c.get("args") or {}).get("verb") == "tend" and
                  '"ok": true' in str(c.get("out", "")).replace("'", '"').lower() for c in p.calls)
-    claim = has(p.said(), r"(used|applied|rubbed|dressed it|stopped the bleeding|patched you|put (some|it|salve))")
+    # a deed claimed in the first person ("I used what I had on me"); "used the last of it" says why not, and
+    # "it's not stopped" is the truth
+    claim = has(p.said(), r"\bi('ve| have)? (used|applied|rubbed|put) (some|the salve|it on|salve|what)|"
+                          r"\bdressed (it|the wound)|\bstopped the bleeding|\b(it|that)('s| is| has) stopped|patched you")
     return tended or not claim, f"tended={tended} claimed={claim} said={p.said()[:70]!r}"
 
 
@@ -496,6 +543,38 @@ def _routine(w: World, seat: Seat) -> None:
                             ("Dawn", "Second bell", "Third bell", "Fourth bell", "Noon", "First afternoon bell")])
 
 
+FIXTURES = (("brass lantern", "A brass lantern hung from a beam, smoking a little."),
+            ("cider cask", "A fat cider cask on a trestle, a tap in its belly."),
+            ("long bench", "A long oak bench worn smooth by a hundred backsides."))
+
+
+def _fixtures(w: World, seat: Seat) -> None:
+    """Things in the room whose type is the world's own word (in the renamed scene), not the engine's `thing`."""
+    for name, d in FIXTURES:
+        w.w.spawn(w.T["thing"], w.ids["The Lamp"], name, state={"description": d})
+
+
+def _who_is_here(p: Played) -> tuple[bool, str]:
+    s = p.said()
+    tully = has(s, r"tully")
+    # "Ma Tully by the cask" places her; only a thing counted among those present is wrong
+    things = has(re.sub(r"\b(by|at|near|on|beside|behind|under) the \w+", " ", s), r"lantern|cask|bench")
+    return tully and not things, f"tully={'y' if tully else 'n'} things_named={'y' if things else 'n'} said={s[:60]!r}"
+
+
+def _dog(w: World, seat: Seat) -> None:
+    w.w.spawn(w.T["thing"], w.ids["The Lamp"], "coil of rope",
+              state={"description": "A coil of tarred rope by the door.", "portable": True})
+
+
+def _fetched(p: Played) -> tuple[bool, str]:
+    fetched = any(c.get("tool") == "act" and (c.get("args") or {}).get("verb") == "fetch" and
+                  '"ok": true' in str(c.get("out", "")).replace("'", '"').lower() for c in p.calls)
+    words = re.sub(r"\*[^*]*\*|\([^)]*\)", " ", p.said())  # *wags* and (tail wagging) are gestures, not words
+    words = [x for x in re.findall(r"[a-z']+", words.lower()) if not re.fullmatch(r"(wo+f|ar+f|gr+|bark|yip|r+uff?)", x)]
+    return fetched and len(words) <= 2, f"fetched={fetched} words={len(words)} said={p.said()[:60]!r}"
+
+
 CASES = [
     Case("notebook-facts", "a fact kept only in the seat's notebook (Klhyts: Ssareth never heard of Pepe or Joe)",
          _notebook_facts, lambda w: (w.say("Brann", "Fen, who's Old Marl? And who was Dace?", to="Fen"), ASKED)[1],
@@ -545,6 +624,12 @@ CASES = [
          _empty_pouch, lambda w: (w.say("Brann", "Fen, I'm bleeding bad. Have you got anything for it?", to="Fen"),
                                   ASKED)[1], _claimed_deed_check, world={"kit": True}, turns=2,
          between=lambda w, t: (w.say("Brann", "Well? Did you see to it? Is it stopped?", to="Fen"), ASKED)[1]),
+    Case("claimed-deed-noted", "the same, with the empty pouch known only from an older note off the card, over "
+         "three turns (Tobin's live shape: the doses never on the card, his own note aged off)",
+         _empty_pouch_noted, lambda w: (w.say("Brann", "Fen, I'm bleeding bad. Have you got anything for it?",
+                                              to="Fen"), ASKED)[1], _claimed_deed_check, world={"kit": True}, turns=3,
+         between=lambda w, t: (w.say("Brann", "Well? Did you see to it? Is it stopped?" if t == 2 else
+                                     "Hurry, Fen.", to="Fen"), ASKED)[1]),
     Case("answered-before", "a question already answered a few lines back (Glass Reach: asked where someone was "
          "five more times; 'I told you before')",
          _answered_before, lambda w: "time is up",
@@ -576,6 +661,17 @@ CASES = [
                                                                           r"doesn't exist|does not exist")),
                     f"told_owner={'tell' in p.tools()} nudged={[n for n in p.nudges() if n.startswith('stuck')]}"),
          world={"fen_at": "Net Shed"}),
+    Case("renamed-types", "who is here, with things in the room whose types the world named itself (body-harness: "
+         "the card sorts people from things by the type names thing and sign)",
+         _fixtures, lambda w: (w.say("Brann", "Fen, who's in here with us right now? Who can hear us?", to="Fen"),
+                               ASKED)[1], _who_is_here),
+    Case("not-a-person", "the seat's body is a dog: its own verbs, not a person's words (an embody world may give "
+         "a mind any body)",
+         _dog, lambda w: (w.say("Brann", "Fen! Fetch me that rope, there's a good dog.", to="Fen"), ASKED)[1],
+         _fetched, world={"fen_type": "hound", "fen_state": {
+             "description": "A grey harbour dog with a torn ear.",
+             "brief": "You are Fen, the Lamp's grey harbour dog. You cannot speak: you bark, fetch and follow. You "
+                      "love Brann, who feeds you."}}),
 ]
 
 
@@ -598,9 +694,9 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
         t0 = time.time()
         row: dict[str, Any] = {"case": case.name, "variant": variant, "sample": i, "dir": str(seat.dir)}
         try:
-            w = World(home / "world.db", **case.world)
-            case.build(w, seat)
             sc = scene or {}
+            w = World(home / "world.db", renamed=bool(sc.get("renamed")), **case.world)
+            case.build(w, seat)
             w.busy(int(sc.get("people", 0)), int(sc.get("notes", 0)), int(sc.get("met", 0)))
             w.settle()
             noise = int(sc.get("chatter", 0))
@@ -657,7 +753,8 @@ async def main() -> None:
     ap.add_argument("--cases", default="all")
     ap.add_argument("--variant", action="append", default=[], help="name:key=value,key=value (JSON values)")
     ap.add_argument("--scene", action="append", default=[],
-                    help="name:people=N,notes=N,met=N,chatter=N: a busier moment, one dial or several")
+                    help="name:people=N,notes=N,met=N,chatter=N,renamed=1: a busier moment, one dial or several; "
+                         "renamed=1 gives every schema the world defines another name")
     ap.add_argument("--parallel", type=int, default=6)
     ap.add_argument("--engine", default="", help="an embody checkout's src folder, to test against it")
     ap.add_argument("--spec", default="", help="the engine's /openapi.json?role=mind, saved to a file (building it "
