@@ -85,6 +85,20 @@ def test_log_lists_number_each_event_and_put_what_the_line_names_first():
     assert not [l for l, _ in m.preopen() if "older talk" in l or "own deeds" in l]  # lists replace the blocks
 
 
+
+def test_log_lists_on_an_engine_with_history_filters_open_by_seq_and_count_the_whole_talk():
+    b = bundle()
+    talk = [{"seq": 40, "t": 900, "kind": "say", "actor": "e2", "target": "e1",
+             "payload": {"text": "Tide's late.", "to": "e1"}}]
+    m = menu.Menu(b, scene.Names(), "e1", lists={"v2": True, "with": "e2", "talk": talk, "talk_total": 25,
+                                                 "talk_full": False, "deeds": [], "deeds_full": False})
+    text = m.render()
+    assert "Talk with Brann, in your log since t=900 (the newest 1 of 25)" in text
+    n = next(i for i, w in enumerate(m.widgets, 1) if w.title.startswith("Talk with"))
+    assert m.resolve(f"{n}.1") == ("op", "history", {"seq": 40}, {"full": True})
+    assert m.widgets[n - 1].more[2] == {"kinds": ["say", "talked"], "until": 39, "newest": True, "between": "e2",
+                                        "limit": 30}
+
 def test_the_header_shows_the_bodys_own_state_by_its_own_keys():
     b = bundle()
     b["you"]["state"].update({"coin": 2, "brief": "secret", "wounded": True})

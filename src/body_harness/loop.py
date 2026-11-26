@@ -544,20 +544,38 @@ class Mind:
         log (a mind reads only its own body's). A window that came back full says the log goes further back."""
         me_name = self.my_name()
         speaker = next((e.get("actor") for e in evs if scene.to_me(e, self.me, me_name) and e.get("actor")), None)
-        out: dict[str, Any] = {}
 
-        async def read(args: dict[str, Any]) -> list[dict[str, Any]]:
+        async def read(op: str, args: dict[str, Any]) -> Any:
             try:
-                r = await self._op("history", args)
+                r = await self._op(op, args)
             except Exception:
-                return []
-            return [e for e in r if isinstance(e, dict)] if isinstance(r, list) else []
+                return None
+            return None if isinstance(r, dict) and r.get("ok") is False else r
+
+        # an engine with history's between/actor/seq and history_count filters in the world; an older one is read
+        # in a window and filtered here, and its cuts can only say that the log goes further back
+        if getattr(self, "_history_v2", None) is None:  # asked once a run: the engine may be upgraded between runs
+            self._history_v2 = await read("history_count", {"actor": self.me}) is not None
+        v2 = bool(self._history_v2)
+        out: dict[str, Any] = {"v2": v2}
+        talk_kinds = ["say", "talked"]
         if speaker:
-            talk = await read({"kinds": ["say", "talked"], "limit": 80, "newest": True})
-            out.update({"with": speaker, "talk_full": len(talk) >= 80,
-                        "talk": menu.Menu.pick(talk, {"with": speaker, "keep": 30})})
-        deeds = await read({"limit": 120, "newest": True})
-        out.update({"deeds_full": len(deeds) >= 120, "deeds": menu.Menu.pick(deeds, {"deeds_of": self.me, "keep": 30})})
+            if v2:
+                talk = await read("history", {"between": speaker, "kinds": talk_kinds, "limit": 30, "newest": True})
+                n = await read("history_count", {"between": speaker, "kinds": talk_kinds})
+                talk = [e for e in talk or [] if isinstance(e, dict)]
+                out.update({"with": speaker, "talk": talk, "talk_total": int((n or {}).get("total") or len(talk)),
+                            "talk_full": len(talk) >= 30})
+            else:
+                talk = [e for e in await read("history", {"kinds": talk_kinds, "limit": 80, "newest": True}) or []
+                        if isinstance(e, dict)]
+                out.update({"with": speaker, "talk_full": len(talk) >= 80,
+                            "talk": menu.Menu.pick(talk, {"with": speaker, "keep": 30})})
+        raw = await read("history", {"actor": self.me, "limit": 60, "newest": True} if v2 else
+                         {"limit": 120, "newest": True}) or []
+        raw = [e for e in raw if isinstance(e, dict)]
+        out.update({"deeds_full": len(raw) >= (60 if v2 else 120),
+                    "deeds": menu.Menu.pick(raw, {"deeds_of": self.me, "keep": 30})})
         return out
 
     async def _menu_run(self, got: tuple[Any, ...]) -> str:

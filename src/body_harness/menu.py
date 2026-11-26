@@ -357,7 +357,7 @@ class Menu:
         return f"[t={float(e.get('t') or 0):.0f}] " + (core if len(core) <= 140 else core[:137] + "...") + tag
 
     def _log_list(self, title: str, evs: list[dict[str, Any]], full: bool, shown: int,
-                  more: tuple[Any, ...] | None) -> Widget:
+                  more: tuple[Any, ...] | None, v2: bool = False, total: int = 0) -> Widget:
         """One list of log events: a short line each, those sharing words with what was just said first, then the
         newest. Each opens the event in full by its seq; the title says how far back the log was read."""
         said = loose(" ".join(str((e.get("payload") or {}).get("text", "")) for e in self.told))
@@ -367,32 +367,36 @@ class Menu:
         for e in evs:
             seq = int(e.get("seq") or 0)
             text = json.dumps(e.get("payload") or {}, default=str) + " " + self.names.name(e.get("target"))
-            items.append(Item(self._short(e), ("op", "history", {"since": seq - 1, "until": seq, "limit": 1},
-                                              {"full": True}),
+            one = {"seq": seq} if v2 else {"since": seq - 1, "until": seq, "limit": 1}
+            items.append(Item(self._short(e), ("op", "history", one, {"full": True}),
                               key={"newest": float(seq), "named": float(len(loose(text) & said))}))
         items.sort(key=lambda i: (-i.key["named"], -i.key["newest"]))
         since = f"since t={min(float(e.get('t') or 0) for e in evs):.0f}" if evs else "none"
-        head = (f"{title}, in your log {since}{' (it goes further back)' if full else ''}" if evs
-                else f"{title}, in your log")
+        back = f" (the newest {len(evs)} of {total})" if total > len(evs) else " (it goes further back)" if full else ""
+        head = f"{title}, in your log {since}{back}" if evs else f"{title}, in your log"
         return Widget(head, items, shown, ("newest", "named"), "named, then newest", more=more,
                       empty="none on record in your log" + (" this far back" if full else ""),
                       more_label="further back, from the log")
 
     def _log_lists(self) -> None:
         L = self.lists or {}
+        v2 = bool(L.get("v2"))
         mine = {e.get("seq") for e in self.told}
         if L.get("with"):
             evs = [e for e in L.get("talk") or [] if e.get("seq") not in mine]
             first = min([int(e.get("seq") or 0) for e in evs] or [0])
-            more = ("op", "history", {"until": first - 1, "kinds": ["say", "talked"], "limit": 80, "newest": True},
+            talk = {"kinds": ["say", "talked"], "until": first - 1, "newest": True}
+            more = ("op", "history", {**talk, "between": L["with"], "limit": 30} if v2 else {**talk, "limit": 80},
                     {"with": L["with"], "keep": 30}) if first > 1 else None
+            total = max(0, int(L.get("talk_total") or 0) - (len(L.get("talk") or []) - len(evs)))
             self.widgets.append(self._log_list(f"Talk with {self.names.name(L['with'])}", evs,
-                                               bool(L.get("talk_full")), 6, more))
+                                               bool(L.get("talk_full")), 6, more, v2, total))
         evs = L.get("deeds") or []
         first = min([int(e.get("seq") or 0) for e in evs] or [0])
-        more = ("op", "history", {"until": first - 1, "limit": 120, "newest": True},
+        window = {"actor": self.me, "limit": 60} if v2 else {"limit": 120}
+        more = ("op", "history", {**window, "until": first - 1, "newest": True},
                 {"deeds_of": self.me, "keep": 30}) if first > 1 else None
-        self.widgets.append(self._log_list("Your deeds", evs, bool(L.get("deeds_full")), 8, more))
+        self.widgets.append(self._log_list("Your deeds", evs, bool(L.get("deeds_full")), 8, more, v2))
 
     @staticmethod
     def pick(events: list[dict[str, Any]], how: dict[str, Any]) -> list[dict[str, Any]]:
