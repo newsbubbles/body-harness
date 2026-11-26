@@ -25,15 +25,17 @@ than an act's verb.
 ## Wire format
 
 `POST <url>/v1/events` with `{"events": [...]}`, at most 500 a batch, and `Authorization: Bearer <key>` when the
-environment variable named by `key_env` is set. A 2xx answer means the whole batch was taken; anything else, and the
-batch is posted again later.
+environment variable named by `key_env` is set. A 2xx answer means the whole batch was taken. A 4xx other than 401,
+403, 408 or 429 means the server will never take it: the events are posted one at a time and the refused ones are
+dropped. Anything else, and the batch is posted again later. Each event has a `uid`, so one posted twice is stored
+once.
 
 Every event carries these labels:
 
 | field | what |
 |---|---|
 | `ts` | Unix seconds |
-| `kind` | `seat`, `model_call`, `tool_call`, `turn`, `invented` |
+| `uid`, `kind` | a unique id; `seat`, `setup`, `model_call`, `tool_call`, `turn`, `tell`, `invented` |
 | `harness`, `version` | `body-harness` and its version |
 | `settings` | a 12-character hash of the seat's settings (telemetry, keys and the operator's own words left out) |
 | `switches` | the main settings as booleans: menu, menu_rank, menu_preopen, menu_lists, reflexes, imagine, past, think_tool, escalate |
@@ -44,10 +46,12 @@ And by kind:
 
 | kind | fields |
 |---|---|
-| `seat` | `event`: start (with `turns`, `model`), server away, capped |
-| `model_call` | `model`, `use` (turn or judge), `turn`, `step`, `rung` (escalations so far this turn), `rules` (judge), and the usage numbers: `calls`, `input_tokens`, `cached_tokens`, `cache_write_tokens`, `output_tokens`, `reasoning_tokens`, `cost`, `seconds` |
+| `seat` | `event`: start or restart (with `turns`, `model`), server away, capped, stop (`why`, `status`), error (the error's type) |
+| `setup` | `setup`: the seat's settings that are bools, numbers or model names (model, judge, escalate); never prompts, providers, files or anything named like a key or token |
+| `model_call` | `model`, `use` (turn or judge), `turn`, `step`, `rung` (escalations so far this turn), `rules` (judge), and the usage numbers: `calls`, `input_tokens`, `cached_tokens`, `cache_write_tokens`, `output_tokens`, `reasoning_tokens`, `cost`, `seconds`; on turn calls `ctx`, the characters of the context by part: system, tools, wake, history, tool_results |
 | `tool_call` | `turn`, `tool`, `layer` (verb, engine, menu, app, harness, invented), `verb` (for act), `ok`, `code`, `secs`, `out_chars`; `refusal` at lines or full |
-| `turn` | `turn`, `model`, `steps`, `tool_calls`, `deeds`, `says`, `reads`, `opens` (menu), `nudges`, `escalated` (models), `ended` (slept, out of steps, other), `wall`, the usage numbers; `reason` and `note` at lines or full |
+| `turn` | `turn`, `model`, `steps`, `tool_calls`, `deeds`, `says`, `reads`, `opens` (menu), `nudges`, `nudge_kinds` (the word before each nudge's colon, e.g. stuck, last_step), `escalated` (models), `ended` (slept, out of steps, other), `wall`, the usage numbers; `reason` and `note` at lines or full |
+| `tell` | `to` (operator or owner), `about` (its kind), `out_chars` |
 | `invented` | `model`, `tool` (the made-up name), `read_as` |
 
 A server should keep fields it does not know, so a newer harness never breaks an older server.

@@ -247,7 +247,9 @@ class Mind:
         await self.join()
         self.tele.labels.update(world=str(self.briefing.get("world") or ""), character=self.my_name(), role=self.role)
         self.tele.start(self.client)
-        self.tele.emit("seat", {"event": "start", "turns": self.turns, "model": self.model.spec})
+        self.tele.emit("seat", {"event": "restart" if self.turns else "start", "turns": self.turns,
+                                "model": self.model.spec})
+        self.tele.emit("setup", {"setup": telemetry.safe_setup(self.cfg)})
         try:
             o = await self.door.get("/op")
             self.ops = o.get("ops", [])
@@ -619,13 +621,17 @@ class Mind:
     async def _tell(self, a: dict[str, Any]) -> Any:
         what, why = str(a.get("what", "")).strip(), str(a.get("why", "") or "").strip()
         if a.get("to") == "operator":
+            self.tele.emit("tell", {"to": "operator", "about": str(a.get("kind") or "note")[:24],
+                                    "out_chars": len(what) + len(why)})
             self.seat.outbox(what + (f"\n{why}" if why else ""), a.get("kind") or "note")
             _log(self.seat.name, f"to operator: {what[:200]}")
             return {"ok": True, "sent": "to your operator"}
         kind = a.get("kind") or "other"
         if kind in ("flaw", "vulnerability"):
+            self.tele.emit("tell", {"to": "owner", "about": kind, "out_chars": len(what) + len(why)})
             return await self.door.op("report_flaw", what=what, how=why, severity=a.get("severity") or "medium")
         kind = {"feature": "capability"}.get(kind, kind)
+        self.tele.emit("tell", {"to": "owner", "about": str(kind)[:24], "out_chars": len(what) + len(why)})
         r = await self.door.op("ask_owner", kind=kind, what=what[:300], why=why[:1000], credit=a.get("credit"))
         return r
 
@@ -1281,8 +1287,10 @@ class Mind:
                 break
             tu.add(u)
             usage_append(self.seat.p("usage.jsonl"), self.seat.name, self.model.spec, u, reason[:80])
-            self.tele.emit("model_call", {"model": self.model.spec, "use": "turn", "turn": self.turns, "step": step,
-                                          "rung": len(turn.get("escalated") or []), **telemetry.usage(u)})
+            if self.tele.on:
+                self.tele.emit("model_call", {"model": self.model.spec, "use": "turn", "turn": self.turns,
+                                              "step": step, "rung": len(turn.get("escalated") or []),
+                                              "ctx": telemetry.context(messages, tools), **telemetry.usage(u)})
             calls = msg.get("tool_calls") or []
             text = (msg.get("content") or "").strip() if isinstance(msg.get("content"), str) else ""
             if not calls:
@@ -1408,7 +1416,7 @@ class Mind:
         self.tele.emit("turn", {
             "turn": self.turns, "model": self.base_model.spec, "steps": tu.calls, "tool_calls": len(tools_used),
             "deeds": turn["deeds"], "says": tools_used.count("say"), "reads": sum(t in READS for t in tools_used),
-            "opens": tools_used.count("menu"), "nudges": len(nudges), "escalated": turn.get("escalated") or [],
+            "opens": tools_used.count("menu"), "nudges": len(nudges), "nudge_kinds": telemetry.kinds(nudges), "escalated": turn.get("escalated") or [],
             "ended": "slept" if turn["slept"] else "out of steps" if turn.get("last_step") else "other",
             "wall": round(time.time() - t_turn, 2), **telemetry.usage(tu)}, {"reason": reason, "note": note})
         self.save()
@@ -1462,6 +1470,7 @@ class Mind:
                 if e.status in (401, 403):
                     self.seat.outbox(f"stopped: {e}", "error")
                     _log(self.seat.name, f"stopped: {e}")
+                    self.tele.emit("seat", {"event": "stop", "why": "grant refused", "status": e.status})
                     return
                 reason, events = self._away_reason(await self.ride_out(e)), []
             except asyncio.CancelledError:
@@ -1469,6 +1478,7 @@ class Mind:
             except Exception as e:  # keep the seat alive; say what broke
                 _log(self.seat.name, f"error: {e}\n{traceback.format_exc()}")
                 self.seat.outbox(f"harness error: {e}", "error")
+                self.tele.emit("seat", {"event": "error", "error": type(e).__name__})
                 await asyncio.sleep(60)
                 reason, events = "the harness recovered from an error; look before you act", []
 

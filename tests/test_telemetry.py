@@ -52,3 +52,40 @@ def test_flush_posts_batches_and_keeps_what_the_server_did_not_take(tmp_path):
     assert asyncio.run(go()) == telemetry.BATCH
     left = (tmp_path / "t.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(got[0]) == telemetry.BATCH and len(left) == 10 and json.loads(left[0])["i"] == telemetry.BATCH
+
+
+def test_setup_keeps_only_safe_settings_and_nudges_go_by_kind():
+    cfg = {"model": "p:m", "menu": True, "max_steps": 16, "extra_prompt": "words", "api_key_env": "X",
+           "providers": {"a": 1}, "escalate": ["p:n"], "default_until": "to_me()"}
+    assert telemetry.safe_setup(cfg) == {"model": "p:m", "menu": True, "max_steps": 16, "escalate": ["p:n"]}
+    assert telemetry.kinds(["stuck: 'salt road' in 5 notes", "last_step: step 16", "Brann waits"]) == [
+        "stuck", "last_step", "other"]
+
+
+def test_context_counts_each_part_of_a_call():
+    msgs = [{"role": "system", "content": "abc"}, {"role": "user", "content": "wake!"},
+            {"role": "assistant", "content": "", "tool_calls": []}, {"role": "tool", "content": "xy"}]
+    c = telemetry.context(msgs, [{"t": 1}])
+    assert (c["system"], c["wake"], c["tool_results"]) == (3, 5, 2) and c["tools"] > 0 and c["history"] == 2
+
+
+def test_a_batch_the_server_never_takes_is_sent_one_by_one_and_the_refused_dropped(tmp_path):
+    seen = []
+
+    def handler(req):
+        evs = json.loads(req.content)["events"]
+        if len(evs) > 1:
+            return httpx.Response(400)
+        seen.append(evs[0]["i"])
+        return httpx.Response(422 if evs[0]["i"] == 1 else 200)
+
+    s = telemetry.Sender(tmp_path / "t.jsonl", {"telemetry": {"url": "http://t"}})
+    for i in range(3):
+        s.emit("tool_call", {"i": i})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await s.flush(c)
+
+    asyncio.run(go())
+    assert seen == [0, 1, 2] and (tmp_path / "t.jsonl").read_text(encoding="utf-8") == ""

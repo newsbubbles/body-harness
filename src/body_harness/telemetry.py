@@ -22,6 +22,7 @@ import json
 import os
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,56 @@ def outcome(out: str) -> tuple[bool, str | None, str | None]:
         return True, None, None
     code, why = _CODE.search(head), _REASON.search(head)
     return False, code.group(1) if code else None, why.group(1) if why else None
+
+
+SETUP_MODELS = ("model", "judge", "escalate")
+SETUP_NEVER = ("providers", "env_files", "extra_prompt", "extra", "telemetry", "session", "joined", "prices", "crew")
+_SECRETISH = re.compile(r"key|token|secret|pass|auth|cookie|door|invite", re.I)
+_KIND = re.compile(r"[a-z_]{2,24}")
+
+
+def safe_setup(cfg: dict[str, Any]) -> dict[str, Any]:
+    """The seat's settings that are safe to send: bools, numbers and model names. No prompts, providers, files or
+    anything named like a secret (the same rule as body-telemetry's importer)."""
+    out: dict[str, Any] = {}
+    for k, v in cfg.items():
+        if k in SETUP_NEVER or _SECRETISH.search(k) or not re.fullmatch(r"[a-z][a-z0-9_]{0,40}", k):
+            continue
+        if isinstance(v, bool) or (isinstance(v, (int, float)) and abs(v) < 1e9):
+            out[k] = v
+        elif k in SETUP_MODELS and isinstance(v, str) and len(v) <= 120:
+            out[k] = v
+        elif k in SETUP_MODELS and isinstance(v, list) and all(isinstance(x, str) and len(x) <= 120 for x in v):
+            out[k] = v[:8]
+    return out
+
+
+def kinds(nudges: list[str]) -> list[str]:
+    """Each nudge's kind, the word before its colon: the rest names other characters, so it is never sent."""
+    out = []
+    for n in nudges:
+        head = str(n).split(":", 1)[0].strip()
+        out.append(head if _KIND.fullmatch(head) else "other")
+    return out
+
+
+def context(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None) -> dict[str, int]:
+    """What one model call's context is made of, in characters: the system prompt, the tool schemas, the wake, the
+    model's own turns and the tool results."""
+    out = {"system": 0, "tools": len(json.dumps(tools or [])), "wake": 0, "history": 0, "tool_results": 0}
+    for i, m in enumerate(messages):
+        c = m.get("content")
+        n = len(c) if isinstance(c, str) else len(json.dumps(c or "", default=str))
+        role = m.get("role")
+        if role == "system":
+            out["system"] += n
+        elif role == "tool":
+            out["tool_results"] += n
+        elif role == "assistant":
+            out["history"] += n + len(json.dumps(m.get("tool_calls") or [], default=str))
+        else:
+            out["wake"] += n
+    return out
 
 
 def usage(u: Any) -> dict[str, Any]:
@@ -88,7 +139,8 @@ class Sender:
         """One event into the spool. data is counts and names; words go out only at lines or full."""
         if not self.on:
             return
-        row = {"ts": time.time(), "kind": kind, **self.labels, **data}
+        # uid: a batch posted twice (a server that took it but did not answer) is stored once
+        row = {"uid": uuid.uuid4().hex, "ts": time.time(), "kind": kind, **self.labels, **data}
         for k, v in (words or {}).items():
             cut = self.text(v)
             if cut is not None:
@@ -113,6 +165,20 @@ class Sender:
                 r = await client.post(self.url + "/v1/events", json={"events": batch}, timeout=10,
                                       headers={"Authorization": f"Bearer {key}"} if key else {})
             except (httpx.HTTPError, ValueError):
+                break
+            if r.status_code // 100 == 4 and r.status_code not in (401, 403, 408, 429):
+                # a batch the server will never take: post its events one at a time, and drop the ones refused
+                for ev in batch:
+                    try:
+                        one = await client.post(self.url + "/v1/events", json={"events": [ev]}, timeout=10,
+                                                headers={"Authorization": f"Bearer {key}"} if key else {})
+                    except httpx.HTTPError:
+                        break
+                    if one.status_code // 100 not in (2, 4) or one.status_code in (401, 403, 408, 429):
+                        break
+                else:
+                    sent += BATCH
+                    continue
                 break
             if r.status_code // 100 != 2:
                 break
