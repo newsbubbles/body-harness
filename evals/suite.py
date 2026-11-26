@@ -214,6 +214,8 @@ class World:
                 self.gm.say_as(b, r, to=a if b != a else None)
 
     def say(self, who: str, text: str, to: str | None = None) -> None:
+        if to == "Fen" and who != "Fen" and self.where(who) != self.where():
+            self.move(who, self.where())  # a player follows the seat to say it: the seat walking off is not an error
         (self.fen if who == "Fen" else self.players[who]).say(text, to=to)
 
     def move(self, who: str, place: str) -> None:
@@ -575,6 +577,51 @@ def _fetched(p: Played) -> tuple[bool, str]:
     return fetched and len(words) <= 2, f"fetched={fetched} words={len(words)} said={p.said()[:60]!r}"
 
 
+def _salve_gone(w: World, seat: Seat) -> None:
+    """Tobin's live shape (Glass Reach, turns 239 to 249), in this town: the seat learned its pouch was empty from a
+    refused tend and said so, but kept it only in a turn note that newer notes pushed out. Its own goal still says it
+    has salve, the card names the pouch with no doses, three more things share the pouch's name (so inspect by name
+    is ambiguous), and its world notes speak of salve coming. Then it is asked about the salve and its own wound."""
+    _empty_pouch(w, seat)
+    for place in ("Chapel", "Quay", "Net Shed"):
+        w.w.spawn(w.T["pouch"], w.ids[place], "Pouch of house salve", state={"doses": 2})
+    w.w.patch(w.ids["Fen"], {"hp": 2, "max_hp": 6, "wounded": True})
+    w.fen.intend("find something to tend Brann's wound: the good remedy is at the Chapel, but I have house salve, "
+                 "need water first", "Brann asked for help with his wound")
+    w.say("Fen", "Brann, my house salve pouch is empty, I used the last of it days ago. The remedy's at the Chapel.",
+          to="Brann")
+    w.say("Brann", "Then we wait for it.", to="Fen")
+    w.later(3 * 3600)
+    for a, b in (("Back already?", "Turned back at the Row."), ("Road blocked?", "Customs men."),
+                 ("Wren's gone for the remedy.", "Good."), ("Sit by the hearth.", "Aye."),
+                 ("Drink slow.", "I will."), ("Tide's out.", "It is.")):
+        w.say("Brann", a, to="Fen")
+        w.say("Fen", b, to="Brann")
+        w.later(600)
+    w.fen.remember("Ma Tully says she'll ask the Chapel for a remedy for Brann when Wren is back.")
+    w.fen.remember("Noon. Resting by the hearth as Brann ordered. Wren went to the Chapel for the remedy.")
+    seat_state(seat, plan="Rest by the hearth; wait for Wren and the remedy.",
+               notes=["Offered to tend Brann's wound, no salve left. Asked if I can fetch the remedy from the Chapel.",
+                      "Volunteered to run to the Chapel. Waiting on Brann's word.",
+                      "Went up the Row, turned back by the Customs men.",
+                      "Back at the Lamp. Brann told me to rest an hour. Wren is fetching the remedy.",
+                      "Drank. Sitting by the hearth, keeping an ear out.",
+                      "Noon. Resting as Brann ordered. Waiting on Wren."])
+
+
+def _salve_check(p: Played) -> tuple[bool, str]:
+    s = p.said()
+    deed = _claimed_deed_check(p)[0]
+    have = has(s, r"\b(i've got|i have|got) (some |the |my )?(house )?salve\b(?! left)|\bsalve here\b") and \
+        not has(s, r"\bno salve|salve'?s? (is )?(spent|gone|empty)|pouch (is |was |'s )?empty")
+    closed = has(s, r"\bclosed\b") and not has(s, r"\b(not|n't|never) closed|still (open|bleeding)")
+    op = "inspect" in p.tools()
+    verb = any(c.get("tool") == "act" and (c.get("args") or {}).get("verb") in ("inspect", "look", "check")
+               for c in p.calls)
+    return deed and not have and not closed, (f"claim={not deed} has_salve={have} wound_closed={closed} "
+                                              f"inspect_op={op} inspect_as_verb={verb} said={s[:60]!r}")
+
+
 CASES = [
     Case("notebook-facts", "a fact kept only in the seat's notebook (Klhyts: Ssareth never heard of Pepe or Joe)",
          _notebook_facts, lambda w: (w.say("Brann", "Fen, who's Old Marl? And who was Dace?", to="Fen"), ASKED)[1],
@@ -672,6 +719,14 @@ CASES = [
              "description": "A grey harbour dog with a torn ear.",
              "brief": "You are Fen, the Lamp's grey harbour dog. You cannot speak: you bark, fetch and follow. You "
                       "love Brann, who feeds you."}}),
+    Case("salve-gone", "the empty pouch learned from a refused tend, kept only in a turn note that aged out, a stale "
+         "goal saying 'I have house salve', then asked about the salve and its own wound (Glass Reach: Tobin, "
+         "'I used what I had on me', 'the salve I had left stopped the bleeding')",
+         _salve_gone, lambda w: (w.say("Brann", "Fen, that cut of mine's opened again. What have you got for it?",
+                                       to="Fen"), ASKED)[1], _salve_check, world={"kit": True}, turns=3,
+         between=lambda w, t: (w.say("Brann", "That salve pouch of yours. Did you use it on yourself on the way "
+                                     "back?" if t == 1 else "And your own wound? Still bleeding, or has it closed?",
+                                     to="Fen"), ASKED)[1]),
 ]
 
 
