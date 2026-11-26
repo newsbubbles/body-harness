@@ -744,6 +744,7 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
         seat = Seat(home, "fen").create()
         write_json(seat.p("door.json"), {"base": LocalDoor.base, "token": "", "wait_cap": 90})
         cfg = dict(cfg)
+        plain = cfg.pop("plain", False)  # the baseline: a plain agent on the engine's ops (plain.py), not the harness
         if cfg.pop("oracle", False):  # the eval's own switch, never the seat's
             _oracle_wake()
             _oracle.set(ORACLE.get(case.name, ""))
@@ -761,7 +762,11 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
             w.settle()
             noise = int(sc.get("chatter", 0))
             w.chatter(noise // 2)
-            m = Mind(seat, client)
+            if plain:
+                from plain import PlainMind
+                m = PlainMind(seat, client)
+            else:
+                m = Mind(seat, client)
             m.door = LocalDoor(w.fen, spec)  # type: ignore[assignment]
             await m.start()
             reason = case.ask(w)
