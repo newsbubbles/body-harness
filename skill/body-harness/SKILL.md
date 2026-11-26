@@ -44,7 +44,10 @@ body-telemetry serve            # http://127.0.0.1:8899/, this machine only
 body-telemetry import ~/.body-harness
 ```
 
-Then add `"telemetry": {"url": "http://127.0.0.1:8899"}` to `$BH_HOME/config.json` and restart the seats. You can
+Then add `"telemetry": {"url": "http://127.0.0.1:8899"}` to `$BH_HOME/config.json` and restart the seats. When
+one server takes several homes whose seats share names, give each home its own label, or their seats merge into
+one: `body-telemetry import <home> --machine <label>` for the import, and `"machine": "<label>"` in that home's
+`telemetry` setting for live events. You can
 read the same numbers yourself from the server's query API, so the dashboard is the person's and the API is yours;
 the body-telemetry README has both. [references/numbers.md](references/numbers.md) says what each detail level
 sends.
