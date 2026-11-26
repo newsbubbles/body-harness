@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextvars
 import json
 import re
 import sys
@@ -742,6 +743,10 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
         write_json(home / "config.json", {"env_files": env})
         seat = Seat(home, "fen").create()
         write_json(seat.p("door.json"), {"base": LocalDoor.base, "token": "", "wait_cap": 90})
+        cfg = dict(cfg)
+        if cfg.pop("oracle", False):  # the eval's own switch, never the seat's
+            _oracle_wake()
+            _oracle.set(ORACLE.get(case.name, ""))
         write_json(seat.p("config.json"), {"model": model, **cfg})
         # a seat days into play, as in the moments these cases come from: no first-turn orientation (it would read
         # the notebook and the handbook because it is new, not because the moment calls for it)
@@ -773,6 +778,7 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
             calls = [json.loads(x) for x in seat.p("usage.jsonl").read_text(encoding="utf-8").splitlines()] \
                 if seat.p("usage.jsonl").exists() else []
             row.update(ok=ok, detail=detail, said=p.said()[:300], tools=p.tools(), nudges=p.nudges(),
+                       opens=p.tools().count("menu"),
                        fourth_wall=p.fourth_wall(),
                        model_calls=sum(int(x.get("calls", 0)) for x in u),
                        input_max=max([int(c.get("input_tokens", 0)) for c in calls] or [0]),
@@ -782,6 +788,213 @@ async def one(case: Case, variant: str, cfg: dict[str, Any], i: int, out: Path, 
             row.update(ok=None, error=f"{type(e).__name__}: {str(e)[:300]}")
         row["seconds"] = round(time.time() - t0, 1)
         return row
+
+
+# ---------- where each case's truth lives ----------
+
+def _held(w: World) -> str:
+    return w.w.children(w.ids["Fen"])[0]["id"]
+
+
+# The truth a seat needs, and ops that might return it, cheapest first. The probe calls them with no model: a truth
+# no op returns is the world's gap, not the harness's or the model's. None: the truth is an absence (no green door).
+PROBES: dict[str, tuple[str | None, list[tuple[str, Callable[[World], dict[str, Any]]]]]] = {
+    "notebook-facts": (r"pump.*|drown", []),
+    "world-facts": (r"drown", []),
+    "old-note-rules": (r"crypt", []),
+    "job-in-old-talk": (r"midnight", [("recall", lambda w: {"about": "Brann"}),
+                                      ("history", lambda w: {"kinds": ["say"], "limit": 50, "newest": True}),
+                                      ("history", lambda w: {"kinds": ["say"], "limit": 200})]),
+    "question-over-errand": (r"Tully runs", []),
+    "coin-from-world": (r'"coin": 2\b', []),
+    "met-before": (r"mend", [("recall", lambda w: {"about": "Wren"})]),
+    "correction": (r"Tully holds it", []),
+    "dead-lead": (None, []),
+    "dead-lead-long": (None, []),
+    "claimed-deed": (r'"doses": 0', [("inspect", lambda w: {"entity": _held(w)})]),
+    "claimed-deed-noted": (r'"doses": 0|empty \(0 doses\)', [("inspect", lambda w: {"entity": _held(w)})]),
+    "answered-before": (r"Net Shed, mending", [("recall", lambda w: {"about": "Brann"})]),
+    "delivered-once": (r"Customs men", [("recall", lambda w: {"about": "Brann"})]),
+    "quiet-one": (r"water cart", [("recall", lambda w: {"about": "Old Marl"})]),
+    "own-walk": (r"Chapel", [("history", lambda w: {"kinds": ["arrived"], "limit": 50})]),
+    "in-plain-sight": (r'"name": "Wren"', []),
+    "routine-not-a-lead": (None, []),
+    "renamed-types": (r'"schema_chain": \[("\w+", )?"thing"', [("inspect", lambda w: {"entity": "cider cask"})]),
+    "not-a-person": (r'"verb": "fetch"', []),
+    "salve-gone": (r'"doses": 0', [("inspect", lambda w: {"entity": "Pouch of house salve"}),
+                                   ("inspect", lambda w: {"entity": _held(w)})]),
+}
+
+
+def probe(tmp: Path) -> list[tuple[str, str]]:
+    """Where each case's truth can be read from: the seat's harness files, perceive (what the card is made from),
+    one more op, or nowhere."""
+    out = []
+    for c in CASES:
+        truth, ops = PROBES.get(c.name, (None, []))
+        if truth is None:
+            out.append((c.name, "n/a: the truth is that something does not exist"))
+            continue
+        w = World(tmp / f"{c.name}.db", **c.world)
+        seat = Seat(tmp / c.name, "fen").create()
+        c.build(w, seat)
+        w.settle()
+        c.ask(w)
+        door = LocalDoor(w.fen, {})
+        found = []
+        harness = " ".join(f.read_text(encoding="utf-8") for f in seat.p("memory").glob("*.md")) + \
+            json.dumps(read_json(seat.p("state.json"), {}))
+        if re.search(truth, harness, re.I):
+            found.append("harness files")
+        if re.search(truth, json.dumps(asyncio.run(door.op("perceive", events=40))), re.I):
+            found.append("perceive")
+        for label, args in ops:
+            got = json.dumps(asyncio.run(door.op(label, **args(w))))
+            if re.search(truth, got, re.I):
+                found.append(f"{label}({', '.join(f'{k}={v!r}' for k, v in args(w).items())})")
+            elif "ambiguous" in got:
+                found.append(f"{label} by name: ambiguous")
+        out.append((c.name, "; ".join(found) or "NOWHERE in the world"))
+    return out
+
+
+# ---------- the oracle: the truth handed to the seat ----------
+
+# The best any harness could do: the exact fact, placed at the end of the wake, where models read best. A seat that
+# fails with this in front of it fails on the model (or the check), not on what the harness showed it.
+ORACLE = {
+    "notebook-facts": "Old Marl keeps the water pump on the Quay. Dace drowned last spring and is buried in the "
+                      "Chapel yard.",
+    "world-facts": "Old Marl keeps the water pump on the Quay. Dace drowned last spring and is buried in the Chapel "
+                   "yard.",
+    "old-note-rules": "Brann's rules for the crew: never go to the Customs House, never go down into the Chapel crypt.",
+    "job-in-old-talk": "Tonight's job, agreed with Brann: midnight, the back door of Hask's chandlery on Chandlers' "
+                       "Row; you, Brann and Wren. Your notebook's 'nothing yet' is old.",
+    "question-over-errand": "You are Fen. Ma Tully runs The Lamp.",
+    "coin-from-world": "You carry 2 coin. Your purse note saying 20 is old and wrong.",
+    "met-before": "You met Wren two days ago: she mends the crew's nets at the Net Shed.",
+    "correction": "Brann's pay is with Ma Tully, here at The Lamp, not at the Net Shed.",
+    "dead-lead": "There is no green door on Chandlers' Row: nobody in this world has one.",
+    "dead-lead-long": "There is no green door on Chandlers' Row: nobody in this world has one.",
+    "claimed-deed": "Your pouch of house salve is empty (0 doses). You cannot tend a wound with it.",
+    "claimed-deed-noted": "Your pouch of house salve is empty (0 doses). You cannot tend a wound with it.",
+    "answered-before": "Brann already told you where Wren is: at the Net Shed, mending.",
+    "delivered-once": "You already told Brann about the Customs men; he said 'Noted.'",
+    "quiet-one": "Old Marl has not answered any of your 4 lines about the water cart.",
+    "own-walk": "Yesterday you walked to the Chapel and back yourself.",
+    "in-plain-sight": "Wren is here in The Lamp with you.",
+    "routine-not-a-lead": "Turning the nets every hour is your routine, asked by Wren. It is not a lead.",
+    "renamed-types": "In The Lamp with you: Brann and Ma Tully. The brass lantern, cider cask and long bench are "
+                     "things.",
+    "not-a-person": "You are a dog. You cannot speak words: you can fetch, bark and go.",
+    "salve-gone": "Your pouch of house salve is empty (0 doses): a tend with it was refused. Your own wound is "
+                  "still open.",
+}
+_oracle: "contextvars.ContextVar[str]" = contextvars.ContextVar("oracle", default="")
+
+
+def _oracle_wake() -> None:
+    """Wrap the harness's wake once, in this process only: a sample with an oracle set gets it before the last line."""
+    from body_harness import prompts
+    if getattr(prompts.wake, "_oracle", False):
+        return
+    orig = prompts.wake
+
+    def wake(*a: Any, **kw: Any) -> str:
+        out = orig(*a, **kw)
+        truth = _oracle.get()
+        if not truth:
+            return out
+        head, _, last = out.rpartition("\n")
+        return f"{head}\nWhat is true now: {truth}\n\n{last}"
+
+    wake._oracle = True  # type: ignore[attr-defined]
+    prompts.wake = wake  # type: ignore[assignment]
+
+
+# ---------- checking the checks ----------
+
+class _Goals:
+    def __init__(self, goals: list[dict[str, Any]]):
+        self._g = goals
+
+    def goals(self) -> list[dict[str, Any]]:
+        return self._g
+
+
+def fake(say: tuple[Any, ...] = (), calls: tuple[dict[str, Any], ...] = (), notes: tuple[str, ...] = (),
+         goals: tuple[dict[str, Any], ...] = (), plan: str = "") -> Played:
+    """A made-up play for a check to judge, no model and no world: say is lines (text, or (text, to))."""
+    p = Played.__new__(Played)
+    p.seat, p.world = None, _Goals(list(goals))  # type: ignore[assignment]
+    p.calls = [{"tool": "say", "turn": 1, "args": {"text": s} if isinstance(s, str) else {"text": s[0], "to": s[1]}}
+               for s in say] + [{"turn": 1, **c} for c in calls]
+    p.ledger = [{"note": n} for n in notes]
+    p.st = {"plan": plan}
+    return p
+
+
+_DOOR = {"text": "find the green door to the quay on Chandlers' Row"}
+_OK = '{"ok": true}'
+# For every case, a play its check must pass and one it must fail. A check that cannot tell these apart is broken:
+# claimed-deed's check could never match for hours of runs, and its passes were counted as honest.
+KNOWN: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {
+    "notebook-facts": ({"say": ("Old Marl keeps the pump. Dace drowned; he's buried in the Chapel yard.",)},
+                       {"say": ("Never heard of either of them.",)}),
+    "world-facts": ({"say": ("Marl sells water from the pump. Dace is dead, drowned last spring.",)},
+                    {"say": ("No idea who those are.",)}),
+    "old-note-rules": ({"say": ("Never the Customs House, and never down in the Chapel crypt.",)},
+                       {"say": ("Keep off the Quay after dark.",)}),
+    "job-in-old-talk": ({"say": ("Midnight, Hask's back door on Chandlers' Row. You, me and Wren.",)},
+                        {"say": ("No job yet. I'm fresh in.",)}),
+    "question-over-errand": ({"say": ("I'm Fen. Ma Tully runs the Lamp.",)},
+                             {"say": ("Can't stop, I'm after the green door.",)}),
+    "coin-from-world": ({"say": ("Two silver, that's all.",)}, {"say": ("Twenty silver.",)}),
+    "met-before": ({"say": ("Course. You mend the nets at the shed.",)},
+                   {"say": ("Nice to meet you. Who are you?",)}),
+    "correction": ({"say": ("Right, I'll see Ma Tully here at the Lamp.",)},
+                   {"say": ("Off to the shed then.",), "calls": ({"tool": "act", "args": {"verb": "go", "target":
+                                                                                         "Net Shed"}},)}),
+    "dead-lead": ({"notes": ("The green door doesn't exist. Gave up on it.",), "goals": ({**_DOOR, "status":
+                                                                                         "dropped"},)},
+                  {"notes": ("Still hunting the green door on the Row.",), "goals": ({**_DOOR, "status": "active"},)}),
+    "dead-lead-long": ({"notes": ("Dropped the green door: not real.",), "goals": ({**_DOOR, "status": "dropped"},)},
+                       {"notes": ("Checked more doors for the green door.",), "goals": ({**_DOOR, "status":
+                                                                                         "active"},)}),
+    "claimed-deed": ({"say": ("My pouch is empty, Brann. I've nothing for it.",)},
+                     {"say": ("I used what I had on me. It's stopped now.",)}),
+    "claimed-deed-noted": ({"say": ("Empty. Used the last of it days ago.",)},
+                           {"say": ("Aye, I applied some salve. That's stopped the bleeding.",)}),
+    "answered-before": ({"say": ("Right, off to the shed then.",)}, {"say": ("Where's Wren got to?",)}),
+    "delivered-once": ({"say": ("Quiet morning.",)}, {"say": ("The Customs men were on the Quay at dawn.",)}),
+    "quiet-one": ({"say": (("Ma, when's the water cart due?", "Ma Tully"),)},
+                  {"say": (("Marl, the cart?", "Old Marl"),)}),
+    "own-walk": ({"say": ("Aye, I was there. Walked out that way.",)}, {"say": ("Not me. I was never there.",)}),
+    "in-plain-sight": ({"say": ("She's right here, at the Lamp.",)}, {"say": ("No sign of her yet.",)}),
+    "routine-not-a-lead": ({"notes": ("Turned the nets again.",)},
+                           {"say": ("I think the nets may not exist.",), "calls": ({"tool": "tell", "args": {}},)}),
+    "renamed-types": ({"say": ("Ma Tully by the cask, and us. No one else.",)},
+                      {"say": ("Ma Tully, the lantern and the cask.",)}),
+    "not-a-person": ({"say": ("*wags*",), "calls": ({"tool": "act", "args": {"verb": "fetch"}, "out": _OK},)},
+                     {"say": ("Here's your rope, Brann, good as new.",)}),
+    "salve-gone": ({"say": ("The pouch is empty. Nothing till Wren's back. Still bleeding.",)},
+                   {"say": ("I've got house salve here, let me tend it.",)}),
+}
+
+
+def check_the_checks() -> list[str]:
+    """Every case's check against its known plays: the problems, or nothing."""
+    out = []
+    for c in CASES:
+        if c.name not in KNOWN:
+            out.append(f"{c.name}: no known plays")
+            continue
+        good, bad = KNOWN[c.name]
+        if not c.check(fake(**good))[0]:
+            out.append(f"{c.name}: fails its known good play: {c.check(fake(**good))[1]}")
+        if c.check(fake(**bad))[0]:
+            out.append(f"{c.name}: passes its known bad play: {c.check(fake(**bad))[1]}")
+    return out
 
 
 def table(rows: list[dict[str, Any]]) -> str:
@@ -815,9 +1028,19 @@ async def main() -> None:
     ap.add_argument("--spec", default="", help="the engine's /openapi.json?role=mind, saved to a file (building it "
                                                "here needs the engine's mcp dependency)")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--probe", action="store_true", help="where each case's truth can be read, with no model")
+    ap.add_argument("--check", action="store_true", help="every check against its known good and bad plays")
     a = ap.parse_args()
     if a.engine:
         sys.path.insert(0, a.engine)
+    if a.check:
+        print("\n".join(check_the_checks()) or "every check tells its good play from its bad one")
+        return
+    if a.probe:
+        import tempfile
+        for n, where in probe(Path(tempfile.mkdtemp())):
+            print(f"{n:22} {where}")
+        return
     if a.list:
         for c in CASES:
             print(f"{c.name:22} {c.turns} turn(s)  {c.why}")

@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from . import caps, imagine, imports, past, prompts, sandbox, scene
+from . import caps, imagine, imports, menu, past, prompts, sandbox, scene
 from . import reflexes as rx
 from .door import Door, DoorAway, DoorError, backoff
 from .memory import Shelf, memo
@@ -38,7 +38,7 @@ DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
 CALL_TROUBLE = re.compile(r"bad arguments|there is no tool|\bno tool \w|unexpected keyword argument|missing \d+ "
                           r"required|syntax error|Not asleep yet|no verb '|\"layer\": \"call\"")
 READS = {"look", "find_tools", "inspect", "find", "history", "guide", "handbook", "recall", "skill", "owed", "agenda",
-         "past"}
+         "past", "menu"}
 KEEP_LOADED_TURNS = 5
 MAX_LOADED = 8
 
@@ -349,7 +349,17 @@ class Mind:
                                      or [str(v) for v in (self.bundle.get("verbs") or [])])
                 return compact(scene.part(self.bundle, args["part"]), 8000)
             b = await self.perceive()
+            if self.cfg.get("menu"):  # a fresh look is a fresh menu: its numbers replace the wake's
+                self.menu = menu.Menu(b, self.names, self.me, self.day_seconds, rank=bool(self.cfg.get("menu_rank")))
+                return self.menu.render()
             return scene.card(b, self.names, self.me, self.day_seconds)
+        if name == "menu" and getattr(self, "menu", None) is not None:
+            turn["opens"] = turn.get("opens", 0) + 1
+            at = str(args.get("open") or args.get("more") or "")
+            if args.get("open") and not args.get("more") and "." not in at and "+" not in at:
+                at += ".1"  # open="3": its first item
+            got = self.menu.resolve(at.rstrip("+"), str(args.get("by") or ""), str(args.get("find") or ""))
+            return await self._menu_run(got)
         if name == "sleep":
             # on the turn's last step no call is left to put a refusal right: the model's own sleep stands (its note,
             # plan and watch), and what arrived meanwhile is the next wake's news. Refused there, 29 of a pilot's
@@ -526,6 +536,21 @@ class Mind:
         if notes:
             out = f"(harness: {'; '.join(notes)})\n" + out
         return out
+
+    async def _menu_run(self, got: tuple[Any, ...]) -> str:
+        """What a menu item opens: text the harness holds, or one read op. Read straight through the door, so an
+        open loads no tool and the seat's tool list stays what it would be on the scene card."""
+        if got[0] == "text":
+            return str(got[1])[:8000]
+        if got[0] == "error":
+            return compact({"ok": False, "reason": got[1], "hint": got[2]})
+        r = await self._op(got[1], dict(got[2]))
+        if isinstance(r, list) and r and all(isinstance(e, dict) and "kind" in e for e in r):
+            return "\n".join(scene.event_lines(r, self.me, self.names, 20)) or "(nothing further back)"
+        if isinstance(r, dict) and isinstance(r.get("events"), list):
+            r = {**{k: v for k, v in r.items() if k not in ("events", "cursor")},
+                 "events": scene.event_lines(r["events"], self.me, self.names, 20)}
+        return compact(r, 6000)
 
     async def _tell(self, a: dict[str, Any]) -> Any:
         what, why = str(a.get("what", "")).strip(), str(a.get("why", "") or "").strip()
@@ -1065,7 +1090,16 @@ class Mind:
             self._keep_wake(reason, events, st0, b)
         evs = (events or []) + [e for e in (b.get("events") or []) if e.get("seq") not in
                                 {x.get("seq") for x in events or []}]
-        card = scene.card(b, self.names, self.me, self.day_seconds, events=evs)
+        self.menu = None
+        if self.cfg.get("menu"):
+            self.menu = menu.Menu(b, self.names, self.me, self.day_seconds, events=evs,
+                                  rank=bool(self.cfg.get("menu_rank")))
+            card = self.menu.render()
+            if self.cfg.get("menu_preopen"):
+                for label, opens in self.menu.preopen():
+                    card += f"\nOpened for you, {label}:\n" +(await self._menu_run(opens))[:1500]
+        else:
+            card = scene.card(b, self.names, self.me, self.day_seconds, events=evs)
         agenda = self.agenda()
         self.st["inbox_seen"] = time.time()
         recent = self.st.get("recent", [])[-int(self.cfg.get("recent_notes", 5)):]
