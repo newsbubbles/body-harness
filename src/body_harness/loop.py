@@ -465,8 +465,10 @@ class Mind:
                 # Ssareth asked Wick where Pepe Papa was five turns running and never heard a word back
                 asked = self.st.setdefault("unanswered", {})
                 asked[to] = asked.get(to, 0) + 1
+                self.st.setdefault("quiet_names", {})[to] = str(fixed["to"])
                 if asked[to] >= int(self.cfg.get("unanswered", 3)):
-                    turn.setdefault("nudges", []).append(f"unanswered: {fixed['to']} ({asked[to]} lines)")
+                    # the log line is a record of the note this say got back, after the mind's Nth line
+                    turn.setdefault("nudges", []).append(f"unanswered: told after line {asked[to]} to {fixed['to']}")
                     # no "mind" here: seats copied "X has no mind" into notes, and from notes it can reach speech
                     notes.append(f"{fixed['to']} has not answered your last {asked[to]} lines to them. Some people "
                                  f"keep to themselves and may not answer: ask someone else, look for another way, "
@@ -1051,6 +1053,15 @@ class Mind:
             user += (f"\n\n(harness: you and {', '.join(long_talk)} have traded lines {chat[long_talk[0]]} turns in a "
                      "row with nothing done between. Unless this line changes something, answer in a few words or "
                      "not at all, and sleep on what would move things: a deed, someone arriving, the hour.)")
+        asked = self.st.get("unanswered") or {}
+        quiet = [(self.st.get("quiet_names") or {}).get(k, k) for k, v in asked.items()
+                 if v >= int(self.cfg.get("unanswered", 3))]
+        if quiet:
+            # before the next line, not after it: Joss re-asked Rhosyn Vael and Tarin Vale because he only learned
+            # they were quiet from what his say returned (Glass Reach, 26 Nov)
+            nudges.append(f"quiet: {', '.join(quiet[:4])}")
+            user += (f"\n\n(harness: quiet lately, your last lines to them went unanswered: {', '.join(quiet[:4])}. "
+                     "Do not ask them again; wait until they speak to you.)")
         need = int(self.cfg.get("stuck_notes", 5))
         known = {w for n in self.names.by_id.values() for w in re.findall(r"[a-z][a-z'-]{2,}", str(n).lower())}
         lead = stuck_on(self.st.get("notes") or [], known, need) if need else ""
