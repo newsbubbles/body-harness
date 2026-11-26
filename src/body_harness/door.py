@@ -1,6 +1,6 @@
 """The door into a hosted embody world: every op is POST <base>/op/<name> with the grant's bearer token.
 
-Plain HTTPS, not an MCP session, so a redeploy of the server costs one retry instead of a lost seat. The token stays
+Plain HTTPS, not an MCP session, so a redeploy of the server costs a short outage instead of a lost seat. The token stays
 in this object and in the seat's door file; it never reaches the model, the logs or the sandbox."""
 
 from __future__ import annotations
@@ -23,6 +23,22 @@ class DoorError(RuntimeError):
     def __init__(self, msg: str, status: int = 0):
         super().__init__(msg)
         self.status = status
+
+
+class DoorAway(DoorError):
+    """The server is not answering at all (restarting, redeploying, the network down). Not the call's fault and not
+    the model's to fix: the seat stops calling and rides it out (Mind.ride_out), then joins again."""
+
+
+def backoff(attempt: int, base: float = 1.0, cap: float = 60.0) -> float:
+    """Exponential backoff with jitter: base * 2^attempt, capped, then a random point in its upper half, so many
+    seats that lost the same server do not come back in step and hammer it as it starts."""
+    d = min(cap, base * 2 ** attempt)
+    return random.uniform(d / 2, d)
+
+
+# what counts as the server being away, as opposed to the server answering badly
+AWAY_STATUS = {502, 503, 504}
 
 
 _BEARER = re.compile(r"Bearer ([A-Za-z0-9_\-.~+/=]+)")
@@ -85,19 +101,28 @@ class Door:
             h["x-embody-principal"] = self.principal
         return h
 
-    async def op(self, _op: str, /, _http: float = 60.0, _retries: int = 6, **args: Any) -> Any:
+    async def op(self, _op: str, /, _http: float = 60.0, _retries: int = 4, **args: Any) -> Any:
         """Call one op. The op is positional-only so an op's own `name` argument passes through (find(name=)).
-        A refusal inside the world comes back as {ok: false, reason, hint, alternatives}; only the door failing raises. Network trouble and 5xx retry with backoff and jitter, so many seats never hammer a server
-        that is coming back up."""
+        A refusal inside the world comes back as {ok: false, reason, hint, alternatives}; only the door failing raises.
+
+        Failures come in tiers:
+        - the grant refused (401, 403): DoorError at once; nothing to retry.
+        - a bad call (400, 404, 422): the world's own refusal, returned.
+        - the server away (no connection, a timeout, 502, 503, 504, 429): a few quick retries with backoff and
+          jitter (about 15 s in all; 429 waits as long as Retry-After says), then DoorAway, so a turn stops calling a
+          server that is down instead of spending a model call on each failure.
+        - the server failing on this call (500 and other 5xx): one quick retry, then a refusal the model can read and
+          route around. A 500 is usually this call's shape meeting a server bug, which waiting does not fix (a
+          pilot's params sent as a string gave 24 of them, 25 Nov)."""
         args = {k: v for k, v in args.items() if v is not None}
-        delay = 2.0
-        last = ""
-        for _ in range(_retries):
+        last, fails = "", 0
+        for attempt in range(_retries):
+            wait = backoff(attempt, 1.0, 8.0)
             try:
                 r = await self.client.post(f"{self.base}/op/{_op}", json=args, headers=self._headers(),
                                            timeout=_http)
             except httpx.HTTPError as e:
-                last = f"{type(e).__name__}"
+                last = type(e).__name__
             else:
                 if r.status_code == 200:
                     return r.json()
@@ -109,13 +134,39 @@ class Door:
                         return r.json()
                     except ValueError:
                         return {"ok": False, "reason": f"{_op}: {r.status_code} {r.text[:300]}"}
-                last = f"{r.status_code}"
-            await asyncio.sleep(delay + random.uniform(0, delay))
-            delay = min(delay * 2, 60)
-        raise DoorError(f"{_op}: the server did not answer ({last})", 0)
+                last = str(r.status_code)
+                if r.status_code == 429:
+                    try:
+                        wait = max(wait, min(60.0, float(r.headers.get("retry-after") or 0)))
+                    except ValueError:
+                        pass
+                elif r.status_code >= 500 and r.status_code not in AWAY_STATUS:
+                    fails += 1
+                    if fails >= 2:
+                        return {"ok": False, "code": "server_error",
+                                "reason": f"{_op}: the server failed on this call ({r.status_code})",
+                                "hint": "the server's fault, not a refusal: check the arguments' shape (an object, "
+                                        "not a string of JSON), try another way, or go on without it"}
+            if attempt < _retries - 1:
+                await asyncio.sleep(wait)
+        raise DoorAway(f"{_op}: the server did not answer ({last})", 0)
+
+    async def alive(self) -> bool:
+        """Whether the server itself answers, for riding out an outage. A proxy's 502/503/504 while the app behind it
+        restarts is not the server."""
+        try:
+            r = await self.client.get(f"{self.base}/op", headers=self._headers(), timeout=15)
+            return r.status_code not in AWAY_STATUS
+        except httpx.HTTPError:
+            return False
 
     async def get(self, path: str) -> Any:
-        r = await self.client.get(f"{self.base}{path}", headers=self._headers(), timeout=30)
+        try:
+            r = await self.client.get(f"{self.base}{path}", headers=self._headers(), timeout=30)
+        except httpx.HTTPError as e:
+            raise DoorAway(f"GET {path}: the server did not answer ({type(e).__name__})") from e
+        if r.status_code in AWAY_STATUS:
+            raise DoorAway(f"GET {path}: the server did not answer ({r.status_code})", r.status_code)
         if r.status_code != 200:
             raise DoorError(f"GET {path}: {r.status_code}", r.status_code)
         return r.json()

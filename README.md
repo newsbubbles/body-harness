@@ -131,6 +131,12 @@ bh service install    # Windows: start the supervisor at logon and check on it e
 bh service status     # what runs, since when, how often it restarted
 ```
 
+A world's server restarting or redeploying needs neither: a seat rides it out in its own process. A failed call
+gets a few quick retries (about 15 seconds, with jitter); if the server is still away, the turn stops calling and the
+seat probes with backoff and jitter (2 seconds doubling to 5 minutes), joins again when it answers, and wakes with
+"the server was away for N minutes; look before you act". A server error on one call (a 500) comes back to the model
+as a refusal instead. Only a refused grant (401, 403) ends a seat.
+
 One process per seat, so one crash never takes another down. A seat that stops comes back after 5 seconds, then
 10, up to 5 minutes. A seat already run some other way is left alone, so it never runs twice. On Linux or macOS,
 start `bh service run` at login with a systemd user unit, a launchd agent or cron `@reboot`.

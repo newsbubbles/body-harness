@@ -24,7 +24,7 @@ import httpx
 
 from . import caps, imagine, imports, past, prompts, sandbox, scene
 from . import reflexes as rx
-from .door import Door, DoorError
+from .door import Door, DoorAway, DoorError, backoff
 from .memory import Shelf, memo
 from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
@@ -203,6 +203,41 @@ class Mind:
             b = await self.door.op("perceive", events=40)
         self._keep_bundle(b)
         return b
+
+    async def ride_out(self, why: Exception | str) -> float:
+        """Wait out a server that is away, in this process: probe with backoff and jitter (2 s doubling to 5
+        minutes, so thirty seats do not knock in step), then join again, since a restarted server may not hold the
+        seat. Returns the seconds it was away. No supervisor is needed for a restart or a redeploy; only a refused
+        grant (401/403) ends the seat."""
+        t0, attempt, said = time.time(), 0, False
+        _log(self.seat.name, f"server away ({why}); riding it out")
+        while not self.stop:
+            await asyncio.sleep(backoff(attempt, 2.0, float(self.cfg.get("away_cap", 300))))
+            attempt += 1
+            away = time.time() - t0
+            if away > 600 and not said:
+                said = True
+                self.seat.outbox(f"the server has been away {away / 60:.0f} min; still trying, nothing to do", "note")
+            if not await self.door.alive():
+                continue
+            try:
+                await self.join()
+            except DoorError as e:
+                if e.status in (401, 403):
+                    raise
+                _log(self.seat.name, f"server answers but join failed ({e}); trying again")
+                continue
+            away = time.time() - t0
+            _log(self.seat.name, f"server back after {away:.0f}s; joined again")
+            if said:
+                self.seat.outbox(f"the server is back after {away / 60:.0f} min", "note")
+            return away
+        return time.time() - t0
+
+    @staticmethod
+    def _away_reason(secs: float) -> str:
+        span = f"{secs / 60:.0f} minutes" if secs >= 90 else f"{secs:.0f} seconds"
+        return f"the server was away for {span} and you are back in your seat; look before you act"
 
     async def start(self) -> None:
         await self.join()
@@ -695,7 +730,6 @@ class Mind:
         last_look = time.time()
         inbox_seen = float(self.st.get("inbox_seen", time.time()))
         present = self._player_here()
-        lost_since = None
         while not self.stop:
             now = time.time()
             if self.seat.inbox_new(inbox_seen):
@@ -717,14 +751,10 @@ class Mind:
             step = min(self.door.wait_cap, piece, watch["deadline"] - now, (due_real - now) if due_real else 1e9)
             try:
                 w = await self.door.wait(until, max(5.0, step), present=present or None)
-                lost_since = None
             except DoorError as e:
                 if e.status in (401, 403):
                     raise
-                lost_since = lost_since or now
-                _log(self.seat.name, f"lost the door ({e}); trying again")
-                await asyncio.sleep(30)
-                continue
+                return self._away_reason(await self.ride_out(e)), []
             if isinstance(w, dict) and w.get("ok") is False:
                 reason = str(w.get("reason", ""))
                 if "join" in reason.lower() or "seat" in reason.lower() or "embod" in reason.lower():
@@ -1165,7 +1195,10 @@ class Mind:
                                    **({"hint": f"{name} takes {', '.join(sorted(takes)) or 'no arguments'}"}
                                       if takes is not None else {})})
                 except DoorError as e:
-                    if e.status in (401, 403):
+                    if e.status in (401, 403) or isinstance(e, DoorAway):
+                        # the server is away: no call this turn can work, and telling the model "try again" spent
+                        # a model call per failure. The run loop rides the outage out and wakes the seat after
+                        _log(self.seat.name, f"turn {self.turns} stopped at {name}: {e}")
                         raise
                     out = compact({"ok": False, "reason": f"the server did not answer: {e}; try again or sleep"})
                 except Exception as e:  # a fault in the harness, not the call: the turn goes on, and it is logged
@@ -1225,7 +1258,17 @@ class Mind:
         self.save()
 
     async def run(self) -> None:
-        await self.start()
+        while not self.stop:
+            try:
+                await self.start()
+                break
+            except DoorError as e:
+                if e.status in (401, 403):
+                    self.seat.outbox(f"stopped: {e}", "error")
+                    _log(self.seat.name, f"stopped: {e}")
+                    return
+                # a seat started while the server is down waits for it, here: no supervisor restart loop
+                await self.ride_out(e)
         _log(self.seat.name, f"joined as {(self.bundle.get('you') or {}).get('name')} ({self.role}) "
                              f"with {self.model.spec}")
         reason = ("you just took your seat in the world" if not self.turns else
@@ -1263,9 +1306,7 @@ class Mind:
                     self.seat.outbox(f"stopped: {e}", "error")
                     _log(self.seat.name, f"stopped: {e}")
                     return
-                _log(self.seat.name, f"door trouble: {e}; waiting a minute")
-                await asyncio.sleep(60)
-                reason, events = "the server was away for a while; look before you act", []
+                reason, events = self._away_reason(await self.ride_out(e)), []
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # keep the seat alive; say what broke

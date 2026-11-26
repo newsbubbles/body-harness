@@ -1007,3 +1007,67 @@ def test_the_card_says_whom_the_seat_has_met_from_the_worlds_knows():
     assert "your note: Rhosyn is a Carrier" in line  # an old note, past the newest 8 the card shows
     assert "- A porter: no meeting on record" in c and "counter: no meeting" not in c
     assert "People here" not in scene.card({**b, "knows": None}, scene.Names({}), "e1")  # a world without knows
+
+
+def test_the_door_retries_in_tiers_and_a_seat_rides_out_a_server_that_is_away(monkeypatch):
+    import asyncio
+    import httpx
+    from body_harness import door as doormod
+    from body_harness.door import Door, DoorAway, DoorError
+    from body_harness.loop import Mind
+    slept = []
+
+    async def nap(s):
+        slept.append(s)
+    monkeypatch.setattr(doormod.asyncio, "sleep", nap)
+
+    def run(answers, **kw):
+        it = iter(answers)
+
+        def handler(req):
+            a = next(it)
+            if isinstance(a, Exception):
+                raise a
+            return a
+        async def go():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+                return await Door("http://w", "t", c).op("look", **kw)
+        return asyncio.run(go())
+
+    ok = httpx.Response(200, json={"ok": True})
+    assert run([httpx.Response(503), httpx.ConnectError("down"), ok]) == {"ok": True}  # a blip: retried
+    slept.clear()
+    try:
+        run([httpx.ConnectError("down")] * 4)
+        assert False
+    except DoorAway:
+        assert len(slept) == 3 and max(slept) <= 8  # a few quick tries, then the seat rides it out instead
+    r = run([httpx.Response(500), httpx.Response(500)])
+    assert r["ok"] is False and r["code"] == "server_error"  # a server bug: the model hears it, no long wait
+    slept.clear()
+    assert run([httpx.Response(429, headers={"retry-after": "20"}), ok]) == {"ok": True} and slept[0] >= 20
+    try:
+        run([httpx.Response(401)])
+        assert False
+    except DoorAway:
+        assert False
+    except DoorError as e:
+        assert e.status == 401
+
+    # the seat waits for the server in its own process, then joins again: no supervisor restart
+    m = Mind.__new__(Mind)
+    m.stop, m.cfg = False, {}
+    m.seat = type("S", (), {"name": "guard", "outbox": lambda self, *a: None})()
+    answers = iter([False, False, True])
+    joined = []
+
+    async def alive():
+        return next(answers)
+
+    async def join():
+        joined.append(1)
+    m.door = type("D", (), {"alive": staticmethod(alive)})()
+    m.join = join
+    monkeypatch.setattr("body_harness.loop.asyncio.sleep", nap)
+    asyncio.run(m.ride_out("test"))
+    assert joined == [1] and "server was away" in Mind._away_reason(42)
