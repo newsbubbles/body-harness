@@ -22,14 +22,14 @@ from typing import Any
 
 import httpx
 
-from . import caps, imagine, imports, menu, past, prompts, sandbox, scene
+from . import caps, imagine, imports, menu, past, prompts, sandbox, scene, telemetry
 from . import reflexes as rx
 from .door import Door, DoorAway, DoorError, backoff
 from .memory import Shelf, memo
 from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 from .skills import Skills
-from .tools import EXTRAS, Registry, compact, fix_args, parse_args, route
+from .tools import CORE_NAMES, EXTRAS, Registry, compact, fix_args, parse_args, route
 from .usage import Usage, append as usage_append
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
@@ -84,10 +84,13 @@ def _log(seat: str, msg: str) -> None:
 
 
 class Mind:
+    tele = telemetry.OFF  # a seat's own sender is set in __init__; off for minds built without one
+
     def __init__(self, seat: Seat, client: httpx.AsyncClient):
         self.seat = seat
         self.client = client
         self.cfg = seat.config()
+        self.tele = telemetry.Sender(seat.p("telemetry.jsonl"), self.cfg, {"seat": seat.name})
         self.door = Door.load(seat.p("door.json"), client)
         self.door.wait_cap = float(self.cfg.get("wait_cap", self.door.wait_cap))
         # extra grants on the same world (a builder's hand on one part of it): bh hand SEAT add NAME <invite>
@@ -211,6 +214,7 @@ class Mind:
         grant (401/403) ends the seat."""
         t0, attempt, said = time.time(), 0, False
         _log(self.seat.name, f"server away ({why}); riding it out")
+        self.tele.emit("seat", {"event": "server away"})
         while not self.stop:
             await asyncio.sleep(backoff(attempt, 2.0, float(self.cfg.get("away_cap", 300))))
             attempt += 1
@@ -241,6 +245,9 @@ class Mind:
 
     async def start(self) -> None:
         await self.join()
+        self.tele.labels.update(world=str(self.briefing.get("world") or ""), character=self.my_name(), role=self.role)
+        self.tele.start(self.client)
+        self.tele.emit("seat", {"event": "start", "turns": self.turns, "model": self.model.spec})
         try:
             o = await self.door.get("/op")
             self.ops = o.get("ops", [])
@@ -417,6 +424,7 @@ class Mind:
             meant = route(name, args)
             append_jsonl(self.seat.p("invented.jsonl"), {"ts": time.time(), "model": self.model.spec, "tool": name,
                                                          "args": sorted(args), "read_as": meant[0] if meant else None})
+            self.tele.emit("invented", {"model": self.model.spec, "tool": name, "read_as": meant[0] if meant else None})
             if meant and (meant[0] != "act" or meant[1]["verb"] in self.verb_names() or not self.verb_names()):
                 out = await self.call(meant[0], meant[1], turn)
                 return f"(harness: there is no tool {name}; read as {meant[0]}({_brief(meant[1])}))\n" + out
@@ -908,6 +916,7 @@ class Mind:
                 return False
             u = Usage(calls=1, cost=cost, seconds=secs)
             usage_append(self.seat.p("usage.jsonl"), self.seat.name, self.judge.spec, u, f"reflex ({trigger})")
+            self.tele.emit("model_call", {"model": self.judge.spec, "use": "judge", "rules": len(live), **telemetry.usage(u)})
             k, best = rx.choose(rules, ps, float(self.cfg.get("reflex_fire", rx.FIRE)))
             rec.update(p={live[i][1]["if"]: round(ps.get(f"r{i}", 0), 3) for i in range(len(live))},
                        cost=cost, ms=round(secs * 1000))
@@ -1074,6 +1083,20 @@ class Mind:
                 out.setdefault(str(h[3]), []).append(str(h[2]))
         return out
 
+    def _layer(self, name: str) -> str:
+        """Which layer a tool belongs to, for telemetry: a world verb, an engine op, the menu, an app, a harness
+        tool, or a name the model made up."""
+        if name == "act":
+            return "verb"
+        if name in ("say", "remember", "intend") or name in self.registry.world:
+            return "engine"
+        if name == "menu" or name.startswith("app_"):
+            return "menu" if name == "menu" else "app"
+        if name in CORE_NAMES or name in EXTRAS or name in ("think", "records", "past", "imagine", "reflect",
+                                                             "relive", "behavior"):
+            return "harness"
+        return "invented"
+
     def my_name(self) -> str:
         return str((self.bundle.get("you") or {}).get("name") or "")
 
@@ -1140,6 +1163,7 @@ class Mind:
 
     async def turn(self, reason: str, events: list[dict[str, Any]]) -> None:
         st0 = json.loads(json.dumps(self.st, default=str))
+        t_turn = time.time()
         self.turns += 1
         b = await self.perceive()
         if int(self.cfg.get("keep_wakes", 5)) > 0:
@@ -1257,6 +1281,8 @@ class Mind:
                 break
             tu.add(u)
             usage_append(self.seat.p("usage.jsonl"), self.seat.name, self.model.spec, u, reason[:80])
+            self.tele.emit("model_call", {"model": self.model.spec, "use": "turn", "turn": self.turns, "step": step,
+                                          "rung": len(turn.get("escalated") or []), **telemetry.usage(u)})
             calls = msg.get("tool_calls") or []
             text = (msg.get("content") or "").strip() if isinstance(msg.get("content"), str) else ""
             if not calls:
@@ -1297,7 +1323,9 @@ class Mind:
                         turn["cut"] = f"{name}({_short(args)})"[:160]
                         out = "(harness: not run; the turn is over)"
                     else:
+                        t_call = time.time()
                         out = await self.call(name, args, turn)
+                        turn["secs"] = time.time() - t_call
                     extra = self._ignored_keys(name, args)
                     if extra:
                         note = "; ".join(x for x in (note, extra) if x)
@@ -1327,6 +1355,13 @@ class Mind:
                 append_jsonl(self.seat.p("calls.jsonl"), {"ts": time.time(), "turn": self.turns, "tool": name,
                                                           "args": args if isinstance(args, dict) else {}, "out": out})
                 messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": out})
+                if self.tele.on:
+                    ok, code, why = telemetry.outcome(out)
+                    a = args if isinstance(args, dict) else {}
+                    self.tele.emit("tool_call", {"turn": self.turns, "tool": name, "layer": self._layer(name),
+                                                 "verb": a.get("verb") if name == "act" else None, "ok": ok,
+                                                 "code": code, "secs": round(turn.pop("secs", 0.0), 3),
+                                                 "out_chars": len(out)}, {"refusal": why})
                 if CALL_TROUBLE.search(out[:600]):
                     turn["trouble"] = turn.get("trouble", 0) + 1
             if turn["slept"]:
@@ -1369,6 +1404,13 @@ class Mind:
                                                    **({"imagined": turn["imagined"]} if turn.get("imagined") else {})})
         _log(self.seat.name, f"turn {self.turns} ({reason[:60]}): {len(turn['calls'])} tool calls; {tu.line()}; "
                              f"{note[:120]}")
+        tools_used = [c["tool"] for c in turn["calls"]]
+        self.tele.emit("turn", {
+            "turn": self.turns, "model": self.base_model.spec, "steps": tu.calls, "tool_calls": len(tools_used),
+            "deeds": turn["deeds"], "says": tools_used.count("say"), "reads": sum(t in READS for t in tools_used),
+            "opens": tools_used.count("menu"), "nudges": len(nudges), "escalated": turn.get("escalated") or [],
+            "ended": "slept" if turn["slept"] else "out of steps" if turn.get("last_step") else "other",
+            "wall": round(time.time() - t_turn, 2), **telemetry.usage(tu)}, {"reason": reason, "note": note})
         self.save()
 
     async def run(self) -> None:
@@ -1402,6 +1444,7 @@ class Mind:
                                          f"room, or raise the cap (bh cap {self.seat.name} <dollars>, or always)",
                                          "error")
                         _log(self.seat.name, f"paused: {capped}")
+                        self.tele.emit("seat", {"event": "capped"})
                     self.st["cap_missed"] = int(self.st.get("cap_missed", 0)) + 1
                     self.save()
                     t0 = time.time()

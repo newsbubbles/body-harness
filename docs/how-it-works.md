@@ -227,6 +227,7 @@ Everything is a file under `$BH_HOME/seats/<name>/`:
 | `calls.jsonl` | every tool call and what came back |
 | `usage.jsonl` | every model call's tokens and cost |
 | `invented.jsonl` | tool names the model made up, and how they were read |
+| `telemetry.jsonl` | events waiting to be posted, when telemetry is on ([telemetry.md](telemetry.md)) |
 | `reflexes.jsonl` | every judge look while the seat slept: trigger, p per rule, what ran, cost |
 | `inbox.jsonl`, `outbox.jsonl` | your messages to the seat, and its reports to you |
 | `memory/`, `workspace/`, `apps/`, `skills/` | its notes, files, tools and skills |

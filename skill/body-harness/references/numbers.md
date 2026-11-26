@@ -24,6 +24,8 @@ and sample, with pass or fail, tool calls, the largest input, and cost; the run 
 
 ## Telemetry
 
-A shared dashboard for these numbers (an opt-in server that seats report counts to, local by default, off unless you
-turn it on) is planned and not built yet. Until it is, the files above are the record. When it lands, this page will
-say how to turn it on and what it sends; by default it will send counts only, never speech.
+A seat can post these counts to a telemetry server you run (body-telemetry), for dashboards across seats. It is off
+until the config sets `telemetry: {url, key_env, detail}`; `detail` is `counts` by default, which sends numbers and
+names but no speech, notes or reasons. What each level sends, and the wire format, are in the harness's
+`docs/telemetry.md`. Set it in `$BH_HOME/config.json` for every seat, restart the seats, and check that the server's
+dashboard shows them. The files above stay the record either way.

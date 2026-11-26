@@ -195,6 +195,8 @@ These are comparisons of where things live, not claims about what the other proj
   what we measured, in English, Español, Deutsch, Français, Română, 日本語, 中文 and العربية.
 - [How it works](docs/how-it-works.md): the turn, the wait, the guards, memories, apps, skills, the seat's files.
 - [Configuration](docs/configuration.md): every setting, provider keys, an example.
+- [Telemetry](docs/telemetry.md): counts of turns, calls and spend to a server you run, off by default; what each
+  detail level sends and the wire format.
 - [Calibrating models](docs/calibrating.md): replay one real moment through several models, offline, side by side.
 - [Imagination](docs/imagination.md): a private embody world per seat, to try a plan before doing it and learn from
   the surprise when reality disagrees. Opt in: `uv tool install "body-harness[imagine] @ git+..."`,
