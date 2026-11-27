@@ -134,3 +134,18 @@ def test_tool_calls_carry_their_step_and_order_in_the_turn(tmp_path, monkeypatch
     rows = [json.loads(x) for x in seat.p("telemetry.jsonl").read_text(encoding="utf-8").splitlines()]
     tc = [r for r in rows if r["kind"] == "tool_call"]
     assert [(r["tool"], r["step"], r["call"]) for r in tc] == [("say", 0, 0), ("memo", 0, 1), ("sleep", 1, 2)]
+    assert [r["woke"] for r in rows if r["kind"] == "turn"] == ["event"]
+
+
+def test_a_turn_says_what_woke_it_in_counts():
+    from body_harness import scene
+    from body_harness.loop import woke
+    n = scene.Names({"e1": "Ossa", "e4": "Wick", "e5": "Tam"})
+    said = {"kind": "say", "actor": "e4", "payload": {"text": "Ossa, the cart", "to": "e1"}}
+    assert woke("what you waited for happened (to_me())", [said], "e1", "Ossa", n) == {
+        "woke": "spoken_to", "woke_by": "say", "woke_seat": 1, "woke_actor": "Wick"}
+    walk = {"kind": "arrived", "actor": "e5", "by_player": True}
+    assert woke("what you waited for happened (arrived())", [walk], "e1", "Ossa", n)["woke_seat"] == 0
+    assert woke("time is up on your watch ('x' did not happen)", [], "e1", "Ossa", n)["woke"] == "timeout"
+    assert woke("your operator wrote to you (see the agenda)", [said], "e1", "Ossa", n)["woke_by"] == ""
+    assert woke("what you waited for happened (x)", [walk], "e1", "Ossa", n, reflexed=True)["woke"] == "reflex"

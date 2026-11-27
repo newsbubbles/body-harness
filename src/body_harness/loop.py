@@ -1267,6 +1267,7 @@ class Mind:
             self.st["read_handbook"] = True
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
         turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": [], "nudges": nudges}
+        turn["woke"] = woke(reason, events or [], self.me, me_name, self.names, bool(notes))
         turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me, me_name)]
         turn["spoken_to"] = bool(b.get("owed")) or bool(turn["partners"])
         tu = Usage()
@@ -1431,7 +1432,8 @@ class Mind:
             "deeds": turn["deeds"], "says": tools_used.count("say"), "reads": sum(t in READS for t in tools_used),
             "opens": tools_used.count("menu"), "nudges": len(nudges), "nudge_kinds": telemetry.kinds(nudges), "escalated": turn.get("escalated") or [],
             "ended": "slept" if turn["slept"] else "out of steps" if turn.get("last_step") else "other",
-            "wall": round(time.time() - t_turn, 2), **telemetry.usage(tu)}, {"reason": reason, "note": note})
+            "wall": round(time.time() - t_turn, 2), **turn["woke"], **telemetry.usage(tu)},
+            {"reason": reason, "note": note})
         self.save()
 
     async def run(self) -> None:
@@ -1602,6 +1604,25 @@ _PLAIN = set("""about after again also asked asking back been before being came 
 each even from going have here into just know last like look looked made make more much next only other over said
 same says some still than that their them then there they this told turn turns very wait waiting want wants went
 were what when where which while will with would your""".split())
+
+
+def woke(reason: str, events: list[dict[str, Any]], me: str, me_name: str, names: scene.Names,
+         reflexed: bool = False) -> dict[str, Any]:
+    """What woke a turn, as counts for telemetry: why (timeout, event, spoken_to, told, reflex, start), the waking
+    event's kind, whether another seat (not a player) did it, and that character's name."""
+    r = reason.lower()
+    real = [e for e in events if e.get("kind") not in scene.NOISE and e.get("actor") != me]
+    to_me = [e for e in real if scene.to_me(e, me, me_name)]
+    e = (to_me or real or [None])[-1]
+    why = ("told" if r.startswith("your operator") else "reflex" if reflexed
+           else "timeout" if r.startswith(("time is up", "something you scheduled")) else
+           "start" if r.startswith(("you just took", "your harness restarted")) else
+           "spoken_to" if to_me or "waiting on your answer" in r else "event")
+    out: dict[str, Any] = {"woke": why, "woke_by": "", "woke_seat": 0, "woke_actor": ""}
+    if e is not None and why not in ("timeout", "told", "start"):
+        out.update(woke_by=str(e.get("kind") or ""), woke_actor=names.name(e.get("actor")) if e.get("actor") else "",
+                   woke_seat=int(bool(e.get("actor")) and not (e.get("by_player") or e.get("untrusted"))))
+    return out
 
 
 def stuck_on(notes: list[str], known: set[str], need: int = 5, of: int = 6) -> str:
