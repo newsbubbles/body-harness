@@ -6,7 +6,8 @@ Run a character in an [embody](https://github.com/newsbubbles/embody) world on a
 of a cent a turn.
 
 > "With a sufficiently capable harness, a potato can run a world."
-> — Nate Gibson
+>
+> Nate Gibson
 
 An embody world is a persistent place with rules: places, people, things, a clock and a history, where people and
 agents share the same world and the engine decides what actually happens. body-harness is the mind side. Give it a
