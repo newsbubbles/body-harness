@@ -60,27 +60,32 @@ class Names:
                 out.append(n)
         return sorted(set(out))
 
-    def resolve(self, text: str, among: list[str] | None = None) -> tuple[str | None, list[str]]:
-        """A name the model wrote -> the one full name it means, or None and the candidates. Exact (any case) wins,
-        then a whole-word match, then a substring; `among` (names present now) is searched before everything seen."""
+    def resolve(self, text: str, among: list[str] | None = None,
+                fits: list[str] | None = None) -> tuple[str | None, list[str]]:
+        """A name the model wrote -> the one full name it means, or None and the candidates. Exact (any case, in any
+        pool) wins, then a whole-word match, then a substring; `among` (names present now) is searched before
+        everything seen. When several match, the ones in `fits` (what the verb is listed against) pick."""
         if not isinstance(text, str) or not text.strip():
             return None, []
         t = text.strip().lower()
         if t in self.by_id:  # an id: let the engine take it
             return text, []
         pools = [among or [], list(dict.fromkeys(self.by_id.values()))]
-        for pool in pools:
+        for pool in pools:  # "Hauler Nine" is the cart, never "Hauler Nine's wheel" in the room
             exact = [n for n in pool if n.lower() == t]
             if exact:
                 return exact[0], []
-            words = [n for n in pool if t in n.lower().replace(",", " ").split()]
-            if len(set(words)) == 1:
-                return words[0], []
-            sub = [n for n in pool if t in n.lower()]
-            if len(set(sub)) == 1:
-                return sub[0], []
+        fit = {n.lower() for n in fits or []}
+        for pool in pools:
+            words = list(dict.fromkeys(n for n in pool if t in n.lower().replace(",", " ").split()))
+            sub = list(dict.fromkeys(n for n in pool if t in n.lower()))
+            for found in (words, sub):
+                if len(found) > 1 and fit:
+                    found[:] = [n for n in found if n.lower() in fit] or found
+                if len(found) == 1:
+                    return found[0], []
             if words or sub:
-                return None, list(dict.fromkeys(words or sub))[:8]
+                return None, (words or sub)[:8]
         return None, []
 
 

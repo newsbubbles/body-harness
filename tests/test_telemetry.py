@@ -89,3 +89,48 @@ def test_a_batch_the_server_never_takes_is_sent_one_by_one_and_the_refused_dropp
 
     asyncio.run(go())
     assert seen == [0, 1, 2] and (tmp_path / "t.jsonl").read_text(encoding="utf-8") == ""
+
+
+def test_tool_calls_carry_their_step_and_order_in_the_turn(tmp_path, monkeypatch):
+    # Glass Reach host, 27 Nov: step was null on every tool_call event, so a turn's calls could not be put in order
+    import sys
+    from pathlib import Path
+
+    import pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "evals"))
+    suite = pytest.importorskip("suite")
+    from embody.openapi import spec
+
+    from body_harness.loop import Mind
+    from body_harness.seat import Seat
+    from body_harness.usage import Usage
+    from body_harness.seat import write_json
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
+    seat = Seat(tmp_path, "fen").create()
+    write_json(seat.p("door.json"), {"base": suite.LocalDoor.base, "token": ""})
+    write_json(seat.p("config.json"), {"model": "openrouter:a/cheap", "telemetry": {"url": "http://t"}})
+    suite.seat_state(seat, turns=40, read_handbook=True)
+    w = suite.World(tmp_path / "world.db")
+    w.settle()
+    script = [[("say", {"text": "Morning."}), ("memo", {"text": "said morning"})],
+              [("sleep", {"until": "to_me()", "note": "greeted the room"})]]
+
+    async def chat(client, messages, tools, choice=None):
+        calls = script.pop(0) if script else [("sleep", {"until": "to_me()", "note": "done"})]
+        return {"content": "", "tool_calls": [{"id": f"c{i}", "type": "function", "function": {
+            "name": n, "arguments": json.dumps(a)}} for i, (n, a) in enumerate(calls)]}, Usage()
+
+    async def go():
+        async with httpx.AsyncClient() as c:
+            m = Mind(seat, c)
+            m.door = suite.LocalDoor(w.fen, spec([{"name": "say", "description": "Speak.", "input_schema": {
+                "type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}], role="mind"))
+            await m.start()
+            m.model.chat = chat
+            await m.turn("someone spoke", [])
+            m.tele._task.cancel()
+
+    asyncio.run(go())
+    rows = [json.loads(x) for x in seat.p("telemetry.jsonl").read_text(encoding="utf-8").splitlines()]
+    tc = [r for r in rows if r["kind"] == "tool_call"]
+    assert [(r["tool"], r["step"], r["call"]) for r in tc] == [("say", 0, 0), ("memo", 0, 1), ("sleep", 1, 2)]

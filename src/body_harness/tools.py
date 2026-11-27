@@ -396,7 +396,8 @@ def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any
         v = args[k]
         if not isinstance(v, str):
             continue
-        full, cands = mind.names.resolve(v, mind.present_names())
+        fits = mind.verb_targets(args.get("verb")) if op == "act" and k == "target" else []
+        full, cands = mind.names.resolve(v, mind.present_names(), fits)
         if full and full != v:
             args[k] = full
             notes.append(f"{k}={v!r} is {full!r}")

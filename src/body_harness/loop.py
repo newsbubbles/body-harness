@@ -159,7 +159,17 @@ class Mind:
         # a full perceive has present/affordances; a brief one (newer engines) people/things, exits as plain names
         for key in ("present", "people", "things", "holding", "exits"):
             names += [x.get("name") if isinstance(x, dict) else scene.bare(x) for x in (b.get(key) or [])]
+        here = b.get("here")  # the place the body is in: a cart it rides is a target too (halt, alight)
+        names.append(here.get("name") if isinstance(here, dict) else here)
         return [n for n in names if isinstance(n, str) and n]
+
+    def verb_targets(self, verb: Any) -> list[str]:
+        """The names the perceive lists `verb` against: what breaks a tie between two names that both match."""
+        if not isinstance(verb, str) or not verb:
+            return []
+        out = [a.get("target_name") or self.names.name(a.get("target"))
+               for a in (self.bundle.get("affordances") or []) if isinstance(a, dict) and a.get("verb") == verb]
+        return [n for n in out if isinstance(n, str) and n]
 
     # ---------- the world ----------
 
@@ -1265,6 +1275,7 @@ class Mind:
                 not scene.event_lines(evs, self.me, self.names, 1):
             # nothing happened: a look, a deed or a line of its own, and back to sleep
             max_steps = min(max_steps, int(self.cfg.get("quiet_steps", 8)))
+        n_call = 0  # tool calls so far this turn, for telemetry
         for step in range(max_steps):
             tools = self.registry.tools(self.loaded_tools())
             choice = None
@@ -1366,10 +1377,12 @@ class Mind:
                 if self.tele.on:
                     ok, code, why = telemetry.outcome(out)
                     a = args if isinstance(args, dict) else {}
-                    self.tele.emit("tool_call", {"turn": self.turns, "tool": name, "layer": self._layer(name),
+                    self.tele.emit("tool_call", {"turn": self.turns, "step": step, "call": n_call,
+                                                 "tool": name, "layer": self._layer(name),
                                                  "verb": a.get("verb") if name == "act" else None, "ok": ok,
                                                  "code": code, "secs": round(turn.pop("secs", 0.0), 3),
                                                  "out_chars": len(out)}, {"refusal": why})
+                n_call += 1
                 if CALL_TROUBLE.search(out[:600]):
                     turn["trouble"] = turn.get("trouble", 0) + 1
             if turn["slept"]:

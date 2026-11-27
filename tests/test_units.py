@@ -1094,3 +1094,28 @@ def test_the_door_retries_in_tiers_and_a_seat_rides_out_a_server_that_is_away(mo
     monkeypatch.setattr("body_harness.loop.asyncio.sleep", nap)
     asyncio.run(m.ride_out("test"))
     assert joined == [1] and "server was away" in Mind._away_reason(42)
+
+
+def test_a_name_said_exactly_wins_over_a_longer_one_and_the_verb_breaks_ties():
+    # Glass Reach, 27 Nov: Ossa rode Hauler Nine holding its wheel; every act target 'Hauler Nine' was rewritten to
+    # "Hauler Nine's wheel" (the present match beat the exact one), so halt and alight came back unknown_verb
+    from body_harness.loop import Mind
+    from body_harness.tools import fix_args
+    m = Mind.__new__(Mind)
+    m.me = "e1"
+    m.names = scene.Names({"e1": "Ossa", "e7": "Hauler Nine", "e8": "Hauler Nine's wheel", "e9": "Hauler Ten"})
+    m.registry = type("R", (), {"world": {}})()
+    m.bundle = {"here": {"id": "e7", "name": "Hauler Nine"}, "holding": [{"id": "e8", "name": "Hauler Nine's wheel"}],
+                "affordances": [{"verb": "halt", "target": "e7", "target_name": "Hauler Nine"},
+                                {"verb": "drive", "target": "e8", "target_name": "Hauler Nine's wheel"}]}
+    assert "Hauler Nine" in m.present_names()
+    for verb in ("halt", "alight"):
+        args, notes = fix_args("act", {"verb": verb, "target": "Hauler Nine"}, m)
+        assert args["target"] == "Hauler Nine" and not notes
+    # a partial name still resolves, with the note; and when it matches two, the one the verb is listed on wins
+    args, notes = fix_args("act", {"verb": "drive", "target": "wheel"}, m)
+    assert args["target"] == "Hauler Nine's wheel" and notes
+    args, notes = fix_args("act", {"verb": "drive", "target": "hauler"}, m)
+    assert args["target"] == "Hauler Nine's wheel" and "is \"Hauler Nine's wheel\"" in notes[0]
+    args, notes = fix_args("act", {"verb": "look", "target": "hauler"}, m)
+    assert args["target"] == "hauler" and "could be" in notes[0]

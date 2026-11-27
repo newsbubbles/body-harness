@@ -49,7 +49,7 @@ And by kind:
 | `seat` | `event`: start or restart (with `turns`, `model`), server away, capped, stop (`why`, `status`), error (the error's type) |
 | `setup` | `setup`: the seat's settings that are bools, numbers or model names (model, judge, escalate); never prompts, providers, files or anything named like a key or token |
 | `model_call` | `model`, `use` (turn or judge), `turn`, `step`, `rung` (escalations so far this turn), `rules` (judge), and the usage numbers: `calls`, `input_tokens`, `cached_tokens`, `cache_write_tokens`, `output_tokens`, `reasoning_tokens`, `cost`, `seconds`; on turn calls `ctx`, the characters of the context by part: system, tools, wake, history, tool_results |
-| `tool_call` | `turn`, `tool`, `layer` (verb, engine, menu, app, harness, invented), `verb` (for act), `ok`, `code`, `secs`, `out_chars`; `refusal` at lines or full |
+| `tool_call` | `turn`, `step` (the model call it came from, as on `model_call`), `call` (its place among the turn's tool calls, from 0), `tool`, `layer` (verb, engine, menu, app, harness, invented), `verb` (for act), `ok`, `code`, `secs`, `out_chars`; `refusal` at lines or full |
 | `turn` | `turn`, `model`, `steps`, `tool_calls`, `deeds`, `says`, `reads`, `opens` (menu), `nudges`, `nudge_kinds` (the word before each nudge's colon, e.g. stuck, last_step), `escalated` (models), `ended` (slept, out of steps, other), `wall`, the usage numbers; `reason` and `note` at lines or full |
 | `tell` | `to` (operator or owner), `about` (its kind), `out_chars` |
 | `invented` | `model`, `tool` (the made-up name), `read_as` |
