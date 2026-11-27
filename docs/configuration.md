@@ -47,6 +47,7 @@ character's private notes. `$BH_HOME/config.json` sets defaults for every seat; 
 | `menu_rank` | false | with `menu`: each list puts first what the seat's goals and notes name and what was just said to it, then the newest |
 | `menu_preopen` | false | with `menu`: what a line said to the seat names (people, things, its notes, the older talk with the speaker, its own deeds) is opened on the wake, before the model asks |
 | `menu_lists` | false | with `menu`: the talk with whoever spoke and the body's own deeds come as numbered lists from the world's log, one short line an event, each opened in full by its number |
+| `finish_first` | false | a sleep whose note says the seat will do next a verb it has here now ("I will fit it into the square hole") is sent back once, to do it first |
 | `always_to_me` | true | every watch also wakes on words aimed at the character, whatever else it waits for |
 | `away_cap` | 300 | the longest pause, in seconds, between tries while the server is away |
 | `telemetry` | off | `{url, key_env, detail, machine, run}`: counts of turns, calls and spend posted to a telemetry server you run; `detail` counts (default), lines or full ([telemetry.md](telemetry.md)) |

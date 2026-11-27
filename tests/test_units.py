@@ -1119,3 +1119,13 @@ def test_a_name_said_exactly_wins_over_a_longer_one_and_the_verb_breaks_ties():
     assert args["target"] == "Hauler Nine's wheel" and "is \"Hauler Nine's wheel\"" in notes[0]
     args, notes = fix_args("act", {"verb": "look", "target": "hauler"}, m)
     assert args["target"] == "hauler" and "could be" in notes[0]
+
+
+def test_a_note_that_names_a_next_step_open_now_is_caught():
+    # Shape Table, 27 Nov: "Picked up the cube. I will fit it into the square hole. Waiting to fit the cube." then sleep
+    from body_harness.loop import next_step
+    verbs = {"fit", "pick_up", "say"}
+    assert next_step("Picked up the cube. I will fit it into the square hole.", verbs) == "fit"
+    assert next_step("Fitted cube; next pick up the cylinder", verbs) == "pick_up"
+    assert next_step("Fitted the cube into the square hole.", verbs) == ""  # done, not next
+    assert next_step("Will dig at dawn", verbs) == ""  # not a verb this seat has here

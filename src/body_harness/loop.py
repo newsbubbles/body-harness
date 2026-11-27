@@ -743,6 +743,14 @@ class Mind:
                 return (f"Not asleep yet: your note says you {claim[0]}, but no act did it this turn, so the world "
                         f"does not know. Do it now (act(verb='{claim[1]}', ...)), or write the note as what you said, "
                         f"not what you did, and sleep.")
+            nxt = None if turn.get("next_checked") or not self.cfg.get("finish_first") else                 next_step(str(a.get("note") or ""), self.verb_names())
+            if nxt:
+                # Shape Table, 27 Nov: small models did one deed a turn and slept on "I will fit it into the square
+                # hole next", in a world where nothing else would wake them; 9 of 15 seats ran out of time
+                turn["next_checked"] = True
+                return (f"Not asleep yet: your note says you will {nxt} next, and {nxt} is open to you here now. If "
+                        f"nothing stands in the way, do it now. Sleep when what is left needs someone or something "
+                        f"else to happen first.")
         rules: list[dict[str, Any]] = []
         waiting_for = str(a.get("waiting_for") or "").strip()
         if self.cfg.get("reflexes") and not forced and a.get("reflexes"):
@@ -1604,6 +1612,22 @@ _PLAIN = set("""about after again also asked asking back been before being came 
 each even from going have here into just know last like look looked made make more much next only other over said
 same says some still than that their them then there they this told turn turns very wait waiting want wants went
 were what when where which while will with would your""".split())
+
+
+_INTENT = re.compile(r"\b(will|next|then|going to|need to|plan to|waiting to|about to|to do)\b", re.I)
+
+
+def next_step(note: str, verbs: set[str]) -> str:
+    """A verb open to the seat now that its sleep note says it will do next ("I will fit it into the square hole"),
+    or "". A past deed ("fitted") never matches: only the verb's own word."""
+    m = _INTENT.search(note)
+    if not m:
+        return ""
+    after = note[m.start():].lower()
+    for v in sorted(verbs, key=len, reverse=True):
+        if re.search(r"\b" + re.escape(v.replace("_", " ")).replace(r"\ ", r"[ _]") + r"\b", after):
+            return v
+    return ""
 
 
 def woke(reason: str, events: list[dict[str, Any]], me: str, me_name: str, names: scene.Names,
