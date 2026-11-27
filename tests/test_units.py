@@ -1129,3 +1129,13 @@ def test_a_note_that_names_a_next_step_open_now_is_caught():
     assert next_step("Fitted cube; next pick up the cylinder", verbs) == "pick_up"
     assert next_step("Fitted the cube into the square hole.", verbs) == ""  # done, not next
     assert next_step("Will dig at dawn", verbs) == ""  # not a verb this seat has here
+
+
+def test_a_note_claiming_a_deed_no_act_did_is_caught():
+    from body_harness.loop import next_step, past_claim
+    verbs = {"fit", "pick_up"}
+    assert past_claim("Fitted cube into square hole.", verbs, set()) == "fit"
+    assert past_claim("Fitted cube into square hole.", verbs, {"fit"}) == ""  # it went through
+    assert past_claim("Picked up cylinder, ready to fit it.", verbs, set()) == "pick_up"
+    assert next_step("Plan: fit cube into square hole, then cylinder", verbs) == "fit"
+    assert next_step("Picked up cylinder, ready to fit into round hole.", verbs) == "fit"

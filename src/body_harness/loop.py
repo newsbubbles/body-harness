@@ -743,7 +743,15 @@ class Mind:
                 return (f"Not asleep yet: your note says you {claim[0]}, but no act did it this turn, so the world "
                         f"does not know. Do it now (act(verb='{claim[1]}', ...)), or write the note as what you said, "
                         f"not what you did, and sleep.")
-            nxt = None if turn.get("next_checked") or not self.cfg.get("finish_first") else                 next_step(str(a.get("note") or ""), self.verb_names())
+            did = None if turn.get("did_checked") or not self.cfg.get("finish_first") else \
+                past_claim(str(a.get("note") or ""), self.verb_names(), turn.get("verbs") or set())
+            if did:
+                turn["did_checked"] = True
+                return (f"Not asleep yet: your note says you did {did}, but no {did} went through this turn, so the "
+                        f"world does not have it. Look at what you hold and what is here, do it now if it is not "
+                        f"done, or write the note as what really happened, and sleep.")
+            nxt = None if turn.get("next_checked") or not self.cfg.get("finish_first") else \
+                next_step(str(a.get("note") or ""), self.verb_names())
             if nxt:
                 # Shape Table, 27 Nov: small models did one deed a turn and slept on "I will fit it into the square
                 # hole next", in a world where nothing else would wake them; 9 of 15 seats ran out of time
@@ -1614,7 +1622,8 @@ same says some still than that their them then there they this told turn turns v
 were what when where which while will with would your""".split())
 
 
-_INTENT = re.compile(r"\b(will|next|then|going to|need to|plan to|waiting to|about to|to do)\b", re.I)
+_INTENT = re.compile(r"\b(will|next|then|plan|planned|going to|need to|ready to|waiting to|about to|to do|now)\b",
+                     re.I)
 
 
 def next_step(note: str, verbs: set[str]) -> str:
@@ -1626,6 +1635,19 @@ def next_step(note: str, verbs: set[str]) -> str:
     after = note[m.start():].lower()
     for v in sorted(verbs, key=len, reverse=True):
         if re.search(r"\b" + re.escape(v.replace("_", " ")).replace(r"\ ", r"[ _]") + r"\b", after):
+            return v
+    return ""
+
+
+def past_claim(note: str, verbs: set[str], done: set[str]) -> str:
+    """A verb the seat has that its note says it did ("Fitted cube into square hole", "picked up the star") when no
+    act of that verb went through this turn, or "". Shape Table, 27 Nov: nano wrote "Fitted cube" twice, and the
+    world had no fit."""
+    for v in sorted(verbs - done, key=len, reverse=True):
+        head, _, rest = v.partition("_")
+        forms = "|".join(re.escape(f) for f in {head + "ed", head + "d", head + head[-1:] + "ed"})
+        tail = r"[ _]" + re.escape(rest).replace("_", "[ _]") if rest else ""
+        if re.search(r"\b(" + forms + r")\b" + tail, note, re.I):
             return v
     return ""
 
