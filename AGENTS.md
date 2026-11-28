@@ -24,7 +24,9 @@ For any agent or person changing this code.
   remove, from docs/audit-string-conditionals.md). Never add debt to it. What stays variable, always read from the
   world: names and any text of a world; entity types (a world has as many as its schemas say); limits the world or
   the seat's owner marks. A harness default is not a fix for a world's or a model's behaviour.
-- Fix at the source. When the cause is in the engine or a world, the fix goes there, proposed with restraint and
-  approved by the owner or the agent the owner delegates that authority to; a harness patch around it is not the fix.
+- The engine does not bend to weak models; the harness accounts for them. Help a weak model needs (more steps, a
+  nudge, a check, extra structure) is a setting that model's seat switches on, off by default, so capable models
+  never pay for it. Every model behaves differently in the same harness: keep it modular.
+- Harness changes that change how seats behave are approved by the project owner before they land.
 - Every lesson from a failure in play becomes either a guard in code (a lint, a wrapper, a default) or a line in a
   skill, with the case that taught it in the commit message.
