@@ -171,6 +171,14 @@ class Mind:
                for a in (self.bundle.get("affordances") or []) if isinstance(a, dict) and a.get("verb") == verb]
         return [n for n in out if isinstance(n, str) and n]
 
+    def verb_params(self, verb: Any) -> set[str]:
+        """The params the perceive says `verb` takes, over every target it is listed against."""
+        if not isinstance(verb, str) or not verb:
+            return set()
+        bundle = getattr(self, "bundle", None) or {}
+        return {k for a in (bundle.get("affordances") or []) if isinstance(a, dict) and a.get("verb") == verb
+                for k in (a.get("params") or {})}
+
     # ---------- the world ----------
 
     async def join(self) -> dict[str, Any]:
