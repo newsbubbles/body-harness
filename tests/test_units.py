@@ -1027,14 +1027,21 @@ def test_notes_are_cut_at_punctuation_in_any_script_and_lose_known_names_whole()
     assert clauses("ok. Zoë Ægir!", ["Zoë Ægir"]) == []  # nothing of four letters is left to mean anything
 
 
-def test_a_soft_dict_finds_a_key_by_meaning_and_keeps_only_text():
-    from body_harness.embed import SoftDict
-    d = SoftDict(_Topics("runner").embedder(), 0.65, {"the archive runner": "told"})
-    assert _run(d.get(None, "a runner from the archive")) == "told"
-    assert _run(d.get(None, "grill shift", "none")) == "none"
-    assert _run(SoftDict(d.e, 0.65).has(None, "anything")) is False
+def test_a_semantic_dict_finds_keys_by_meaning_nearest_first_and_keeps_only_text():
+    # after Nate's semdict (adventuremode): add, get(key, n, threshold) -> [(key, value, nearness)], remove
+    from body_harness.embed import SemanticDict
+    d = SemanticDict(_Topics("runner").embedder(), 0.65, {"the archive runner": "told"})
+    d.add("a runner at the gate", "seen")
+    d.add("grill shift", "routine")
+    hits = _run(d.get(None, "a runner from the archive", n=5))
+    assert sorted(v for _, v, _ in hits) == ["seen", "told"] and all(s >= 0.65 for *_, s in hits)
+    assert len(_run(d.get(None, "a runner from the archive"))) == 1  # n=1 by default
+    assert _run(d.get(None, "nothing like it", n=5)) == []
+    assert _run(d.get(None, "nothing like it", n=5, threshold=0.0))  # a looser threshold for this call only
+    assert d.remove("grill shift") == "routine" and len(d) == 2
+    assert _run(SemanticDict(d.e).has(None, "anything")) is False
     import json
-    assert json.loads(json.dumps(d.items)) == {"the archive runner": "told"}
+    assert json.loads(json.dumps(d.data)) == {"the archive runner": "told", "a runner at the gate": "seen"}
 
 
 def test_an_embedder_names_its_provider_and_keeps_vectors_for_texts_it_has_seen():

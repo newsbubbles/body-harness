@@ -31,7 +31,7 @@ from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 from .skills import Skills
 from .tools import CORE_NAMES, EXTRAS, Registry, compact, fix_args, parse_args, route
-from .embed import NEAR, Embedder, SoftDict, clauses, cosine
+from .embed import NEAR, Embedder, SemanticDict, clauses, cosine
 from .usage import Usage, append as usage_append
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
@@ -1113,7 +1113,7 @@ class Mind:
             lead = await stuck_on(self.st.get("notes") or [], self.names.by_id.values(), self.embedder, self.client,
                                   need, near_at=at)
             # once per lead, matched by meaning: the same lead in other words is not news
-            told = SoftDict(self.embedder, at, {t: 1 for t in self.st.get("stuck_told") or []})
+            told = SemanticDict(self.embedder, at, {t: 1 for t in self.st.get("stuck_told") or []})
             if lead and await told.has(self.client, lead):
                 lead = ""
         except (ModelError, httpx.HTTPError, ValueError, KeyError) as e:

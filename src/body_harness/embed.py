@@ -106,35 +106,39 @@ def cosine(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
 
 
-class SoftDict:
-    """A dict whose keys match by meaning. `get(text)` gives the value of the nearest key at or over `near`, so a lead
-    filed as "the archive runner" is found again as "a runner from the archive" or "Archivläufer". Keys stay text,
+class SemanticDict:
+    """A dict whose keys match by meaning, after Nate's semdict (lks-ai/semdict, the one adventuremode searches its
+    classes, skills and properties with). `get(key, n)` gives the `n` nearest entries at or over `threshold`, nearest
+    first, as (key, value, nearness); a lead filed as "the archive runner" is found again as "a runner from the
+    archive" or "Archivläufer". semdict measured distance (under 0.83); this measures nearness (at or over
+    `threshold`, on the model's own scale), and it runs on whatever model the seat's `embed` names. Keys stay text,
     so the dict saves as plain JSON and survives a change of model."""
 
-    def __init__(self, embedder: Embedder, near: float, items: dict[str, Any] | None = None):
-        self.e, self.near = embedder, near
-        self.items: dict[str, Any] = dict(items or {})
+    def __init__(self, embedder: Embedder, threshold: float = NEAR, data: dict[str, Any] | None = None):
+        self.e, self.threshold = embedder, threshold
+        self.data: dict[str, Any] = dict(data or {})
 
-    async def nearest(self, client: httpx.AsyncClient, text: str) -> tuple[str, float]:
-        if not self.items:
-            return "", 0.0
-        keys = list(self.items)
-        q, *vs = await self.e.vectors(client, [text, *keys])
-        return max(((k, cosine(q, v)) for k, v in zip(keys, vs)), key=lambda kv: kv[1])
+    def add(self, key: str, value: Any) -> None:
+        self.data[key] = value
 
-    async def get(self, client: httpx.AsyncClient, text: str, default: Any = None) -> Any:
-        k, s = await self.nearest(client, text)
-        return self.items[k] if k and s >= self.near else default
+    def remove(self, key: str) -> Any:
+        return self.data.pop(key, None)
 
-    async def has(self, client: httpx.AsyncClient, text: str) -> bool:
-        k, s = await self.nearest(client, text)
-        return bool(k) and s >= self.near
+    async def get(self, client: httpx.AsyncClient, key: str, n: int = 1,
+                  threshold: float | None = None) -> list[tuple[str, Any, float]]:
+        if not self.data:
+            return []
+        at = self.threshold if threshold is None else threshold
+        keys = list(self.data)
+        q, *vs = await self.e.vectors(client, [key, *keys])
+        hits = sorted(((k, cosine(q, v)) for k, v in zip(keys, vs)), key=lambda kv: kv[1], reverse=True)
+        return [(k, self.data[k], s) for k, s in hits[:n] if s >= at]
 
-    def __setitem__(self, text: str, value: Any) -> None:
-        self.items[text] = value
+    async def has(self, client: httpx.AsyncClient, key: str) -> bool:
+        return bool(await self.get(client, key))
 
     def __len__(self) -> int:
-        return len(self.items)
+        return len(self.data)
 
 
 def clauses(text: str, names: Iterable[str] = ()) -> list[str]:
