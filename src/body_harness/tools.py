@@ -10,7 +10,6 @@ a refusal read as noise. A wrapper never invents a deed: what it sends is what t
 from __future__ import annotations
 
 import ast
-import difflib
 import json
 import re
 from typing import TYPE_CHECKING, Any
@@ -24,8 +23,6 @@ if TYPE_CHECKING:
 HIDDEN_OPS = {"join", "use", "worlds", "wait", "perceive", "answer_ask", "leave"}
 # The ops a name in these params must resolve for.
 NAME_PARAMS = {"to", "target", "entity", "about", "who"}
-# What a mind calls a verb's `count`
-QUANTITY = {"n", "num", "number", "qty", "quantity", "amount", "how_many", "howmany"}
 # Params minds kept sending under the wrong name, by op.
 ALIASES = {"inspect": {"target": "entity", "name": "entity", "id": "entity"},
            "recall": {"who": "about", "target": "about", "entity": "about"},
@@ -386,17 +383,6 @@ def fix_args(op: str, args: dict[str, Any], mind: "Mind") -> tuple[dict[str, Any
             for k in stray:
                 args.pop(k)
             notes.append(f"{', '.join(stray)} moved into params")
-        takes = mind.verb_params(args.get("verb"))
-        if takes and isinstance(args.get("params"), dict):
-            # Klhyts Refuge, 28 Nov: Corra staked one copper as drop(Coin, params={'n': 1}); the engine read no count
-            # and the whole purse of 57 hit the table. A quantity under another name is the verb's count
-            args["params"] = dict(args["params"])
-            for k in [k for k in args["params"] if k not in takes]:
-                right = ("count" if k.lower() in QUANTITY and "count" in takes else
-                         next(iter(difflib.get_close_matches(k, sorted(takes), n=1, cutoff=0.8)), None))
-                if right and right not in args["params"]:
-                    args["params"][right] = args["params"].pop(k)
-                    notes.append(f"params.{k}= read as params.{right}=")
         if not args.get("target") and isinstance(args.get("params"), dict):
             # act(verb='go', params={'go': 'Harbour Street'}): a param whose value names something here is the target
             here = {n.lower(): n for n in mind.present_names()}

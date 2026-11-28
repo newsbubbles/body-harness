@@ -171,13 +171,13 @@ class Mind:
                for a in (self.bundle.get("affordances") or []) if isinstance(a, dict) and a.get("verb") == verb]
         return [n for n in out if isinstance(n, str) and n]
 
-    def verb_params(self, verb: Any) -> set[str]:
-        """The params the perceive says `verb` takes, over every target it is listed against."""
-        if not isinstance(verb, str) or not verb:
-            return set()
-        bundle = getattr(self, "bundle", None) or {}
-        return {k for a in (bundle.get("affordances") or []) if isinstance(a, dict) and a.get("verb") == verb
-                for k in (a.get("params") or {})}
+    def verb_params(self, verb: Any) -> set[str] | None:
+        """The params the perceive declares for `verb`, or None when it lists the verb without saying (or not at all)."""
+        listed = [a for a in ((getattr(self, "bundle", None) or {}).get("affordances") or [])
+                  if isinstance(a, dict) and a.get("verb") == verb]
+        if not listed or any(not isinstance(a.get("params"), dict) for a in listed):
+            return None
+        return {k for a in listed for k in a["params"]}
 
     # ---------- the world ----------
 
@@ -454,6 +454,16 @@ class Mind:
                             "hint": (f"did you mean {', '.join(near)}? " if near else "") +
                                     "find_tools(query) finds and loads tools; verbs go through act(verb, ...)"})
         fixed, notes = fix_args(name, args, self)
+        if name == "act":
+            # Klhyts Refuge, 28 Nov: Corra staked one copper as drop(Coin, params={'n': 1}); drop takes count, the
+            # engine read none and her whole purse of 57 hit the table. A param the verb does not declare is sent
+            # back with what it does declare, so the model names it itself
+            takes = self.verb_params(fixed.get("verb"))
+            extra = undeclared(fixed.get("params"), takes)
+            if extra:
+                return compact({"ok": False, "reason": f"{fixed.get('verb')} takes no {', '.join(extra)}; "
+                                                       "nothing was done",
+                                "takes": sorted(takes) or "no params"})
         if name == "act" and self.imagination is not None and self.imagination.spec["bound"] and                 imagine._key(str(fixed.get("verb") or "")) not in self.imagination.bound_plans()[0]:
             # a deed outside the plan ends its run: score it now, before (say) a rest heals what the plan cost.
             # Tamsin sparred three times and rested in the same turn; read at the next wake, she was whole again
@@ -1520,6 +1530,13 @@ class Mind:
                 self.tele.emit("seat", {"event": "error", "error": type(e).__name__})
                 await asyncio.sleep(60)
                 reason, events = "the harness recovered from an error; look before you act", []
+
+
+def undeclared(params: Any, takes: set[str] | None) -> list[str]:
+    """The params sent that the verb does not declare; none when the perceive did not say what it takes."""
+    if takes is None or not isinstance(params, dict):
+        return []
+    return sorted(k for k in params if k not in takes)
 
 
 def _words(text: str, skip: set[str]) -> set[str]:

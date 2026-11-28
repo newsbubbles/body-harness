@@ -1121,29 +1121,22 @@ def test_a_name_said_exactly_wins_over_a_longer_one_and_the_verb_breaks_ties():
     assert args["target"] == "hauler" and "could be" in notes[0]
 
 
-def test_a_quantity_under_another_name_is_the_verbs_count():
-    # Klhyts Refuge, 28 Nov: Corra staked one copper as drop(Coin, params={'n': 1}); the engine read no count and
-    # dropped the whole purse of 57
-    from body_harness.loop import Mind
-    from body_harness.tools import fix_args
+def test_a_param_the_verb_does_not_declare_is_sent_back():
+    # Klhyts Refuge, 28 Nov: Corra staked one copper as drop(Coin, params={'n': 1}); drop takes count, the engine
+    # read none and dropped the whole purse of 57. What a verb takes comes from the perceive, never from a list here
+    from body_harness.loop import Mind, undeclared
     m = Mind.__new__(Mind)
-    m.me = "e1"
-    m.names = scene.Names({"e1": "Corra", "e484": "Coin"})
-    m.registry = type("R", (), {"world": {}})()
-    m.bundle = {"holding": [{"id": "e484", "name": "Coin"}],
-                "affordances": [{"verb": "drop", "target": "e484", "target_name": "Coin", "params": {"count": {}}},
-                                {"verb": "give", "target": "e9", "target_name": "Hob",
-                                 "params": {"item": {}, "count": {}}}]}
-    sent = {"verb": "drop", "target": "Coin", "params": {"n": 1}}
-    args, notes = fix_args("act", sent, m)
-    assert args["params"] == {"count": 1} and "params.n= read as params.count=" in notes
-    assert sent["params"] == {"n": 1}  # the call as sent is left as it was
-    assert fix_args("act", {"verb": "give", "target": "Coin", "params": {"items": "Coin", "qty": 2}}, m)[0][
-        "params"] == {"item": "Coin", "count": 2}
-    # a count given stays, and a verb that takes no count keeps what it was sent
-    assert fix_args("act", {"verb": "drop", "target": "Coin", "params": {"count": 3, "n": 1}}, m)[0][
-        "params"] == {"count": 3, "n": 1}
-    assert fix_args("act", {"verb": "throw", "target": "Coin", "params": {"n": 1}}, m)[0]["params"] == {"n": 1}
+    m.bundle = {"affordances": [{"verb": "drop", "target": "e484", "params": {"count": {"type": "integer"}}},
+                                {"verb": "drop", "target": "e485", "params": {}},
+                                {"verb": "wave", "target": "e9", "params": {}},
+                                {"verb": "sing", "target": "e9"}]}
+    assert m.verb_params("drop") == {"count"}
+    assert undeclared({"n": 1}, m.verb_params("drop")) == ["n"]
+    assert undeclared({"count": 1}, m.verb_params("drop")) == []
+    assert undeclared({"loud": True}, m.verb_params("wave")) == ["loud"]  # declared as taking none
+    # a verb the perceive lists without saying what it takes, or does not list, is left to the world
+    assert m.verb_params("sing") is None and undeclared({"loud": True}, None) == []
+    assert m.verb_params("fly") is None
 
 
 def test_a_note_that_names_a_next_step_open_now_is_caught():
