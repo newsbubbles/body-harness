@@ -245,25 +245,12 @@ def test_invented_tool_names_route_to_real_tools():
     assert route("whisper", {"text": "Quiet."}) == ("say", {"text": "Quiet.", "low": True})
     tool, a = route("gesture", {"gesture": "nods"})
     assert tool == "say" and a["gesture"] == "nods" and a["text"]
-    assert route("walk", {"destination": "Docks"})[:1] == ("act",)
-    assert route("walk", {"destination": "Docks"})[1]["verb"] == "go"
+    assert route("walk", {"destination": "Docks"}) is None  # a world verb is the world's: no guessed "go"
     assert route("wait", {"note": "n", "bogus": 1}) == ("sleep", {"note": "n"})
     assert route("fly", {}) is None
 
 
-def test_words_that_claim_a_deed_get_caught():
-    # Ssareth told Gog "I take it" and never ran take_job; the world never knew he had the job
-    from body_harness.loop import Mind
-    m = Mind.__new__(Mind)
-    m.bundle = {"affordances": [{"verb": "take_job"}, {"verb": "give"}]}
-    assert m._deed_claim("Aye, I take the job.", {"verbs": set()}) == ("took the job", "take_job")
-    assert m._deed_claim("Aye, I take the job.", {"verbs": {"take_job"}}) is None
-    assert m._deed_claim("Where is the dock?", {"verbs": set()}) is None
-    m.bundle = {"affordances": [{"verb": "give"}]}
-    assert m._deed_claim("I take the job.", {"verbs": set()}) is None  # no verb does it: not the harness's call
-
-
-def test_to_me_reads_target_to_and_first_name():
+def test_to_me_reads_target_to_and_a_name_word_that_is_mine():
     me = "e1"
     say = lambda text, **k: {"kind": "say", "actor": "e2", "payload": {"text": text, **k}}
     assert scene.to_me(say("Hi.", to="e1"), me, "Corra Venn")
@@ -271,7 +258,9 @@ def test_to_me_reads_target_to_and_first_name():
     assert not scene.to_me(say("Corral the goats."), me, "Corra Venn")
     assert not scene.to_me(say("Corra, wait.", to="e3"), me, "Corra Venn")
     assert not scene.to_me({"kind": "say", "actor": "e1", "payload": {"text": "Corra here."}}, me, "Corra Venn")
-    assert scene.to_me(say("Reeve, a word."), me, "The Reeve") is False  # titles alone never count
+    two = scene.Names({"e1": "Reeve Odo", "e3": "Reeve Hal"})  # a word two names share calls neither
+    assert not scene.to_me(say("Reeve, a word."), me, "Reeve Odo", two)
+    assert scene.to_me(say("Odo, a word."), me, "Reeve Odo", two)
 
 
 def test_system_carries_the_body_and_dates_the_briefing():
@@ -305,7 +294,7 @@ def test_companion_left_gets_a_line():
     m.st = {"said": [[time.time(), "Brakka", "ok"]], "heard": []}
     left = {"kind": "left", "actor": "e2", "payload": {"entity": "e2", "to": "e3"}}
     line = m._companion_left([left])
-    assert "Brakka Bomber" in line and "Gog's Hall" in line and "follow" in line
+    assert "Brakka Bomber" in line and "Gog's Hall" in line and "your verbs say how" in line
     stranger = {"kind": "left", "actor": "e4", "payload": {"entity": "e4", "to": "e3"}}
     assert m._companion_left([stranger]) == ""
 
@@ -426,7 +415,8 @@ def test_escalate_hands_the_turn_to_the_next_model(monkeypatch):
 
     assert CALL_TROUBLE.search('{"ok": false, "reason": "bad arguments for say: x"}')
     assert CALL_TROUBLE.search("Not asleep yet: your note says")
-    assert CALL_TROUBLE.search('{"refused": "until: syntax error: invalid syntax"}')
+    assert CALL_TROUBLE.search('{"refused": "no param n on drop", "layer": "call", "code": "unknown_param"}')
+    assert not CALL_TROUBLE.search('{"refused": "until: syntax error: invalid syntax"}')  # by layer, never words
     assert not CALL_TROUBLE.search('{"refused": "the gangplank lifts itself out of reach"}')
 
 
@@ -442,7 +432,8 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert imagine.body_state(card) == {"hp": 12, "max_hp": 12, "coin": 40, "fishing_spear": 1}
     here = {**card, "people": [{"name": "Marlo", "hp": "9/10"}]}
     first = im.imagine({}, here, "Ssareth", 1, {"spar", "rest"})
-    assert first["ok"] and list(first["starter"]["rules"]) == ["spar"]  # named after the seat's own verb
+    assert first["ok"] and list(first["starter"]["rules"]) == ["YOUR_VERB"]  # named for no verb until renamed
+    assert "spar" in first["starter"]["hint"]  # the seat's own verbs, to rename it to
     assert first["seen"] == {"Marlo": {"hp": 9, "max_hp": 10}}
     gap = im.imagine({"rules": {"spar": imagine.STARTER["attack"]}}, here, "Ssareth", 1, {"spar"})
     assert "has no value for yet" in " ".join(gap["notes"]) and "spar" in im.spec["rules"]  # a belief to set
@@ -568,33 +559,13 @@ def test_imagination_predicts_then_scores_surprise(tmp_path):
     assert any("really -7.0 on average over" in e for e in im.evidence("wait"))
 
 
-def test_hearsay_catches_words_put_in_someones_mouth():
-    from body_harness.loop import _hearsay
-    # Pip, hosted Reach day 62: Ruhl had said none of this, and corrected him in the hall
-    ruhl = ["Marked, Reeve: a shard to Jory for each day's laying, the first before he starts, the course done before "
-            "the moon turns. I'll count the days he lays.",
-            "Reeve, I know no seam and no trade for a shard by morning. The jars stand at twelve now, so Iska filled "
-            "them, nothing taken."]
-    voices = {"Captain Ruhl": ruhl}
-    people = ["Captain Ruhl", "Reeve Ansel Varrick", "Hollis"]
-    pip = ("Morning, Reeve. Night was quiet. Spoke to Captain Ruhl already when you were asleep. He said the Guild's "
-           "sending someone from the star to look at our gate, and that Hollis told you the whole of Dreyer's plan.")
-    who, claim, last = _hearsay(pip, voices, people)
-    assert who == "Captain Ruhl" and "Guild" in claim and "twelve" in last
-    assert _hearsay("Ruhl said the jars stand at twelve now, nothing taken.", voices, people) is None
-    assert _hearsay("Ruhl said the Guild road is watched by a rider from the star.", voices, people)[0] == "Captain Ruhl"
-    assert _hearsay("Hollis said the herald means to leave at dawn with the writ.", voices, people)[2] == ""
-    assert _hearsay("Night was quiet; nobody came through the gate.", voices, people) is None
-    assert _hearsay("He said yes.", voices, people) is None
-
-
 def test_timers_say_real_minutes():
     from body_harness.loop import _real_timers
     # Pip, hosted Reach at 4x real time: dusk "in about 29 minutes" was about 7 real minutes away
     t = _real_timers([{"kind": "dusk", "in": 1758.474, "when": "in about 29 minutes", "every": 86400.0},
                       {"kind": "dawn", "in": 44958.474, "when": "in about 12 hours"}], 4.0)
-    assert t[0]["real_minutes"] == 7 and t[0]["when"] == "in about 29 world minutes"
-    assert t[1]["real_minutes"] == 187 and "world hours" in t[1]["when"]
+    assert t[0]["real_minutes"] == 7 and t[0]["when"] == "in about 29 minutes"  # the world's words, as it said them
+    assert t[1]["real_minutes"] == 187
     assert _real_timers([{"in": 60}], None) == [{"in": 60}]
 
 
@@ -759,10 +730,13 @@ def test_reflexes_answer_small_things_and_wake_the_mind_for_the_rest(tmp_path: P
     from body_harness.seat import Seat
     rules, bad = rx.check([{"if": "Brakka greets me", "do": "say", "text": "Morning, Brakka.", "to": "Brakka"},
                            {"if": "Brakka leaves", "do": "act", "verb": "follow", "target": "Brakka"},
-                           {"when": "timeout", "do": "sleep", "minutes": 20, "max": 1}], "Brakka's job offer", {})
+                           {"when": "timeout", "do": "sleep", "minutes": 20, "max": 1}], "Brakka's job offer",
+                          {"reflex_verbs": ["follow"]})  # the seat owner's verbs: the harness guesses none
     assert not bad and [r["do"] for r in rules] == ["say", "act", "sleep"]
     assert any("waiting_for" in b for b in rx.check([{"if": "x", "do": "wake"}], "", {})[1])
-    assert any("coin" in b for b in rx.check([{"if": "x", "do": "act", "verb": "give"}], "w", {})[1])
+    assert any("no rule act" in b for b in rx.check([{"if": "x", "do": "act", "verb": "follow"}], "w", {})[1])
+    assert any("only follow" in b for b in rx.check([{"if": "x", "do": "act", "verb": "give"}], "w",
+                                                    {"reflex_verbs": ["follow"]})[1])
     assert any("text=" in b for b in rx.check([{"if": "x", "do": "say"}], "w", {})[1])
 
     class Judge:
@@ -894,12 +868,12 @@ def test_a_behavior_graph_checks_asks_and_resumes_across_runs():
     _, errs, _ = bv.apply(g, [{"op": "patch", "id": "door", "fields": {"if": "arrived('Brakka') and frobnicate"}}],
                           {}, ops)
     assert "cannot read frobnicate" in errs[0]
-    # a question the world answers exactly is pointed at a check; a think node hands the choice back with the path
+    # a think node hands the choice back with the path
     g2, errs, warns = bv.apply(g, [{"op": "set", "node": {"id": "job", "kind": "ask", "q": "Has Brakka arrived?",
                                                              "yes": "WAKE"}},
                                    {"op": "set", "node": {"id": "mull", "kind": "think", "q": "Take the job?"}},
                                    {"op": "link", "from": "job", "edge": "no", "to": "mull"}], {}, ops)
-    assert not errs and any("arrived(" in w for w in warns)
+    assert not errs
     r3 = bv.walk(g2, said, {"job": {"p": 0.1}}, frm="talk")
     assert r3["end"] == "THINK" and "think" in bv.breadcrumb(r3)
 
@@ -1137,23 +1111,3 @@ def test_a_param_the_verb_does_not_declare_is_sent_back():
     # a verb the perceive lists without saying what it takes, or does not list, is left to the world
     assert m.verb_params("sing") is None and undeclared({"loud": True}, None) == []
     assert m.verb_params("fly") is None
-
-
-def test_a_note_that_names_a_next_step_open_now_is_caught():
-    # Shape Table, 27 Nov: "Picked up the cube. I will fit it into the square hole. Waiting to fit the cube." then sleep
-    from body_harness.loop import next_step
-    verbs = {"fit", "pick_up", "say"}
-    assert next_step("Picked up the cube. I will fit it into the square hole.", verbs) == "fit"
-    assert next_step("Fitted cube; next pick up the cylinder", verbs) == "pick_up"
-    assert next_step("Fitted the cube into the square hole.", verbs) == ""  # done, not next
-    assert next_step("Will dig at dawn", verbs) == ""  # not a verb this seat has here
-
-
-def test_a_note_claiming_a_deed_no_act_did_is_caught():
-    from body_harness.loop import next_step, past_claim
-    verbs = {"fit", "pick_up"}
-    assert past_claim("Fitted cube into square hole.", verbs, set()) == "fit"
-    assert past_claim("Fitted cube into square hole.", verbs, {"fit"}) == ""  # it went through
-    assert past_claim("Picked up cylinder, ready to fit it.", verbs, set()) == "pick_up"
-    assert next_step("Plan: fit cube into square hole, then cylinder", verbs) == "fit"
-    assert next_step("Picked up cylinder, ready to fit into round hole.", verbs) == "fit"

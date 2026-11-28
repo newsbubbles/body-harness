@@ -55,7 +55,6 @@ STARTER = {
 }
 # 40 trials at least: with 20, a value never imagined and one imagined once read the same 4.4 bits
 MIN_TRIALS, MAX_TRIALS, MAX_ROUNDS, BUDGET_S = 40, 200, 30, 8.0
-FIGHT = ("attack", "spar", "fight", "strike", "hit", "duel", "brawl")
 OPEN_FOR, STALE_AFTER = 1800.0, 6 * 3600.0
 
 
@@ -488,19 +487,20 @@ class Imagination:
             out["minds"] = {n: {"id": m["id"], "as": m.get("as", ""), "source": m["source"]}
                             for n, m in self.spec["minds"].items()}
         if not self.spec["rules"]:
-            # named after the seat's own verb: Tamsin copied a starter called attack, her world's verb was spar, and
-            # her imagining could never be compared with what happened
+            # named for no verb at all: Tamsin copied a starter called attack, her world's verb was spar, and her
+            # imagining could never be compared with what happened. The placeholder fails until it is renamed
             real = sorted(verbs or [])
-            verb = next((v for v in real if v in FIGHT), real[0] if real else "attack")
+            verb = "YOUR_VERB"
             who = next(iter(seen or {}), "Someone")
             out["starter"] = {"rules": {verb: STARTER["attack"]},
                               "setup": {who: {"ac": 12, "atk": 2}, "me": {"ac": 12, "atk": 3}},
                               "plan": [{"actor": "me", "verb": verb, "target": who},
                                        {"actor": who, "verb": verb, "target": "me"}],
                               "rounds": 3,
-                              "hint": "name each rule after the real verb it stands for, and write it as your "
-                                      "world's handbook and what you have seen say it works, not as this example "
-                                      "guesses"}
+                              "hint": "rename YOUR_VERB to the real verb it stands for" +
+                                      (f" (yours: {', '.join(real[:12])})" if real else "") +
+                                      ", and write each rule as your world's handbook and what you have seen say "
+                                      "it works, not as this example guesses"}
         if self.spec["lessons"]:
             out["lessons"] = self.spec["lessons"][-8:]
         cal = self.calibration()

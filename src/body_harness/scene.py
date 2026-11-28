@@ -14,9 +14,6 @@ NOISE = {"opinion", "moved", "patched", "tick", "embodied", "released", "remembe
 DAY = 86400.0
 
 
-_TITLES = {"The", "Old", "Young", "Captain", "Reeve", "Elder", "Sir", "Lady", "Master", "Mistress", "Brother", "Sister"}
-
-
 class Names:
     """id -> name for everything this seat has seen, plus the reverse lookups for resolving a short name."""
 
@@ -47,6 +44,12 @@ class Names:
             return "?" if i is None else str(i)
         return self.by_id.get(i, i)
 
+    def keys(self, name: str) -> list[str]:
+        """The words that pick `name` out: its words of 3+ letters that no other name this seat knows shares
+        (a title two people carry calls neither), else the whole name."""
+        taken = {w.lower() for n in set(self.by_id.values()) if n != name for w in n.replace(",", " ").split()}
+        return [w for w in name.replace(",", " ").split() if len(w) >= 3 and w.lower() not in taken] or [name]
+
     def absent_named(self, text: str, present: list[str], me: str = "") -> list[str]:
         """People this seat knows who are named in `text` but are not here: a line said to them reaches nobody."""
         here = {n.lower() for n in present}
@@ -55,8 +58,7 @@ class Names:
             n = self.by_id.get(i)
             if not n or i == me or n.lower() in here:
                 continue
-            keys = [w for w in n.replace(",", " ").split() if len(w) >= 3 and w not in _TITLES] or [n]
-            if any(re.search(r"\b" + re.escape(k) + r"\b", text) for k in keys):
+            if any(re.search(r"\b" + re.escape(k) + r"\b", text) for k in self.keys(n)):
                 out.append(n)
         return sorted(set(out))
 
@@ -252,11 +254,11 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     you = b.get("you") or {}
     me = me_id or you.get("id", "")
     st = you.get("state") or {}
-    vitals = []
-    for k in ("hp", "water", "food", "wounded", "asleep", "bleeding", "tired"):
-        if k in st and st[k] not in (None, False):
-            v = st[k]
-            vitals.append(f"{k} {v}/{st['max_' + k]}" if f"max_{k}" in st else f"{k} {v}")
+    # what the engine says of a body (its condition, asleep), then each gauge the world gives a max_ for
+    vitals = [str(you[k]) if k == "condition" else f"{k} {you[k]}" for k in ("condition", "fading", "decay")
+              if you.get(k)] + (["asleep"] if you.get("asleep") else [])
+    vitals += [f"{k} {st[k]}/{st['max_' + k]}" for k in st
+               if f"max_{k}" in st and isinstance(st[k], (int, float)) and not isinstance(st[k], bool)]
     here = b.get("here") or {}
     lines = [f"{day_and_hour(float(b.get('t') or 0), b.get('ambient'), day_seconds)}; "
              + "; ".join(f"{k} {v}" for k, v in (b.get("ambient") or {}).items() if k != "time_of_day")]
@@ -304,7 +306,7 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     allev = events if events is not None else (b.get("events") or [])
     # what was said to you comes first and is never pushed out by a busy room's barks (models cannot tell addressed
     # from overheard on their own; the world's to= and target fields can)
-    mine = [e for e in allev if to_me(e, me, you.get("name") or "")]
+    mine = [e for e in allev if to_me(e, me, you.get("name") or "", names)]
     told = event_lines(mine, me, names, 10)
     if told:
         lines.append("Said to you:")
@@ -316,17 +318,17 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     return "\n".join(lines)
 
 
-def to_me(e: dict[str, Any], me: str, my_name: str = "") -> bool:
-    """A line aimed at me: said or asked to me, or a room line that calls me by name."""
+def to_me(e: dict[str, Any], me: str, my_name: str = "", names: Names | None = None) -> bool:
+    """A line aimed at me: said or asked to me, or a room line that calls me by a word of my name no other known
+    name shares (`names`), or by my whole name."""
     if e.get("kind") not in ("say", "talked") or not me or e.get("actor") == me:
         return False
     p = e.get("payload") or {}
     if me in (p.get("to"), e.get("target")):
         return True
-    words = [w for w in my_name.replace(",", " ").split() if w not in _TITLES]
-    first = words[0] if words else ""
-    return e.get("kind") == "say" and not p.get("to") and len(first) > 2 and \
-        bool(re.search(r"\b" + re.escape(first) + r"\b", str(p.get("text", "")), re.I))
+    keys = (names or Names()).keys(my_name) if my_name else []
+    return e.get("kind") == "say" and not p.get("to") and \
+        any(re.search(r"\b" + re.escape(k) + r"\b", str(p.get("text", "")), re.I) for k in keys)
 
 
 def wait_card(w: dict[str, Any], names: Names, me_id: str, day_seconds: float = DAY) -> str:

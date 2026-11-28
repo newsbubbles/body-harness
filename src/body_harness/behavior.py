@@ -128,16 +128,13 @@ def _name_parts(name: str) -> list[str]:
     return [w.lower() for w in (caps or ws)]
 
 
-_HAIL = r"(?:hey|oi|hi|hello|ho|listen|look|you)"
-
-
 def _addressed(text: str, parts: list[str]) -> bool:
-    """A name used as the line's address ("Mara, the gate", "Hey Mara", "the gate, Mara?"), not in passing
-    ("Mara went west"): the engine's own rule, so a check reads a line as a watch does."""
+    """A name used as the line's address ("Mara, the gate", "the gate, Mara?"), not in passing ("Mara went west"):
+    by where the name stands in the line, never by greeting words."""
     tx = str(text or "").lower().strip()
     for p in parts:
         n = r"\b" + re.escape(p) + r"\b"
-        if (re.match(r"^\W*" + n + r"\s*(?:[,!?:]|$)", tx) or re.search(_HAIL + r"\W+" + n, tx)
+        if (re.match(r"^\W*" + n + r"\s*(?:[,!?:]|$)", tx)
                 or re.search(r",\s*" + n + r"\s*(?:[,.!?]|$)", tx)):
             return True
     return False
@@ -243,8 +240,6 @@ def problems(g: dict[str, Any], cfg: dict[str, Any] | None = None,
             q = str(n.get("q") or "").strip()
             if not q:
                 errs.append(f"{where}: q= is the question, in words")
-            if k != "think" and (hint := exact_hint(q)):
-                warns.append(f"{where}: {hint}")
             if k == "ask" and not (n.get("yes") or n.get("no")):
                 errs.append(f"{where}: an ask needs yes= or no=")
             if k == "choose" and (not isinstance(n.get("options"), dict) or len(n["options"]) < 2):
@@ -338,25 +333,6 @@ def _cond_problems(c: Any) -> list[str]:
     known = ("heard", "to_me", "arrived", "left", "present", "time", "says", "all", "any", "not")
     bad = [k for k in c if k not in known]
     return [f"if= does not know {', '.join(bad)}; write it as a watch expression instead"] if bad else []
-
-
-_EXACT = [(re.compile(r"\b(arrive[sd]?|come[s]? in|shows? up|turns? up|enters?)\b", re.I),
-           "arrived('NAME') reads arrivals exactly, for free"),
-          (re.compile(r"\b(leave[s]?|left|walks? (off|out|away))\b", re.I), "did('left', by='NAME') reads that exactly"),
-          (re.compile(r"\b(dusk|dawn|nightfall|morning|evening|noon)\b", re.I),
-           "ambient.get('time_of_day') == 'dusk' reads the hour exactly"),
-          (re.compile(r"\b(is|are) \w+ (here|present|around)\b", re.I), "came('NAME') reads that exactly"),
-          (re.compile(r"\b(says?|said|mentions?|mentioned)\b.*['\"]", re.I),
-           "heard('WORD') reads a word in a line exactly")]
-
-
-def exact_hint(q: str) -> str:
-    """A question the world could answer exactly: say so (the judge costs a little and can be wrong)."""
-    for rx, how in _EXACT:
-        if rx.search(q):
-            return (f"q={q[:80]!r} looks like a fact the world tells exactly: a check with {how}. Keep asks for "
-                    f"meaning (mood, intent, what someone wants)")
-    return ""
 
 
 def reachable(g: dict[str, Any], frm: str | None = None) -> set[str]:

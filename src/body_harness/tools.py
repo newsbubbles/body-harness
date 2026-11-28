@@ -36,11 +36,9 @@ ALIASES = {"inspect": {"target": "entity", "name": "entity", "id": "entity"},
 TOOL_ROUTES = {"gesture": ("say", "gesture"), "emote": ("say", "gesture"), "nod": ("say", "gesture"),
                "speak": ("say", ""), "reply": ("say", ""), "respond": ("say", ""), "talk_to": ("say", ""),
                "tell_npc": ("say", ""), "whisper": ("say", "low"), "shout": ("say", "loud"), "yell": ("say", "loud"),
-               "call_out": ("say", "loud"), "walk": ("act", "go"), "move": ("act", "go"), "go_to": ("act", "go"),
-               "goto": ("act", "go"), "travel": ("act", "go"), "wait": ("sleep", ""), "end_turn": ("sleep", ""),
+               "call_out": ("say", "loud"), "wait": ("sleep", ""), "end_turn": ("sleep", ""),
                "observe": ("look", ""), "perceive": ("look", ""), "scene": ("look", "")}
 _TEXT_KEYS = ("text", "message", "line", "words", "content", "say", "speech")
-_PLACE_KEYS = ("target", "place", "to", "destination", "where", "exit")
 
 
 def route(name: str, args: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
@@ -63,9 +61,6 @@ def route(name: str, args: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
                 out["to"] = a[k]
                 break
         return "say", out
-    if tool == "act":
-        place = next((a.pop(k) for k in _PLACE_KEYS if a.get(k)), None)
-        return "act", {"verb": how, "target": place, "params": {k: v for k, v in a.items() if k != "verb"}}
     return tool, {k: v for k, v in a.items() if k in ("until", "minutes", "note", "plan", "part")}
 
 

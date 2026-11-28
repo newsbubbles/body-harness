@@ -35,24 +35,18 @@ from .usage import Usage, append as usage_append
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
 # a call the model got wrong, not a world that said no: these move a turn up the escalate list (a rule refusal, like
 # a gangplank that will not take an elf, is the game and never escalates). The engine's layer="call" says it outright.
-CALL_TROUBLE = re.compile(r"bad arguments|there is no tool|\bno tool \w|unexpected keyword argument|missing \d+ "
-                          r"required|syntax error|Not asleep yet|no verb '|\"layer\": \"call\"")
+# The harness's own call errors by their words; the engine's by its layer (call: the shape; target: what it names)
+CALL_TROUBLE = re.compile(r"bad arguments|there is no tool|\bno tool \w|Not asleep yet|\"layer\": \"(call|target)\"")
+# the engine's codes for a seat this principal no longer holds (since 11-26): join again
+SEAT_LOST = ("not_joined", "seat_released")
+
+
+def unseated(r: Any) -> bool:
+    return isinstance(r, dict) and r.get("ok") is False and r.get("code") in SEAT_LOST
 READS = {"look", "find_tools", "inspect", "find", "history", "guide", "handbook", "recall", "skill", "owed", "agenda",
          "past", "menu"}
 KEEP_LOADED_TURNS = 5
 MAX_LOADED = 8
-
-
-# Words that claim a deed, what they claim, and the verbs that would do it (the first the world has is suggested)
-_CLAIMS = [
-    (r"\b(i take (it|the job|the work|your offer)|i('ll| will) take (it|the job|the work)|accept(ed)?\b.{0,40}\b(job|"
-     r"offer|work)|took\b.{0,30}\bjob|i('m| am) in for the job)\b", "took the job",
-     ("take_job", "accept", "hire")),
-    (r"\b(i give (you|him|her|them)|i('ve| have) given|gave (you|him|her|them)|here('s| is) (the|your) "
-     r"(coin|gold|silver|money))\b", "gave it", ("give", "pay")),
-    (r"\b(i bought|i('ve| have) bought|i('ll| will) buy (it|that|this) now|paid (you|him|her|the))\b", "paid",
-     ("buy", "pay", "give")),
-]
 
 
 def _brief(args: dict[str, Any]) -> str:
@@ -219,7 +213,7 @@ class Mind:
 
     async def perceive(self) -> dict[str, Any]:
         b = await self.door.op("perceive", events=40)
-        if isinstance(b, dict) and b.get("ok") is False and "join" in str(b.get("reason", "")).lower():
+        if unseated(b):
             await self.join()
             b = await self.door.op("perceive", events=40)
         self._keep_bundle(b)
@@ -362,7 +356,7 @@ class Mind:
                 r = await c["door"].op(name, **args)
             except DoorError as e:
                 return {"ok": False, "reason": f"as {c['name']}: {e}"}
-            lost = isinstance(r, dict) and r.get("ok") is False and "join" in str(r.get("reason", "")).lower()
+            lost = unseated(r)
             if not lost or attempt == 2:
                 return r
             c["joined"] = False  # the world restarted and forgot the seat: take it again once
@@ -454,10 +448,11 @@ class Mind:
                             "hint": (f"did you mean {', '.join(near)}? " if near else "") +
                                     "find_tools(query) finds and loads tools; verbs go through act(verb, ...)"})
         fixed, notes = fix_args(name, args, self)
-        if name == "act":
+        if name == "act" and self.cfg.get("strict_params"):
             # Klhyts Refuge, 28 Nov: Corra staked one copper as drop(Coin, params={'n': 1}); drop takes count, the
             # engine read none and her whole purse of 57 hit the table. A param the verb does not declare is sent
-            # back with what it does declare, so the model names it itself
+            # back with what it does declare, so the model names it itself. A setting for models that misname
+            # params: Gemma 4 had 27 of 115 acts sent back for params the engine would have ignored
             takes = self.verb_params(fixed.get("verb"))
             extra = undeclared(fixed.get("params"), takes)
             if extra:
@@ -492,16 +487,6 @@ class Mind:
                                                        f"turns, with nothing done between",
                                 "hint": "do something (act), or let it rest and sleep on a change (someone arriving, "
                                         "a deed, the hour). If this line truly moves things, say it again"})
-            told = None if turn.get("hearsay_ok") == text else \
-                _hearsay(text, self._voices(), [self.names.by_id.get(i) for i in self.names.people if i != self.me])
-            if told:
-                turn["hearsay_ok"] = text  # the same line again goes through: the seat stands by it
-                last = f" The last you heard from them: {told[2]!r}." if told[2] else \
-                    " You have heard no line from them lately."
-                return compact({"ok": False, "reason": f"not said: your line gives {told[0]} words ({told[1]!r}) that "
-                                                       f"nothing you heard from them carries.{last}",
-                                "hint": "say only what they said, name who you really heard it from, or say it as "
-                                        "your own guess. If they truly said it, say the same line again"})
         if name == "away":
             self.st["away"] = fixed
         sent = fixed
@@ -518,8 +503,7 @@ class Mind:
             notes.append(f"this world's {name} takes no {', '.join(dropped)}: sent without it" +
                          (" (the gesture went into the line as *...*)" if "gesture" in dropped and name == "say"
                           else ""))
-        if isinstance(r, dict) and r.get("ok") is False and "join" in str(r.get("reason", "")).lower() \
-                and "seat" in str(r.get("reason", "")).lower():
+        if unseated(r):
             await self.join()
             r = await self._op(name, fixed)
         ok = not (isinstance(r, dict) and r.get("ok") is False)
@@ -533,11 +517,6 @@ class Mind:
                                                                           fixed.get("target")):
                     notes.append("this is part of a plan you imagined: when the plan is done, what came of it is "
                                  "compared with what you imagined")
-        if ok and name == "say":
-            claim = self._deed_claim(str(fixed.get("text", "")), turn)
-            if claim:
-                notes.append(f"your words say you {claim[0]}, but no deed did it, and words do not move the world. "
-                             f"To do it: act(verb='{claim[1]}', ...)")
         if ok and name in ("say", "act") and (fixed.get("to") or (name == "act" and fixed.get("verb") == "talk")):
             who = fixed.get("to") or fixed.get("target")
             if isinstance(who, str) and who:
@@ -581,7 +560,7 @@ class Mind:
         """For menu_lists: the talk with whoever spoke to this seat and this body's own deeds, read from the world's
         log (a mind reads only its own body's). A window that came back full says the log goes further back."""
         me_name = self.my_name()
-        speaker = next((e.get("actor") for e in evs if scene.to_me(e, self.me, me_name) and e.get("actor")), None)
+        speaker = next((e.get("actor") for e in evs if scene.to_me(e, self.me, me_name, self.names) and e.get("actor")), None)
 
         async def read(op: str, args: dict[str, Any]) -> Any:
             try:
@@ -755,28 +734,6 @@ class Mind:
             warn = self._lint(until)
             if warn:
                 return "Not asleep yet: " + warn
-            claim = None if turn.get("claim_checked") else self._deed_claim(str(a.get("note") or ""), turn)
-            if claim:
-                turn["claim_checked"] = True
-                return (f"Not asleep yet: your note says you {claim[0]}, but no act did it this turn, so the world "
-                        f"does not know. Do it now (act(verb='{claim[1]}', ...)), or write the note as what you said, "
-                        f"not what you did, and sleep.")
-            did = None if turn.get("did_checked") or not self.cfg.get("finish_first") else \
-                past_claim(str(a.get("note") or ""), self.verb_names(), turn.get("verbs") or set())
-            if did:
-                turn["did_checked"] = True
-                return (f"Not asleep yet: your note says you did {did}, but no {did} went through this turn, so the "
-                        f"world does not have it. Look at what you hold and what is here, do it now if it is not "
-                        f"done, or write the note as what really happened, and sleep.")
-            nxt = None if turn.get("next_checked") or not self.cfg.get("finish_first") else \
-                next_step(str(a.get("note") or ""), self.verb_names())
-            if nxt:
-                # Shape Table, 27 Nov: small models did one deed a turn and slept on "I will fit it into the square
-                # hole next", in a world where nothing else would wake them; 9 of 15 seats ran out of time
-                turn["next_checked"] = True
-                return (f"Not asleep yet: your note says you will {nxt} next, and {nxt} is open to you here now. If "
-                        f"nothing stands in the way, do it now. Sleep when what is left needs someone or something "
-                        f"else to happen first.")
         rules: list[dict[str, Any]] = []
         waiting_for = str(a.get("waiting_for") or "").strip()
         if self.cfg.get("reflexes") and not forced and a.get("reflexes"):
@@ -895,7 +852,7 @@ class Mind:
                 return self._away_reason(await self.ride_out(e)), []
             if isinstance(w, dict) and w.get("ok") is False:
                 reason = str(w.get("reason", ""))
-                if "join" in reason.lower() or "seat" in reason.lower() or "embod" in reason.lower():
+                if unseated(w):
                     _log(self.seat.name, f"seat lapsed ({reason[:80]}); joining again")
                     await self.join()
                     continue
@@ -1038,17 +995,6 @@ class Mind:
                 lines.append(f"- scheduled [{i['id']}] at {when}: {i['what']}")
         return "\n".join(lines)
 
-    def _deed_claim(self, text: str, turn: dict[str, Any]) -> tuple[str, str] | None:
-        """(what the words claim, the verb that would do it) when a line or note claims a deed no act did this turn
-        and the world has the verb. Ssareth told Gog "I take it" and never ran take_job."""
-        verbs, done = self.verb_names(), turn.get("verbs") or set()
-        for pat, what, cands in _CLAIMS:
-            if re.search(pat, text, re.I):
-                verb = next((v for v in cands if v in verbs), None)
-                if verb and not (done & set(cands)):
-                    return what, verb
-        return None
-
     def _takes(self, name: str) -> set[str] | None:
         """The argument names a tool offered to the model takes (None: not a tool it was offered)."""
         for t in self.registry.tools(self.loaded_tools()):
@@ -1096,22 +1042,10 @@ class Mind:
         keep = self.st.get("heard") or []
         have = {h[0] for h in keep}
         asked = self.st.get("unanswered") or {}
-        voices = self.st.setdefault("voices", {})
         for e in events or []:
             if e.get("kind") in ("say", "talked") and e.get("actor") not in (None, self.me):
                 asked.pop(str(self.names.name(e.get("actor"))).lower(), None)  # they spoke: no longer unanswered
-            said = (e.get("payload") or {}).get("text")
-            seen = self.st.setdefault("voice_seqs", [])
-            if e.get("kind") == "say" and e.get("actor") not in (None, self.me) and isinstance(said, str) and \
-                    e.get("seq") not in seen:
-                # every line this seat heard, by speaker, for checking what it later says they said
-                seen.append(e.get("seq"))
-                del seen[:-200]
-                who = str(self.names.name(e.get("actor")))
-                voices[who] = (voices.pop(who, []) + [said[:400]])[-8:]
-                while len(voices) > 40:
-                    voices.pop(next(iter(voices)))
-            if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me, self.my_name()):
+            if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me, self.my_name(), self.names):
                 continue
             line = scene.event_line(e, self.me, self.names)
             if line:
@@ -1124,14 +1058,6 @@ class Mind:
         """World seconds per real second, from the briefing's pace line ("the clock runs at 4x real time")."""
         m = re.search(r"(\d+(?:\.\d+)?)x real time", str(self.briefing.get("pace") or ""))
         return float(m.group(1)) if m and float(m.group(1)) > 0 else None
-
-    def _voices(self) -> dict[str, list[str]]:
-        """What each speaker was heard saying: every line kept, plus the lines to this seat kept before that began."""
-        out = {k: list(v) for k, v in (self.st.get("voices") or {}).items()}
-        for h in self.st.get("heard") or []:
-            if len(h) > 3 and h[2] not in out.get(h[3], []):
-                out.setdefault(str(h[3]), []).append(str(h[2]))
-        return out
 
     def _layer(self, name: str) -> str:
         """Which layer a tool belongs to, for telemetry: a world verb, an engine op, the menu, an app, a harness
@@ -1167,9 +1093,7 @@ class Mind:
                 out.append(f"{who}, who you were talking with, left for {where}.")
         if not out:
             return ""
-        how = "act(verb='follow') while someone is still here, or go there" if "follow" in self.verb_names() \
-            else "go there"
-        return f"\n\n(harness: {' '.join(dict.fromkeys(out))} If you mean to stay with them, {how}.)"
+        return f"\n\n(harness: {' '.join(dict.fromkeys(out))} If you mean to stay with them, your verbs say how.)"
 
     def _keep_wake(self, reason: str, events: list[dict[str, Any]], st: dict[str, Any], b: dict[str, Any]) -> None:
         """The last few wakes as they arrived, for bh calibrate to replay offline: a calibration that perceived
@@ -1249,7 +1173,7 @@ class Mind:
                  if h[0] not in cur and now - h[1] < float(self.cfg.get("heard_minutes", 60)) * 60]
         self._keep_heard(evs)
         me_name = self.my_name()
-        told = bool(heard) or any(scene.to_me(e, self.me, me_name) for e in evs)
+        told = bool(heard) or any(scene.to_me(e, self.me, me_name, self.names) for e in evs)
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
                             recent, heard, str(self.st.get("plan") or ""), told)
         user += self._companion_left(evs)
@@ -1280,7 +1204,7 @@ class Mind:
             nudges.append(f"quiet: {', '.join(quiet[:4])}")
             user += (f"\n\n(harness: quiet lately, your last lines to them went unanswered: {', '.join(quiet[:4])}. "
                      "Do not ask them again; wait until they speak to you.)")
-        need = int(self.cfg.get("stuck_notes", 5))
+        need = int(self.cfg.get("stuck_notes", 0))  # off unless a seat's model needs it
         known = {w for n in self.names.by_id.values() for w in re.findall(r"[a-z][a-z'-]{2,}", str(n).lower())}
         lead = stuck_on(self.st.get("notes") or [], known, need) if need else ""
         if lead and lead not in (self.st.get("stuck_told") or []):
@@ -1302,7 +1226,7 @@ class Mind:
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
         turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": [], "nudges": nudges}
         turn["woke"] = woke(reason, events or [], self.me, me_name, self.names, bool(notes))
-        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me, me_name)]
+        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me, me_name, self.names)]
         turn["spoken_to"] = bool(b.get("owed")) or bool(turn["partners"])
         tu = Usage()
         max_steps = int(self.cfg.get("max_steps", 16))
@@ -1570,59 +1494,9 @@ def _real_timers(r: Any, rate: float | None) -> Any:
     for t in r:
         if isinstance(t, dict) and isinstance(t.get("in"), (int, float)):
             t = dict(t)
-            if isinstance(t.get("when"), str):
-                t["when"] = re.sub(r"\b(minute|hour|day)", r"world \1", t["when"])
             t["real_minutes"] = max(1, round(t["in"] / rate / 60))
         out.append(t)
     return out
-
-
-_TOLD = r"(?:said|says|told (?:me|you|us|him|her|them)|tells (?:me|you|us)|reckons|swore|claims|claimed|mentioned)"
-_PLAIN = {"that", "this", "with", "from", "have", "were", "they", "them", "their", "there", "what", "when", "will",
-          "would", "about", "your", "just", "been", "some", "someone", "said", "told", "says", "tells", "whole", "also",
-          "only", "here", "back", "like", "into", "over", "then", "than", "know", "come", "coming", "going", "sending"}
-
-
-def _hearsay(text: str, voices: dict[str, list[str]], people: Any = ()) -> tuple[str, str, str] | None:
-    """(who, the words given them, the last line heard from them) when `text` says someone said something that
-    nothing this seat heard from them carries. Pip told the Reeve "Captain Ruhl said the Guild's sending someone from
-    the star to look at our gate"; Ruhl had said nothing of the kind, and corrected him in the hall."""
-    names = sorted({str(n) for n in people if n} | set(voices), key=len, reverse=True)
-    if not names:
-        return None
-    alias = {}  # a name or its last word (Ruhl for Captain Ruhl) -> the full name
-    for n in names:
-        alias.setdefault(n.lower(), n)
-        last = n.split()[-1]
-        if len(last) > 3:
-            alias.setdefault(last.lower(), n)
-    pat = "|".join(re.escape(a) for a in sorted(alias, key=len, reverse=True))
-    for sentence in re.split(r"(?<=[.!?])\s+", text):
-        m = re.search(rf"^\s*(?:and\s+)?(he|she)\s+{_TOLD}\b(.+)", sentence, re.I)
-        if m:  # "He said ..." is the last person named before it
-            before = text[:text.find(sentence)]
-            found = [(before.lower().rfind(a), alias[a]) for a in alias if re.search(rf"\b{re.escape(a)}\b", before,
-                                                                                     re.I)]
-            if not found:
-                continue
-            who = max(found)[1]
-        else:
-            m = re.search(rf"\b({pat})\b[^.!?]{{0,12}}?\b{_TOLD}\b(.+)", sentence, re.I)
-            if not m:
-                continue
-            who = alias[m.group(1).lower()]
-        claim = m.group(2).strip(" ,:")
-        skip = _PLAIN | {w.lower() for n in names for w in n.split()}
-        words = _words(claim, skip)
-        if len(words) < 3:
-            continue
-        lines = voices.get(who) or []
-        heard = set()
-        for ln in lines:
-            heard |= {w[:5] for w in _words(ln, set())}
-        if not lines or len({w for w in words if w[:5] in heard}) / len(words) < 0.34:
-            return who, claim[:160], (lines[-1][:160] if lines else "")
-    return None
 
 
 def clean_calls(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1641,49 +1515,13 @@ def clean_calls(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-_PLAIN = set("""about after again also asked asking back been before being came come could did does doing done down
-each even from going have here into just know last like look looked made make more much next only other over said
-same says some still than that their them then there they this told turn turns very wait waiting want wants went
-were what when where which while will with would your""".split())
-
-
-_INTENT = re.compile(r"\b(will|next|then|plan|planned|going to|need to|ready to|waiting to|about to|to do|now)\b",
-                     re.I)
-
-
-def next_step(note: str, verbs: set[str]) -> str:
-    """A verb open to the seat now that its sleep note says it will do next ("I will fit it into the square hole"),
-    or "". A past deed ("fitted") never matches: only the verb's own word."""
-    m = _INTENT.search(note)
-    if not m:
-        return ""
-    after = note[m.start():].lower()
-    for v in sorted(verbs, key=len, reverse=True):
-        if re.search(r"\b" + re.escape(v.replace("_", " ")).replace(r"\ ", r"[ _]") + r"\b", after):
-            return v
-    return ""
-
-
-def past_claim(note: str, verbs: set[str], done: set[str]) -> str:
-    """A verb the seat has that its note says it did ("Fitted cube into square hole", "picked up the star") when no
-    act of that verb went through this turn, or "". Shape Table, 27 Nov: nano wrote "Fitted cube" twice, and the
-    world had no fit."""
-    for v in sorted(verbs - done, key=len, reverse=True):
-        head, _, rest = v.partition("_")
-        forms = "|".join(re.escape(f) for f in {head + "ed", head + "d", head + head[-1:] + "ed"})
-        tail = r"[ _]" + re.escape(rest).replace("_", "[ _]") if rest else ""
-        if re.search(r"\b(" + forms + r")\b" + tail, note, re.I):
-            return v
-    return ""
-
-
 def woke(reason: str, events: list[dict[str, Any]], me: str, me_name: str, names: scene.Names,
          reflexed: bool = False) -> dict[str, Any]:
     """What woke a turn, as counts for telemetry: why (timeout, event, spoken_to, told, reflex, start), the waking
     event's kind, whether another seat (not a player) did it, and that character's name."""
     r = reason.lower()
     real = [e for e in events if e.get("kind") not in scene.NOISE and e.get("actor") != me]
-    to_me = [e for e in real if scene.to_me(e, me, me_name)]
+    to_me = [e for e in real if scene.to_me(e, me, me_name, names)]
     e = (to_me or real or [None])[-1]
     why = ("told" if r.startswith("your operator") else "reflex" if reflexed
            else "timeout" if r.startswith(("time is up", "something you scheduled")) else
@@ -1707,7 +1545,7 @@ def stuck_on(notes: list[str], known: set[str], need: int = 5, of: int = 6) -> s
     for n in last:
         words = [w for w in re.findall(r"[a-z][a-z'-]{2,}", n.lower())]
         pairs = {f"{a} {b}" for a, b in zip(words, words[1:])
-                 if a not in _PLAIN and b not in _PLAIN and len(a) > 3 and len(b) > 3
+                 if len(a) > 4 and len(b) > 4
                  and a not in known and b not in known}
         for x in pairs:
             counts[x] = counts.get(x, 0) + 1

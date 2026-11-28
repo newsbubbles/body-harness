@@ -114,8 +114,8 @@ def score(s: Seat, wake: dict[str, Any], seconds: float) -> dict[str, Any]:
         me in ((e.get("payload") or {}).get("to"), e.get("target")) for e in wake.get("events") or [])
     note = str(led.get("note") or "")
     u = led.get("usage") or {}
-    says = [str((c.get("args") or {}).get("text", "")) for c in calls if c.get("tool") == "say" or
-            (c.get("tool") == "act" and (c.get("args") or {}).get("verb") in ("talk", "ask", "tell"))]
+    says = [str((c.get("args") or {}).get("text", "")) for c in calls
+            if c.get("tool") == "say" or (c.get("tool") == "act" and (c.get("args") or {}).get("text"))]
     return {
         "calls": len(calls),
         "tools": [c.get("tool") for c in calls],
