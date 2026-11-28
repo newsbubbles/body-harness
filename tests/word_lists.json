@@ -1,0 +1,727 @@
+{
+ "src/body_harness/behavior.py:74323e099e": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "act, op, say, sleep, wake"
+ },
+ "src/body_harness/behavior.py:c33d77173c": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "ask, check, choose, do, think"
+ },
+ "src/body_harness/behavior.py:98e5043cc9": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "no, unsure, yes"
+ },
+ "src/body_harness/behavior.py:a29460e339": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "arrived, came, did, heard, named, state, to_me"
+ },
+ "src/body_harness/behavior.py:9285499411": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "ambient, events, here, me, present, t, woke"
+ },
+ "src/body_harness/behavior.py:3bd156026f": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "act, say, talked"
+ },
+ "src/body_harness/behavior.py:1286da09a6": {
+  "kind": "debt",
+  "why": "2.4 greeting words read as being spoken to; use the engine's to field",
+  "sample": "(?:hey|oi|hi|hello|ho|listen|look|you)"
+ },
+ "src/body_harness/behavior.py:013413943f": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'all' in c"
+ },
+ "src/body_harness/behavior.py:4bf6a4d9af": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'any' in c"
+ },
+ "src/body_harness/behavior.py:e21ffca68e": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'not' in c"
+ },
+ "src/body_harness/behavior.py:9b02adafa1": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'arrived' in c"
+ },
+ "src/body_harness/behavior.py:976ed63864": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'left' in c"
+ },
+ "src/body_harness/behavior.py:f1a3d05a8d": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'present' in c"
+ },
+ "src/body_harness/behavior.py:f2a6a1f335": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'time' in c"
+ },
+ "src/body_harness/behavior.py:915fba19ab": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'heard' in c"
+ },
+ "src/body_harness/behavior.py:95a114cc37": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'says' in c"
+ },
+ "src/body_harness/behavior.py:cbe7c99dd5": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "params, target, verb"
+ },
+ "src/body_harness/behavior.py:76a037f3fe": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "ask, choose, think"
+ },
+ "src/body_harness/behavior.py:7ea215cfff": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "act, op, say"
+ },
+ "src/body_harness/behavior.py:14caeb5c88": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "all, any, arrived, heard, left, not, present, says, time, to_me"
+ },
+ "src/body_harness/behavior.py:a3b1c5cb18": {
+  "kind": "debt",
+  "why": "2.5 English lint hints on behaviour text",
+  "sample": "\\b(arrive[sd]?|come[s]? in|shows? up|turns? up|enters?)\\b"
+ },
+ "src/body_harness/behavior.py:38990558df": {
+  "kind": "debt",
+  "why": "2.5 English lint hints on behaviour text",
+  "sample": "\\b(leave[s]?|left|walks? (off|out|away))\\b"
+ },
+ "src/body_harness/behavior.py:b7c1cb0082": {
+  "kind": "debt",
+  "why": "2.5 English lint hints on behaviour text",
+  "sample": "\\b(dusk|dawn|nightfall|morning|evening|noon)\\b"
+ },
+ "src/body_harness/behavior.py:3550c6005c": {
+  "kind": "debt",
+  "why": "2.5 English lint hints on behaviour text",
+  "sample": "\\b(is|are) \\w+ (here|present|around)\\b"
+ },
+ "src/body_harness/behavior.py:ef048676e0": {
+  "kind": "debt",
+  "why": "2.5 English lint hints on behaviour text",
+  "sample": "\\b(says?|said|mentions?|mentioned)\\b.*['\\\"]"
+ },
+ "src/body_harness/behavior.py:749f71990b": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "link, patch, unlink"
+ },
+ "src/body_harness/behavior.py:898b506d2e": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'says' in m"
+ },
+ "src/body_harness/behavior.py:6870546bd9": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'leaves' in m"
+ },
+ "src/body_harness/behavior.py:0df77a0a28": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'does' in m"
+ },
+ "src/body_harness/behavior.py:3e0846eaf3": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "'scene' in m"
+ },
+ "src/body_harness/behavior.py:a2f81ebc90": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "apply, help, run, view"
+ },
+ "src/body_harness/behavior.py:7b24367979": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "run: what happens, as short events: {who, says, to:'me'|name}, {who, arrives:true}, {who, leaves:place}, {who, does:verb"
+ },
+ "src/body_harness/behavior.py:75e4026a7f": {
+  "kind": "contract",
+  "why": "the harness's own behaviour language (node kinds, helpers, edges, condition keys) and engine op/event names",
+  "sample": "event, now, timeout"
+ },
+ "src/body_harness/calibrate.py:e4cd940570": {
+  "kind": "contract",
+  "why": "harness tool names and seat folder names",
+  "sample": "find, guide, handbook, history, inspect, recall, timers"
+ },
+ "src/body_harness/calibrate.py:bf30123de0": {
+  "kind": "contract",
+  "why": "harness tool names and seat folder names",
+  "sample": "apps, memory, skills"
+ },
+ "src/body_harness/calibrate.py:21093c60ef": {
+  "kind": "debt",
+  "why": "1.7 guessed speaking verbs in calibration; count say ops and talked events",
+  "sample": "ask, talk, tell"
+ },
+ "src/body_harness/calibrate.py:50283b1869": {
+  "kind": "debt",
+  "why": "4 calibration reads error wording",
+  "sample": "'bad arguments' in o"
+ },
+ "src/body_harness/calibrate.py:e8c0d7203d": {
+  "kind": "debt",
+  "why": "4 calibration reads the harness's own nudge wording",
+  "sample": "'Not asleep yet' in o"
+ },
+ "src/body_harness/caps.py:ed7f1511e3": {
+  "kind": "contract",
+  "why": "values of the harness's own spend-cap setting",
+  "sample": "no, none, off"
+ },
+ "src/body_harness/caps.py:993d92e1aa": {
+  "kind": "contract",
+  "why": "values of the harness's own spend-cap setting",
+  "sample": "always, keep-going, never-pause"
+ },
+ "src/body_harness/cli.py:8837b84fb5": {
+  "kind": "contract",
+  "why": "the harness's own CLI words and help text",
+  "sample": "add needs the hand's invite: bh hand SEAT add NAME <link|file>"
+ },
+ "src/body_harness/cli.py:a96c344f84": {
+  "kind": "contract",
+  "why": "the harness's own CLI words and help text",
+  "sample": "name the seats first: bh cap <seat> [<seat>...] 0.50 | off | always"
+ },
+ "src/body_harness/cli.py:e0841e994f": {
+  "kind": "contract",
+  "why": "the harness's own CLI words and help text",
+  "sample": "spend caps, yours to set per seat or for the home: bh cap (all), bh cap <seat> 0.50 | off | always, bh cap --home 3.00 |"
+ },
+ "src/body_harness/cli.py:64567573df": {
+  "kind": "contract",
+  "why": "the harness's own CLI words and help text",
+  "sample": "add, list, remove"
+ },
+ "src/body_harness/cli.py:92f8060785": {
+  "kind": "contract",
+  "why": "the harness's own CLI words and help text",
+  "sample": "add, install, remove, run, status, stop, uninstall"
+ },
+ "src/body_harness/cli.py:cdcbfeeaa3": {
+  "kind": "contract",
+  "why": "the harness's own CLI words and help text",
+  "sample": "    note:   | watch  |  in /  out, $"
+ },
+ "src/body_harness/door.py:cfab405efc": {
+  "kind": "contract",
+  "why": "the HTTP auth header",
+  "sample": "'Bearer' in text"
+ },
+ "src/body_harness/imagine.py:4d91f357fb": {
+  "kind": "debt",
+  "why": "1.4 guessed fight verb names",
+  "sample": "attack, brawl, duel, fight, hit, spar, strike"
+ },
+ "src/body_harness/imagine.py:78f72d56bd": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": ";\\s*(?=(?:if|for|while|return)\\b)"
+ },
+ "src/body_harness/imagine.py:80063cf50b": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "\\s*(return|if|for|while)\\b"
+ },
+ "src/body_harness/imagine.py:435ce86039": {
+  "kind": "debt",
+  "why": "4.3 reads the engine's error wording; needs codes",
+  "sample": "failed while|has no (apply|check)\\(|is not allowed|has no attribute|is not defined|not supported|out of fuel"
+ },
+ "src/body_harness/imagine.py:15e5a4a788": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "'NoneType' in broke"
+ },
+ "src/body_harness/imagine.py:7ebaf9690d": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "i, me, self"
+ },
+ "src/body_harness/imagine.py:0d3cca53dd": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "'NoneType' in e.reason"
+ },
+ "src/body_harness/imagine.py:1d4d626d6a": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "SURPRISE (): you imagined  ( trials). . Only about 1 in  imaginings came out that far off. Rules it used: Decide what wa"
+ },
+ "src/body_harness/imagine.py:d3da3fa5ac": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "belief, luck, rule"
+ },
+ "src/body_harness/imagine.py:19523a5c4b": {
+  "kind": "contract",
+  "why": "Python syntax or error type names, and values of the harness's own imagine tools",
+  "sample": "'scored' in r"
+ },
+ "src/body_harness/loop.py:940d751db7": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "act, act_many, cross, gesture, say, step"
+ },
+ "src/body_harness/loop.py:f365e591b9": {
+  "kind": "debt",
+  "why": "4.1 reads error wording; use layer=call and codes",
+  "sample": "bad arguments|there is no tool|\\bno tool \\w|unexpected keyword argument|missing \\d+ required|syntax error|Not asleep yet"
+ },
+ "src/body_harness/loop.py:95d9757f5a": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "agenda, find, find_tools, guide, handbook, history, inspect, look, menu, owed, past, recall, skill"
+ },
+ "src/body_harness/loop.py:2cfce9fb3f": {
+  "kind": "debt",
+  "why": "1.2 English deed-claim phrases",
+  "sample": "\\b(i take (it|the job|the work|your offer)|i('ll| will) take (it|the job|the work)|accept(ed)?\\b.{0,40}\\b(job|offer|work"
+ },
+ "src/body_harness/loop.py:b6727c02bc": {
+  "kind": "debt",
+  "why": "1.2 guessed world verbs for claims",
+  "sample": "accept, hire, take_job"
+ },
+ "src/body_harness/loop.py:6d552c2270": {
+  "kind": "debt",
+  "why": "1.2 English deed-claim phrases",
+  "sample": "\\b(i give (you|him|her|them)|i('ve| have) given|gave (you|him|her|them)|here('s| is) (the|your) (coin|gold|silver|money)"
+ },
+ "src/body_harness/loop.py:4d3ef73b93": {
+  "kind": "debt",
+  "why": "1.2 English deed-claim phrases",
+  "sample": "\\b(i bought|i('ve| have) bought|i('ll| will) buy (it|that|this) now|paid (you|him|her|the))\\b"
+ },
+ "src/body_harness/loop.py:a41a4575ff": {
+  "kind": "debt",
+  "why": "1.2 guessed world verbs for claims",
+  "sample": "buy, give, pay"
+ },
+ "src/body_harness/loop.py:f0b3191f10": {
+  "kind": "debt",
+  "why": "4.3 reads the door's refusal wording",
+  "sample": "your grant|start with|the door refused this grant"
+ },
+ "src/body_harness/loop.py:ed908a6940": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "entity, into, parent, target, thing, to, under"
+ },
+ "src/body_harness/loop.py:a5b9be0a7c": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "exits, holding, people, present, things"
+ },
+ "src/body_harness/loop.py:1f7176a8c7": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "cls, description, people"
+ },
+ "src/body_harness/loop.py:f632793937": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "'you' in b"
+ },
+ "src/body_harness/loop.py:0ee126a420": {
+  "kind": "debt",
+  "why": "4.2 reads 'join' in the engine's refusal; needs a not-seated code",
+  "sample": "'join' in str(b.get('reason', '')).lower()"
+ },
+ "src/body_harness/loop.py:0601c045ba": {
+  "kind": "debt",
+  "why": "4.2 reads 'join' in the engine's refusal; needs a not-seated code",
+  "sample": "'join' in str(r.get('reason', '')).lower()"
+ },
+ "src/body_harness/loop.py:d599d6f09c": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "affordances, verbs, you can"
+ },
+ "src/body_harness/loop.py:368a994ebb": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "imagine, reflect, relive"
+ },
+ "src/body_harness/loop.py:877711055f": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "hook, name, op, query, shelf, text"
+ },
+ "src/body_harness/loop.py:ca62e778e6": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "act, intend, remember, say"
+ },
+ "src/body_harness/loop.py:9ac55e6a1d": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "'gesture' in dropped"
+ },
+ "src/body_harness/loop.py:198fc9856b": {
+  "kind": "debt",
+  "why": "4.2 reads 'seat' in the engine's refusal; needs a not-seated code",
+  "sample": "'seat' in str(r.get('reason', '')).lower()"
+ },
+ "src/body_harness/loop.py:d8e132ce51": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "'more' in self.registry.world"
+ },
+ "src/body_harness/loop.py:984c5c9e0c": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "'kind' in e"
+ },
+ "src/body_harness/loop.py:635416e7a0": {
+  "kind": "debt",
+  "why": "4.2 reads the engine's refusal wording; needs a not-seated code",
+  "sample": "'join' in reason.lower()"
+ },
+ "src/body_harness/loop.py:903116f1d4": {
+  "kind": "debt",
+  "why": "4.2 reads the engine's refusal wording; needs a not-seated code",
+  "sample": "'seat' in reason.lower()"
+ },
+ "src/body_harness/loop.py:2b3ccb86a8": {
+  "kind": "debt",
+  "why": "4.2 reads the engine's refusal wording; needs a not-seated code",
+  "sample": "'embod' in reason.lower()"
+ },
+ "src/body_harness/loop.py:c0c41be7f7": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "'gesture' in gone"
+ },
+ "src/body_harness/loop.py:bcc756de8a": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "intend, remember, say"
+ },
+ "src/body_harness/loop.py:2127b0688b": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "behavior, imagine, past, records, reflect, relive, think"
+ },
+ "src/body_harness/loop.py:645e5d5635": {
+  "kind": "debt",
+  "why": "new: suggests a follow verb by a guessed name",
+  "sample": "'follow' in self.verb_names()"
+ },
+ "src/body_harness/loop.py:706bdb1462": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "reasoning, reasoning_content, reasoning_details"
+ },
+ "src/body_harness/loop.py:635f1a6871": {
+  "kind": "debt",
+  "why": "4 rewrites the engine's timer wording; needs world-time fields",
+  "sample": "\\b(minute|hour|day)"
+ },
+ "src/body_harness/loop.py:1506210f01": {
+  "kind": "debt",
+  "why": "2.2 English hearsay phrases",
+  "sample": "(?:said|says|told (?:me|you|us|him|her|them)|tells (?:me|you|us)|reckons|swore|claims|claimed|mentioned)"
+ },
+ "src/body_harness/loop.py:459974a247": {
+  "kind": "debt",
+  "why": "2.2/2.3 English stop words",
+  "sample": "about, also, back, been, come, coming, from, going, have, here, into, just, know, like, only, over, said, says, sending,"
+ },
+ "src/body_harness/loop.py:d27c1889e9": {
+  "kind": "debt",
+  "why": "2.2 English pronoun hearsay pattern",
+  "sample": "^\\s*(?:and\\s+)?(he|she)\\s+\\b(.+)"
+ },
+ "src/body_harness/loop.py:79d848dffa": {
+  "kind": "debt",
+  "why": "2.1 finish_first English intent words",
+  "sample": "\\b(will|next|then|plan|planned|going to|need to|ready to|waiting to|about to|to do|now)\\b"
+ },
+ "src/body_harness/loop.py:feb7b009e5": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "'waiting on your answer' in r"
+ },
+ "src/body_harness/loop.py:542474a538": {
+  "kind": "contract",
+  "why": "engine op, event and bundle field names, or the harness's own tools, output fields and wake reasons",
+  "sample": "start, timeout, told"
+ },
+ "src/body_harness/menu.py:478e8d1aa6": {
+  "kind": "debt",
+  "why": "2.6 menu English stop words",
+  "sample": "about, again, could, from, have, just, remind, right, should, still, that, their, there, this, today, what, when, where,"
+ },
+ "src/body_harness/menu.py:66be10b29a": {
+  "kind": "contract",
+  "why": "engine event kinds, the seat's own state keys, and menu sort values",
+  "sample": "brief, description, dialog, goals, hidden, memory, name, secret, standing_orders"
+ },
+ "src/body_harness/menu.py:7ad554729e": {
+  "kind": "contract",
+  "why": "engine event kinds, the seat's own state keys, and menu sort values",
+  "sample": "away, embodied, intended, joined, left, linked, opinion, perceived, remembered, say, spawned, talked, unembodied, unlink"
+ },
+ "src/body_harness/menu.py:dcd2cd75ba": {
+  "kind": "debt",
+  "why": "2.6 menu English stop words",
+  "sample": "all, and, any, are, aye, been, but, calm, can, did, false, for, got, had, has, have, her, here, him, his, how, its, not,"
+ },
+ "src/body_harness/menu.py:846ac95c72": {
+  "kind": "contract",
+  "why": "engine event kinds, the seat's own state keys, and menu sort values",
+  "sample": "'present' in b"
+ },
+ "src/body_harness/menu.py:47b8eead74": {
+  "kind": "contract",
+  "why": "engine event kinds, the seat's own state keys, and menu sort values",
+  "sample": "most, named, newest, standing"
+ },
+ "src/body_harness/past.py:76db0c7a1e": {
+  "kind": "contract",
+  "why": "fields of the harness's own deed records",
+  "sample": "n, target, text, turn, verb"
+ },
+ "src/body_harness/past.py:9cefe64329": {
+  "kind": "contract",
+  "why": "fields of the harness's own deed records",
+  "sample": "from, happened, ok, refused, seq, ts"
+ },
+ "src/body_harness/providers.py:6b5395e74f": {
+  "kind": "contract",
+  "why": "provider ids the harness supports",
+  "sample": "deepseek, groq, llamacpp, lmstudio, ollama, openai, openrouter, vllm"
+ },
+ "src/body_harness/reflexes.py:0d74f426ba": {
+  "kind": "contract",
+  "why": "the harness's own reflex ops",
+  "sample": "act, say, sleep, wake"
+ },
+ "src/body_harness/reflexes.py:6c31252e1c": {
+  "kind": "debt",
+  "why": "1.3 guessed safe verb names",
+  "sample": "follow, go, look, rest, sit, stand, wait"
+ },
+ "src/body_harness/scene.py:2d77f2ec5d": {
+  "kind": "contract",
+  "why": "engine event kinds and bundle fields, and the harness's own lines",
+  "sample": "cursor, embodied, intended, moved, opinion, patched, released, remembered, tick"
+ },
+ "src/body_harness/scene.py:1c51e9a950": {
+  "kind": "debt",
+  "why": "1.6 Glass Reach titles in name matching",
+  "sample": "Brother, Captain, Elder, Lady, Master, Mistress, Old, Reeve, Sir, Sister, The, Young"
+ },
+ "src/body_harness/scene.py:493e6aa056": {
+  "kind": "contract",
+  "why": "engine event kinds and bundle fields, and the harness's own lines",
+  "sample": "'no meeting on record' in x"
+ },
+ "src/body_harness/scene.py:4125a07880": {
+  "kind": "debt",
+  "why": "1.5 guessed body-state keys as vitals",
+  "sample": "asleep, bleeding, food, hp, tired, water, wounded"
+ },
+ "src/body_harness/scene.py:72b0473510": {
+  "kind": "contract",
+  "why": "engine event kinds and bundle fields, and the harness's own lines",
+  "sample": "'people' in b"
+ },
+ "src/body_harness/scene.py:dda2d21fed": {
+  "kind": "contract",
+  "why": "engine event kinds and bundle fields, and the harness's own lines",
+  "sample": "'things' in b"
+ },
+ "src/body_harness/seat.py:8c7b8b7b57": {
+  "kind": "contract",
+  "why": "the seat's own folder names",
+  "sample": "craft, seats, skills"
+ },
+ "src/body_harness/seat.py:3119be44a5": {
+  "kind": "contract",
+  "why": "the seat's own folder names",
+  "sample": "apps, cache, memory, skills, workspace"
+ },
+ "src/body_harness/service.py:61a2b2e7cf": {
+  "kind": "contract",
+  "why": "the service's query for its own processes and CLI words",
+  "sample": "'run' in words[bh + 1:]"
+ },
+ "src/body_harness/service.py:f689d0b8cc": {
+  "kind": "contract",
+  "why": "the service's query for its own processes and CLI words",
+  "sample": "'service' in words[bh + 1:]"
+ },
+ "src/body_harness/service.py:2af27289cf": {
+  "kind": "contract",
+  "why": "the service's query for its own processes and CLI words",
+  "sample": "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'body_harness|bh(\\.exe)?' } | ForEach-Object { \"$($"
+ },
+ "src/body_harness/telemetry.py:45f6201a63": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "counts, full, lines"
+ },
+ "src/body_harness/telemetry.py:a4b0b2f186": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "imagine, menu, menu_lists, menu_preopen, menu_rank, past, reflexes, think_tool"
+ },
+ "src/body_harness/telemetry.py:8a2ae5ad7b": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "\"(?:reason|refused)\":\\s*\"((?:[^\"\\\\]|\\\\.){0,400})"
+ },
+ "src/body_harness/telemetry.py:c4a455c3d5": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "escalate, judge, model"
+ },
+ "src/body_harness/telemetry.py:06036ab411": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "crew, env_files, extra, extra_prompt, joined, prices, providers, session, telemetry"
+ },
+ "src/body_harness/telemetry.py:6e89012a11": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "key|token|secret|pass|auth|cookie|door|invite"
+ },
+ "src/body_harness/telemetry.py:040905acce": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "cache_write_tokens, cached_tokens, calls, cost, input_tokens, output_tokens, reasoning_tokens, seconds"
+ },
+ "src/body_harness/telemetry.py:5d059795c6": {
+  "kind": "contract",
+  "why": "the harness's own setting and telemetry field names, and secret-key patterns",
+  "sample": "env_files, extra_prompt, session, telemetry"
+ },
+ "src/body_harness/tools.py:9433a9fc92": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "answer_ask, join, leave, perceive, use, wait, worlds"
+ },
+ "src/body_harness/tools.py:426adf497b": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "about, entity, target, to, who"
+ },
+ "src/body_harness/tools.py:211088250d": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "act, gesture, handbook, inspect, recall, say"
+ },
+ "src/body_harness/tools.py:b24e630e31": {
+  "kind": "debt",
+  "why": "3.2 invented tools routed by guessed names, incl. world verb go",
+  "sample": "call_out, emote, end_turn, gesture, go_to, goto, move, nod, observe, perceive, reply, respond, scene, shout, speak, talk"
+ },
+ "src/body_harness/tools.py:9287060584": {
+  "kind": "contract",
+  "why": "audit 3.1: names a model used for the harness's own say text param; do not grow",
+  "sample": "content, line, message, say, speech, text, words"
+ },
+ "src/body_harness/tools.py:c649de00d2": {
+  "kind": "contract",
+  "why": "audit 3.1: names a model used for the harness's own place param; do not grow",
+  "sample": "destination, exit, place, target, to, where"
+ },
+ "src/body_harness/tools.py:651903b2cc": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "target, to, who"
+ },
+ "src/body_harness/tools.py:44209f6557": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "minutes, note, part, plan, until"
+ },
+ "src/body_harness/tools.py:cbdf478697": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "capability, feature, fix, flaw, help, other, proposal, quest, seat, testing, vulnerability"
+ },
+ "src/body_harness/tools.py:a7e2cffd48": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "high, low, medium"
+ },
+ "src/body_harness/tools.py:a3d6144e4b": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "append, list, read, search, write"
+ },
+ "src/body_harness/tools.py:d3da3fa5ac": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "belief, luck, rule"
+ },
+ "src/body_harness/tools.py:b41b0cb629": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "Search what you really did and what came of it: every deed (act, say) you did, with its result, lined up so you can see "
+ },
+ "src/body_harness/tools.py:c1fad477f7": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "agenda, run_python, schedule, write_file"
+ },
+ "src/body_harness/tools.py:3609a44fd5": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "add, drop, list"
+ },
+ "src/body_harness/tools.py:659eef95f1": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "properties, required, type"
+ },
+ "src/body_harness/tools.py:940d751db7": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "act, act_many, cross, gesture, say, step"
+ },
+ "src/body_harness/tools.py:1f63f99090": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "as, params, target, verb"
+ },
+ "src/body_harness/tools.py:2e06fadb41": {
+  "kind": "contract",
+  "why": "the harness's own tool names, params and enum values, and the engine's op names",
+  "sample": "how, kinds, names, present"
+ },
+ "src/body_harness/usage.py:040905acce": {
+  "kind": "contract",
+  "why": "fields of the harness's own usage records",
+  "sample": "cache_write_tokens, cached_tokens, calls, cost, input_tokens, output_tokens, reasoning_tokens, seconds"
+ }
+}

@@ -15,5 +15,12 @@ For any agent or person changing this code.
   tracked files, tests or skills.
 - Built-in skills are harness-neutral and world-neutral: a lesson every embody world shares, never one world's
   house rules or story. A world's own rules come from its handbook.
+- **No word lists.** The harness never branches on words or names a world may or may not use: no lists of verb
+  names, state keys, titles or item words, no English phrase patterns over what a model wrote, no fuzzy renames of
+  what it sent. What a world has comes from what it declares (affordances and their params, schemas, event kinds,
+  refusals). When that is missing, the ask goes to the engine, not into a list here. `tests/test_no_word_lists.py`
+  fails on any new word list or word pattern in `src/`, and on a word added to an old one; `tests/word_lists.json`
+  holds the reviewed ones, each marked contract (the engine's or the harness's own names) or debt (guesses still to
+  remove, from docs/audit-string-conditionals.md). Never add debt to it.
 - Every lesson from a failure in play becomes either a guard in code (a lint, a wrapper, a default) or a line in a
   skill, with the case that taught it in the commit message.
