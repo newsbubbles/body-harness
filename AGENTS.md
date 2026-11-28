@@ -21,6 +21,10 @@ For any agent or person changing this code.
   refusals). When that is missing, the ask goes to the engine, not into a list here. `tests/test_no_word_lists.py`
   fails on any new word list or word pattern in `src/`, and on a word added to an old one; `tests/word_lists.json`
   holds the reviewed ones, each marked contract (the engine's or the harness's own names) or debt (guesses still to
-  remove, from docs/audit-string-conditionals.md). Never add debt to it.
+  remove, from docs/audit-string-conditionals.md). Never add debt to it. What stays variable, always read from the
+  world: names and any text of a world; entity types (a world has as many as its schemas say); limits the world or
+  the seat's owner marks. A harness default is not a fix for a world's or a model's behaviour.
+- Fix at the source. When the cause is in the engine or a world, the fix goes there, proposed with restraint and
+  approved by the owner or the agent the owner delegates that authority to; a harness patch around it is not the fix.
 - Every lesson from a failure in play becomes either a guard in code (a lint, a wrapper, a default) or a line in a
   skill, with the case that taught it in the commit message.
