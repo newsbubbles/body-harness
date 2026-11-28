@@ -319,6 +319,11 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("action", choices=["add", "list", "remove"])
     c.add_argument("hand", nargs="?", help="the hand's name (add, remove)")
     c.add_argument("invite", nargs="?", help="with add: the invite link (it opens once), page or file")
+    c = sub.add_parser("near", help="how near in meaning the first text is to each of the others, on an embedding "
+                                    "model: to set embed_near for that model")
+    c.add_argument("texts", nargs="+")
+    c.add_argument("--model", default="", help="provider:model or local:model (default: the seat's or home's embed)")
+    c.add_argument("--seat", default="", help="read embed and providers from this seat's config")
     c = sub.add_parser("service", help="keep seats running, restarted when they stop and after a reboot")
     c.add_argument("action", choices=["add", "remove", "status", "run", "stop", "install", "uninstall"])
     c.add_argument("names", nargs="*")
@@ -344,6 +349,8 @@ def main(argv: list[str] | None = None) -> int:
         except KeyboardInterrupt:
             print("stopped")
         return 0
+    if args.cmd == "near":
+        return asyncio.run(_near(args, h))
     if args.cmd == "status":
         return _status(h)
     if args.cmd == "seats":
@@ -472,6 +479,30 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(cfg, indent=1))
         return 0
     return 1
+
+
+async def _near(args: argparse.Namespace, h: Path) -> int:
+    from .embed import NEAR, Embedder, cosine
+    from .providers import ModelError
+    from .seat import read_json
+    cfg = seats.Seat(h, args.seat).config() if args.seat else read_json(h / "config.json", {})
+    spec = args.model or str(cfg.get("embed") or "")
+    if not spec or len(args.texts) < 2:
+        print("give two texts or more, and --model or an embed in the config", file=sys.stderr)
+        return 2
+    try:
+        e = Embedder(spec, cfg)
+        async with httpx.AsyncClient() as client:
+            first, *rest = await e.vectors(client, args.texts)
+    except ModelError as err:
+        print(err, file=sys.stderr)
+        return 1
+    at = float(cfg.get("embed_near", NEAR))
+    for t, v in zip(args.texts[1:], rest):
+        s = cosine(first, v)
+        print(f"{s:.3f} {'near' if s >= at else '    '}  {t}")
+    print(f"embed_near {at} on {spec}")
+    return 0
 
 
 if __name__ == "__main__":

@@ -21,25 +21,28 @@ Fixed:
 - 1.4 imagine: the starter rule is named `YOUR_VERB`, and its hint lists the seat's own verbs to rename it to.
 - 1.5 vitals: the engine's card fields (`condition`, `fading`, `decay`, `asleep`), then every state number the world
   gives a `max_` for.
-- 1.6 titles: a name matches by its words of 3+ letters that no other known name shares (`Names.keys`), else the whole
-  name. `to_me` uses the same.
+- 1.6 titles: a name matches whole, casefolded, in any script (`scene.mentioned`). Whom a line is to is its `to`
+  only, as in the engine (words-out). "Tam" no longer finds "Old Tam".
 - 1.7 calibrate: a say, or an act that carries text.
-- 2.3 `stuck_on`: no stop words (pairs of words longer than 4 letters), and `stuck_notes` defaults to 0.
+- 2.3 `stuck_on`: by meaning, on an embedding model the operator picks (`embed`), so notes in any language work.
+  Notes are cut at punctuation and lose known names whole; a clause near one in `stuck_notes` of the last 6 notes is
+  the lead, and leads already told are matched by meaning too. Off unless `stuck_notes` and `embed` are set.
 - 2.4 and 2.5: greeting words and phrase hints removed; being addressed is read from where the name stands in the line.
-- 2.6 menu stop words removed; matching is by word length only.
+- 2.6 menu stop words removed; ranking matches the world's names whole.
 - 3.2 world-verb routes removed (`walk`, `move`, `go_to`, `goto`, `travel`), and the "follow" hint with them.
 - 4.1 `CALL_TROUBLE`: the harness's own call errors, plus the engine's `layer` (call or target). No engine wording.
 - 4.2 a lost seat is the engine's `code` (`not_joined`, `seat_released`), never words in the reason. Worlds on an
   engine older than 26 Nov send no code, so their seats do not rejoin by themselves.
 - The timer note keeps the world's own wording.
 
-Still debt (in `tests/word_lists.json`), each waiting on the engine:
+The engine debt is paid (engine fb29150): grant refusals carry `out_of_grant`, script errors `script_error`, a bad
+`until` has `layer="call"`, `bad_args` names its `param`, and the briefing gives `pace_rate`. The harness reads those
+codes and no longer any of the engine's wording.
 
-- 4.3 `_OUT_OF_REACH` (grant refusals) needs a code on the engine's grant refusals.
-- 4.3 `imagine.crashed()` needs a code on script errors.
-- A bad `until` is refused with no `layer`, so it does not count as call trouble now. Ask: `layer="call"` on it.
-- `loop.py` reads the param name out of Python's "unexpected keyword argument" text. Ask: `param` on `bad_args`.
-- `_rate` reads "Nx real time" from the briefing's pace line. Ask: the pace as a number.
+A second pass took out English shapes as well as English words: ASCII letter classes (`[a-z]`), word splitting,
+first-name keys and "word" lengths. Repeats compare runs of 5 characters, a person is a card with a `condition` or
+`embodied_by`, and gauges are any `n/max`. The lint (`tests/test_no_word_lists.py`) now flags 2-item lists and ASCII
+letter classes. Nothing is left on the debt list.
 
 ## 1. Guesses about a world's content
 

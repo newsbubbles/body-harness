@@ -684,11 +684,6 @@
     "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the harness's own names (its tools, params, config, files, state, telemetry fields)",
     "sample": "intend, remember"
   },
-  "src/body_harness/loop.py:ffbc8012da": {
-    "kind": "debt",
-    "why": "stuck_on (opt-in, stuck_notes=0) still splits notes into English-shaped words; no language-free way to tell a lead from a routine phrase found yet; waiting on Nate: remove or keep",
-    "sample": "[a-z][a-z'-]{2,}"
-  },
   "src/body_harness/loop.py:fb681438f4": {
     "kind": "contract",
     "why": "the harness's own wake reasons (loop.py), read back for telemetry",

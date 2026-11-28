@@ -237,6 +237,7 @@ bh import N --list | --remove ENTRY        what it has imported; unlink one (its
 bh past-import N                           read the body's deeds from before this seat into `past`
 bh hand N add|list|remove [H] [invite]     a builder grant beside the mind's: author ops go through it
 bh reflexes N [-n 10]                      the rules the seat left its body, and what each look did
+bh near "a" "b" ... [--model M | --seat N] how near in meaning "a" is to each other text (to set embed_near)
 bh calibrate N --models a,b | --sets F.toml [--set S] [--cfg L:k=v] [--runs 2] [--wake -1] [--json]
                                            replay one of the seat's saved wakes through each model,
                                            offline, and score them side by side

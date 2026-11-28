@@ -18,6 +18,7 @@ import time
 import traceback
 import uuid
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any
 
 import httpx
@@ -30,6 +31,7 @@ from .providers import Model, ModelError
 from .seat import Seat, append_jsonl, read_json, read_jsonl, write_json
 from .skills import Skills
 from .tools import CORE_NAMES, EXTRAS, Registry, compact, fix_args, parse_args, route
+from .embed import NEAR, Embedder, SoftDict, clauses, cosine
 from .usage import Usage, append as usage_append
 
 DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
@@ -1098,6 +1100,33 @@ class Mind:
             return ""
         return f"\n\n(harness: {' '.join(dict.fromkeys(out))} If you mean to stay with them, your verbs say how.)"
 
+    async def _stuck(self) -> str:
+        """A lead the seat's last notes keep coming back to, that it has not been told about yet: by meaning, from the
+        embedding model in `embed`, so it reads notes in any language. Off unless `stuck_notes` and `embed` are set."""
+        need = int(self.cfg.get("stuck_notes", 0))
+        if not need or not self.cfg.get("embed") or caps.over(self.seat):
+            return ""
+        at = float(self.cfg.get("embed_near", NEAR))
+        try:
+            if getattr(self, "embedder", None) is None:
+                self.embedder = Embedder(str(self.cfg["embed"]), self.cfg)
+            lead = await stuck_on(self.st.get("notes") or [], self.names.by_id.values(), self.embedder, self.client,
+                                  need, near_at=at)
+            # once per lead, matched by meaning: the same lead in other words is not news
+            told = SoftDict(self.embedder, at, {t: 1 for t in self.st.get("stuck_told") or []})
+            if lead and await told.has(self.client, lead):
+                lead = ""
+        except (ModelError, httpx.HTTPError, ValueError, KeyError) as e:
+            _log(self.seat.name, f"embed failed, no stuck check this turn: {str(e)[:200]}")
+            lead = ""
+        u = self.embedder.take() if getattr(self, "embedder", None) else Usage()
+        if u.calls:
+            usage_append(self.seat.p("usage.jsonl"), self.seat.name, self.embedder.spec, u, "embed (stuck)")
+            self.tele.emit("model_call", {"model": self.embedder.spec, "use": "embed", **telemetry.usage(u)})
+        if lead:
+            self.st["stuck_told"] = ((self.st.get("stuck_told") or []) + [lead])[-8:]
+        return lead
+
     def _keep_wake(self, reason: str, events: list[dict[str, Any]], st: dict[str, Any], b: dict[str, Any]) -> None:
         """The last few wakes as they arrived, for bh calibrate to replay offline: a calibration that perceived
         through the seat's own grant would move its "since I last looked" and steal the live seat's events."""
@@ -1207,12 +1236,9 @@ class Mind:
             nudges.append(f"quiet: {', '.join(quiet[:4])}")
             user += (f"\n\n(harness: quiet lately, your last lines to them went unanswered: {', '.join(quiet[:4])}. "
                      "Do not ask them again; wait until they speak to you.)")
-        need = int(self.cfg.get("stuck_notes", 0))  # off unless a seat's model needs it
-        known = {w for n in self.names.by_id.values() for w in re.findall(r"[a-z][a-z'-]{2,}", str(n).lower())}
-        lead = stuck_on(self.st.get("notes") or [], known, need) if need else ""
-        if lead and lead not in (self.st.get("stuck_told") or []):
-            # once per lead: a nudge, not a nag
-            self.st["stuck_told"] = ((self.st.get("stuck_told") or []) + [lead])[-8:]
+        lead = await self._stuck()
+        need = int(self.cfg.get("stuck_notes", 0))
+        if lead:
             nudges.append(f"stuck: '{lead}' in {need} of the last 6 notes")
             # replayed on a pilot's notes it also caught routines ("grill shift"), so it asks rather than tells
             user += (f"\n\n(harness: '{lead}' runs through your last {need} notes. If it is a lead that has not paid "
@@ -1539,23 +1565,31 @@ def woke(reason: str, events: list[dict[str, Any]], me: str, me_name: str, names
     return out
 
 
-def stuck_on(notes: list[str], known: set[str], need: int = 5, of: int = 6) -> str:
-    """A two-word phrase (not a name the seat knows) in at least `need` of its last `of` notes: a lead it keeps
-    chasing. Ongo asked five people over 2.5 hours for an "archive runner at South Cluster gate" that other minds
-    had made up; nothing refused him, so nothing told him he was stuck (Niiro Cradle, 25 Nov)."""
+async def stuck_on(notes: list[str], names: Iterable[str], embedder: Embedder, client: httpx.AsyncClient,
+                   need: int = 5, of: int = 6, near_at: float = NEAR) -> str:
+    """A clause of the seat's notes (names it knows taken out) that means the same as a clause in at least `need` of
+    its last `of` notes: a lead it keeps chasing. Ongo asked five people over 2.5 hours for an "archive runner at
+    South Cluster gate" that other minds had made up; nothing refused him, so nothing told him he was stuck (Niiro
+    Cradle, 25 Nov). Nearness is the embedding model's, so the notes may be in any language, or several."""
     last = notes[-of:]
     if len(last) < of:
         return ""
-    counts: dict[str, int] = {}
-    for n in last:
-        words = [w for w in re.findall(r"[a-z][a-z'-]{2,}", n.lower())]
-        pairs = {f"{a} {b}" for a, b in zip(words, words[1:])
-                 if len(a) > 4 and len(b) > 4
-                 and a not in known and b not in known}
-        for x in pairs:
-            counts[x] = counts.get(x, 0) + 1
-    best = max(counts.items(), key=lambda kv: (kv[1], kv[0]), default=("", 0))
-    return best[0] if best[1] >= need else ""
+    names = list(names)
+    flat = [(i, c) for i, n in enumerate(last) for c in clauses(str(n), names)]
+    if not flat:
+        return ""
+    vs = await embedder.vectors(client, [c for _, c in flat])
+    best, score = "", (0, 0.0)
+    for a, (i, c) in enumerate(flat):
+        top: dict[int, float] = {}
+        for b, (j, _) in enumerate(flat):
+            if j != i:
+                top[j] = max(top.get(j, -1.0), cosine(vs[a], vs[b]))
+        hits = [s for s in top.values() if s >= near_at]
+        mine = (len(hits) + 1, sum(hits))
+        if mine > score:
+            best, score = c, mine
+    return best if score[0] >= need else ""
 
 
 def _short(args: dict[str, Any]) -> dict[str, Any]:

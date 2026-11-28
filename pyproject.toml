@@ -10,6 +10,8 @@ dependencies = ["httpx>=0.27"]
 [project.optional-dependencies]
 # imagine: a private embody world per seat (imagine.py); the engine is pure Python with no dependencies of its own
 imagine = ["embody-engine @ git+https://github.com/newsbubbles/embody"]
+# embed: an embedding model run in the harness's own process (embed = "local:<model>"); a provider needs nothing
+embed = ["fastembed"]
 
 [project.scripts]
 bh = "body_harness.cli:main"

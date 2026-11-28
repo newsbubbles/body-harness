@@ -1,5 +1,8 @@
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 from body_harness import scene
 from body_harness.door import parse_invite
@@ -971,6 +974,34 @@ def test_params_sent_as_a_json_string_are_read_as_the_object():
     assert fix_args("say", {"text": "{not json, just words"}, m)[0]["text"] == "{not json, just words"
 
 
+class _Topics:
+    """A stand-in embedding model: a text near another only when both carry the same marker, so a test says which
+    texts mean the same without any model."""
+
+    def __init__(self, *markers):
+        self.markers, self.seen = markers, {}
+
+    def embedder(self):
+        from body_harness.embed import Embedder
+        e = Embedder("local:fake")
+        topics = self
+
+        async def _embed(client, texts):
+            return [topics.vector(t) for t in texts]
+        e._embed = _embed
+        return e
+
+    def vector(self, t):
+        k = next((i for i, m in enumerate(self.markers) if m in t), None)
+        k = k if k is not None else len(self.markers) + self.seen.setdefault(t, len(self.seen))
+        return [1.0 if i == k else 0.0 for i in range(256)]
+
+
+def _run(coro):
+    import asyncio
+    return asyncio.run(coro)
+
+
 def test_a_lead_that_keeps_going_nowhere_is_named_once_its_notes_repeat_it():
     # Ongo chased an "archive runner at South Cluster gate" that other minds had made up, for 2.5 hours
     from body_harness.loop import stuck_on
@@ -980,10 +1011,71 @@ def test_a_lead_that_keeps_going_nowhere_is_named_once_its_notes_repeat_it():
              "Stopped a drinker, asked about the archive runner and the gate route.",
              "Asked the bookie about the archive runner, red hair, chewed nails.",
              "Still no word on the archive runner."]
-    assert stuck_on(chase, {"doc", "zayinth"}) == "archive runner"
-    assert stuck_on(chase[:5], set()) == ""  # too few notes to say
+    e = _Topics("archive runner").embedder()
+    lead = _run(stuck_on(chase, ["Doc", "Zayinth"], e, None))
+    assert "archive runner" in lead
+    assert _run(stuck_on(chase[:5], [], e, None)) == ""  # too few notes to say
+    # a friend named in every note is not a lead: names come out whole before anything is compared
     friends = [f"Talked with Varn Erixx about the {x}." for x in ("weather", "yoke", "plate", "fight", "bar", "rent")]
-    assert stuck_on(friends, {"varn", "erixx"}) == ""  # a friend's name is not a lead
+    assert _run(stuck_on(friends, ["Varn Erixx"], _Topics("varn erixx").embedder(), None)) == ""
+
+
+def test_notes_are_cut_at_punctuation_in_any_script_and_lose_known_names_whole():
+    from body_harness.embed import clauses
+    assert clauses("问了扎因丝档案跑腿的事，等她回话。", ["扎因丝"]) == ["问了 档案跑腿的事", "等她回话"]
+    assert clauses("Asked Old Tam about the mill; waited.", ["Old Tam", "Tam"]) == ["asked about the mill", "waited"]
+    assert clauses("ok. Zoë Ægir!", ["Zoë Ægir"]) == []  # nothing of four letters is left to mean anything
+
+
+def test_a_soft_dict_finds_a_key_by_meaning_and_keeps_only_text():
+    from body_harness.embed import SoftDict
+    d = SoftDict(_Topics("runner").embedder(), 0.65, {"the archive runner": "told"})
+    assert _run(d.get(None, "a runner from the archive")) == "told"
+    assert _run(d.get(None, "grill shift", "none")) == "none"
+    assert _run(SoftDict(d.e, 0.65).has(None, "anything")) is False
+    import json
+    assert json.loads(json.dumps(d.items)) == {"the archive runner": "told"}
+
+
+def test_an_embedder_names_its_provider_and_keeps_vectors_for_texts_it_has_seen():
+    from body_harness.embed import Embedder
+    from body_harness.providers import ModelError
+    with pytest.raises(ModelError):
+        Embedder("paraphrase-multilingual")
+    calls = []
+    e = _Topics("x").embedder()
+    inner = e._embed
+
+    async def counted(client, texts):
+        calls.append(list(texts))
+        return await inner(client, texts)
+    e._embed = counted
+    _run(e.vectors(None, ["a x", "b", "a x"]))
+    _run(e.vectors(None, ["b", "c"]))
+    assert calls == [["a x", "b"], ["c"]]
+
+
+@pytest.mark.skipif(not os.environ.get("BH_TEST_EMBED"), reason="set BH_TEST_EMBED=provider:model to check a real model")
+def test_a_real_embedding_model_tells_a_chased_lead_from_other_talk_in_several_languages():
+    # measured 11-28 on ollama:paraphrase-multilingual and local:sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    import httpx
+    from body_harness.embed import Embedder, NEAR
+    from body_harness.loop import stuck_on
+    e = Embedder(os.environ["BH_TEST_EMBED"], {})
+    at = float(os.environ.get("BH_TEST_EMBED_NEAR", NEAR))
+    lead_zh = ["问了医生那个买线轴的档案跑腿，在等。", "问了扎因丝档案跑腿的事，等她回话。", "据说档案跑腿在南门外面某处。",
+               "拦住一个酒客，问了档案跑腿和去门的路。", "问了庄家档案跑腿的事，红头发，指甲咬过。", "档案跑腿还是没有消息。"]
+    friends = [f"Talked with Varn Erixx about the {x}." for x in ("weather", "yoke", "plate", "fight", "bar", "rent")]
+    days = ["Bought rope at the market.", "Climbed the north ridge, saw smoke.", "Slept at the inn.",
+            "Traded salt for a knife with Oro.", "Found a cave behind the falls.", "Asked Mira about the old mill."]
+
+    async def go():
+        async with httpx.AsyncClient() as c:
+            return [await stuck_on(n, names, e, c, near_at=at) for n, names in
+                    ((lead_zh, ["医生", "扎因丝"]), (friends, ["Varn Erixx"]), (days, ["Oro", "Mira"]))]
+    zh, chat, varied = _run(go())
+    assert "档案跑腿" in zh
+    assert chat == "" and varied == ""
 
 
 def test_the_card_says_whom_the_seat_has_met_from_the_worlds_knows():
