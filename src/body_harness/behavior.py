@@ -79,11 +79,10 @@ def view(events: list[dict[str, Any]], me: str, names: Any, bundle: dict[str, An
 
 def _env(v: dict[str, Any]) -> dict[str, Any]:
     """The names and helpers a check sees: the same as a watch's."""
-    mine = v["_mine"].lower()
-    parts = _name_parts(v["_mine"])
-
     def low(x: Any) -> str:
-        return str(x or "").lower()
+        return str(x or "").casefold()
+
+    mine = low(v["_mine"])
 
     def spoken(e: dict[str, Any]) -> bool:
         return e["kind"] in ("say", "talked") and bool(e["actor"]) and low(e["actor"]) != mine
@@ -104,12 +103,13 @@ def _env(v: dict[str, Any]) -> dict[str, Any]:
         return any(e["kind"] == "arrived" and low(e["who"]) != mine and low(name) in low(e["who"])
                    for e in v["events"])
 
+    # as the engine's watch reads them: a line is to me when its `to` is me, never by its words; named is my whole
+    # name as the world spells it, in any script
     def to_me() -> bool:
-        return any(spoken(e) and (low(e["target"]) == mine or _addressed(e["text"], parts)) for e in v["events"])
+        return any(spoken(e) and low(e["target"]) == mine for e in v["events"])
 
     def named() -> bool:
-        return any(spoken(e) and any(re.search(r"\b" + p + r"\b", low(e["text"])) for p in parts)
-                   for e in v["events"])
+        return bool(mine) and any(spoken(e) and mine in low(e["text"]) for e in v["events"])
 
     def state(name: str) -> dict[str, Any]:
         for n, st in v["_cards"].items():
@@ -119,25 +119,6 @@ def _env(v: dict[str, Any]) -> dict[str, Any]:
     env = {k: v[k] for k in NAMES}
     env.update(heard=heard, did=did, came=came, arrived=arrived, to_me=to_me, named=named, state=state)
     return env
-
-
-def _name_parts(name: str) -> list[str]:
-    """The words a body is called by, as the engine reads them: the capitalised words of its name."""
-    ws = [w for w in re.findall(r"[A-Za-z]+", str(name)) if len(w) > 2 and w.lower() not in ("the", "and")]
-    caps = [w for w in ws if w[0].isupper()]
-    return [w.lower() for w in (caps or ws)]
-
-
-def _addressed(text: str, parts: list[str]) -> bool:
-    """A name used as the line's address ("Mara, the gate", "the gate, Mara?"), not in passing ("Mara went west"):
-    by where the name stands in the line, never by greeting words."""
-    tx = str(text or "").lower().strip()
-    for p in parts:
-        n = r"\b" + re.escape(p) + r"\b"
-        if (re.match(r"^\W*" + n + r"\s*(?:[,!?:]|$)", tx)
-                or re.search(r",\s*" + n + r"\s*(?:[,.!?]|$)", tx)):
-            return True
-    return False
 
 
 _COMPILED: dict[str, Any] = {}

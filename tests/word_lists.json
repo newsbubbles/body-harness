@@ -199,11 +199,6 @@
     "why": "the HTTP auth header",
     "sample": "'Bearer' in text"
   },
-  "src/body_harness/imagine.py:435ce86039": {
-    "kind": "debt",
-    "why": "4.3 reads the engine's error wording; needs codes",
-    "sample": "failed while|has no (apply|check)\\(|is not allowed|has no attribute|is not defined|not supported|out of fuel"
-  },
   "src/body_harness/imagine.py:15e5a4a788": {
     "kind": "contract",
     "why": "Python syntax or error type names, and values of the harness's own imagine tools",
@@ -263,11 +258,6 @@
     "kind": "contract",
     "why": "the harness's own call-error words, and the engine's refusal layers (call, target)",
     "sample": "bad arguments|there is no tool|\\bno tool \\w|Not asleep yet|\\\"layer\\\": \\\"(call|target)\\\""
-  },
-  "src/body_harness/loop.py:f0b3191f10": {
-    "kind": "debt",
-    "why": "4.3 reads the door's refusal wording",
-    "sample": "your grant|start with|the door refused this grant"
   },
   "src/body_harness/loop.py:a5b9be0a7c": {
     "kind": "contract",
@@ -573,5 +563,275 @@
     "kind": "contract",
     "why": "fields of the harness's own usage records",
     "sample": "cache_write_tokens, cached_tokens, calls, cost, input_tokens, output_tokens, reasoning_tokens, seconds"
+  },
+  "src/body_harness/behavior.py:b2aa4f8682": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "SLEEP, WAKE"
+  },
+  "src/body_harness/behavior.py:8ab15f036b": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "no, yes"
+  },
+  "src/body_harness/behavior.py:5095c1c5bf": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "resume, then"
+  },
+  "src/body_harness/behavior.py:7c44b1a201": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "^[A-Za-z][A-Za-z0-9_\\-]{0,31}$"
+  },
+  "src/body_harness/behavior.py:f050a0d3d8": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "THINK, WAKE"
+  },
+  "src/body_harness/behavior.py:3c20588893": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "say, talked"
+  },
+  "src/body_harness/behavior.py:cb88132132": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "ask, choose"
+  },
+  "src/body_harness/behavior.py:ef8619026d": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "id, name"
+  },
+  "src/body_harness/behavior.py:4a56b96fe5": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "text, to"
+  },
+  "src/body_harness/behavior.py:acca2ad1ae": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "fired, id"
+  },
+  "src/body_harness/behavior.py:063b4555f9": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "sleep, wake"
+  },
+  "src/body_harness/behavior.py:7abf67dfbe": {
+    "kind": "contract",
+    "why": "the harness's behaviour language (node kinds, edges, check fields, helper names) and engine event kinds",
+    "sample": "ambient, me"
+  },
+  "src/body_harness/calibrate.py:5b6e826f23": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); engine op names",
+    "sample": "craft, skills"
+  },
+  "src/body_harness/calibrate.py:397090a098": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); engine op names",
+    "sample": "join, perceive"
+  },
+  "src/body_harness/calibrate.py:3c20588893": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); engine op names",
+    "sample": "say, talked"
+  },
+  "src/body_harness/cli.py:32b727d025": {
+    "kind": "contract",
+    "why": "seat-name syntax for bh's own files",
+    "sample": "[a-z0-9][a-z0-9_-]{0,31}"
+  },
+  "src/body_harness/door.py:85fa3d842c": {
+    "kind": "contract",
+    "why": "the invite link and bearer token shapes of the harness's own door",
+    "sample": "Bearer ([A-Za-z0-9_\\-.~+/=]+)"
+  },
+  "src/body_harness/door.py:d5683709e9": {
+    "kind": "contract",
+    "why": "the invite link and bearer token shapes of the harness's own door",
+    "sample": "https?://\\S+/i/[A-Za-z0-9_\\-]+"
+  },
+  "src/body_harness/loop.py:d3122cd793": {
+    "kind": "contract",
+    "why": "the engine's codes for a lost seat",
+    "sample": "not_embodied, not_joined, seat_released"
+  },
+  "src/body_harness/loop.py:50bddd5a30": {
+    "kind": "contract",
+    "why": "the engine's out_of_grant code and the harness's own door_refused",
+    "sample": "door_refused, out_of_grant"
+  },
+  "src/body_harness/loop.py:3c20588893": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "say, talked"
+  },
+  "src/body_harness/loop.py:4e0467128f": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "flaw, vulnerability"
+  },
+  "src/body_harness/loop.py:91789d7a36": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "act, say"
+  },
+  "src/body_harness/loop.py:b87a0d7f61": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "intend, remember"
+  },
+  "src/body_harness/loop.py:ffbc8012da": {
+    "kind": "debt",
+    "why": "stuck_on (opt-in, stuck_notes=0) still splits notes into English-shaped words; no language-free way to tell a lead from a routine phrase found yet; waiting on Nate: remove or keep",
+    "sample": "[a-z][a-z'-]{2,}"
+  },
+  "src/body_harness/loop.py:fb681438f4": {
+    "kind": "contract",
+    "why": "the harness's own wake reasons (loop.py), read back for telemetry",
+    "sample": "something you scheduled, time is up"
+  },
+  "src/body_harness/loop.py:c004e0e583": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "cursor, events"
+  },
+  "src/body_harness/loop.py:3a1512706e": {
+    "kind": "contract",
+    "why": "the harness's own wake reasons (loop.py), read back for telemetry",
+    "sample": "you just took, your harness restarted"
+  },
+  "src/body_harness/memory.py:b4b4d7232e": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "^[a-z0-9][a-z0-9_-]{0,60}\\.md$"
+  },
+  "src/body_harness/memory.py:523922fbfa": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "append, write"
+  },
+  "src/body_harness/menu.py:5d7462e5c0": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the menu's own sort keys",
+    "sample": "named, newest"
+  },
+  "src/body_harness/menu.py:3c20588893": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the menu's own sort keys",
+    "sample": "say, talked"
+  },
+  "src/body_harness/menu.py:10f5cc2b26": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds); the menu's own sort keys",
+    "sample": "connects_to, knows"
+  },
+  "src/body_harness/past.py:91789d7a36": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds)",
+    "sample": "act, say"
+  },
+  "src/body_harness/past.py:49c72f78cc": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds)",
+    "sample": "seq, ts"
+  },
+  "src/body_harness/reflexes.py:9e32c4b3d4": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "fired, timeout"
+  },
+  "src/body_harness/sandbox.py:c144e45b03": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "apps, workspace"
+  },
+  "src/body_harness/scene.py:dbbe230018": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds)",
+    "sample": "gesture, gestured"
+  },
+  "src/body_harness/scene.py:3c20588893": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds)",
+    "sample": "say, talked"
+  },
+  "src/body_harness/scene.py:0a67ac8102": {
+    "kind": "contract",
+    "why": "the engine's names (event kinds, ops, payload and card fields, relation kinds)",
+    "sample": "caused_by, wall"
+  },
+  "src/body_harness/seat.py:1b30ba5e98": {
+    "kind": "contract",
+    "why": "seat-name syntax for bh's own files",
+    "sample": "^[a-z0-9][a-z0-9_-]{0,40}$"
+  },
+  "src/body_harness/service.py:531eff8a6c": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields)",
+    "sample": "add, remove"
+  },
+  "src/body_harness/telemetry.py:a40e784046": {
+    "kind": "contract",
+    "why": "telemetry's own key syntax and the engine's refusal code field",
+    "sample": "\"code\":\\s*\"([A-Za-z0-9_.-]{1,40})\""
+  },
+  "src/body_harness/telemetry.py:cd1895e93f": {
+    "kind": "contract",
+    "why": "telemetry's own key syntax and the engine's refusal code field",
+    "sample": "[a-z_]{2,24}"
+  },
+  "src/body_harness/telemetry.py:da46057b28": {
+    "kind": "contract",
+    "why": "telemetry's own key syntax and the engine's refusal code field",
+    "sample": "[a-z][a-z0-9_]{0,40}"
+  },
+  "src/body_harness/tools.py:55e43851a4": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "gesture, say"
+  },
+  "src/body_harness/tools.py:8e67e65a40": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "low, say"
+  },
+  "src/body_harness/tools.py:a632e668b7": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "loud, say"
+  },
+  "src/body_harness/tools.py:1ead9b78f4": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "Unterminated string, a string is not closed"
+  },
+  "src/body_harness/tools.py:f181350737": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "to, what"
+  },
+  "src/body_harness/tools.py:f5720143d7": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "path, text"
+  },
+  "src/body_harness/tools.py:734653ef24": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "operator, owner"
+  },
+  "src/body_harness/tools.py:748b9c7f60": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "craft, seat"
+  },
+  "src/body_harness/tools.py:b2b0cb851a": {
+    "kind": "contract",
+    "why": "the harness's own names (its tools, params, config, files, state, telemetry fields); Python's own JSON error text",
+    "sample": "cursor, wall"
   }
 }

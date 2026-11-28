@@ -4,8 +4,9 @@ The harness reads what a world declares (affordances and their params, schemas, 
 guesses at what a world calls things. A literal list of words, or a regex of alternative words, is how a guess gets
 in: one case gets fixed, the next world's wording is missed, and what the model meant is quietly changed.
 
-This test finds, in src/, every collection of three or more word-like string literals (dicts only when kept at module
-level as a table) and every string that lists alternative words the way a regex does, and checks each against
+This test finds, in src/, every collection of two or more word-like string literals (dicts only when kept at module
+level as a table) and every string that lists alternative words the way a regex does or matches letters of one alphabet only
+([a-z]), and checks each against
 tests/word_lists.json. A new one fails, and so does a changed one (a word added to an old list). To pass, it must be
 added to word_lists.json with a reason, and that diff is the review. Kinds are "contract" (names the engine or the
 harness itself defines: ops, event kinds, tool params, output fields, config keys, Python syntax) or "debt" (a guess
@@ -24,6 +25,8 @@ ALLOWED = ROOT / "tests" / "word_lists.json"
 WORD = re.compile(r"^[A-Za-z][A-Za-z_' -]{0,30}$")
 # a string that lists words to tell apart, as a regex does: (?:hey|oi|hi), will|next|then, bad arguments|no tool
 ALTERNATION = re.compile(r"[A-Za-z]{2,}[A-Za-z' ?]*\|[A-Za-z' ?]*[A-Za-z]{2,}")
+# a letter class of one alphabet: text is data in any script, and [a-z] drops "Zoë", "Ægir" and "李明"
+ASCII_LETTERS = re.compile(r"\[\^?(?:a-z|A-Z)(?:A-Z|a-z)?")
 
 
 def _words(node: ast.AST) -> list[str] | None:
@@ -34,7 +37,7 @@ def _words(node: ast.AST) -> list[str] | None:
     else:
         return None
     vals = [x.value for x in items if isinstance(x, ast.Constant) and isinstance(x.value, str)]
-    if len(vals) >= 3 and len(vals) == len(items) and all(WORD.match(v) for v in vals):
+    if len(vals) >= 2 and len(vals) == len(items) and all(WORD.match(v) for v in vals):
         return vals
     return None
 
@@ -69,7 +72,7 @@ def found() -> dict[str, dict[str, str]]:
             if words is None and isinstance(node, (ast.Constant, ast.JoinedStr, ast.BinOp)) and \
                     id(node) not in docs and id(node) not in inner:
                 text = _strings(node)
-                if text and ALTERNATION.search(text):
+                if text and (ALTERNATION.search(text) or ASCII_LETTERS.search(text)):
                     words = [text]
             if words is None and isinstance(node, ast.Compare) and isinstance(node.ops[0], (ast.In, ast.NotIn)) and \
                     isinstance(node.left, ast.Constant) and isinstance(node.left.value, str) and \

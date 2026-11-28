@@ -37,8 +37,8 @@ DEEDS = {"act", "say", "gesture", "step", "cross", "act_many"}
 # a gangplank that will not take an elf, is the game and never escalates). The engine's layer="call" says it outright.
 # The harness's own call errors by their words; the engine's by its layer (call: the shape; target: what it names)
 CALL_TROUBLE = re.compile(r"bad arguments|there is no tool|\bno tool \w|Not asleep yet|\"layer\": \"(call|target)\"")
-# the engine's codes for a seat this principal no longer holds (since 11-26): join again
-SEAT_LOST = ("not_joined", "seat_released")
+# the engine's codes for a seat this principal no longer holds: join again
+SEAT_LOST = ("not_joined", "seat_released", "not_embodied")
 
 
 def unseated(r: Any) -> bool:
@@ -53,13 +53,14 @@ def _brief(args: dict[str, Any]) -> str:
     return ", ".join(f"{k}={v!r}" for k, v in args.items() if v not in (None, "", {}))[:160]
 
 
-# the engine's refusals for a limited grant's reach (its under, types, scripts): another hand may cover it
-_OUT_OF_REACH = re.compile(r"your grant|start with|the door refused this grant", re.I)
+# a refusal for where a hand reaches, not for what the op asks: the engine's code for a limited grant's reach, or a
+# hand's door that would not open (the harness's own). Another hand may cover it
+OUT_OF_REACH = ("out_of_grant", "door_refused")
 _TARGET_KEYS = ("entity", "parent", "thing", "target", "to", "into", "under")
 
 
 def _slug(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "crew"
+    return re.sub(r"\W+", "-", name.casefold()).strip("-_")[:40] or "crew"  # any script's letters stay
 
 
 def _world_copy_done(p: Path) -> bool:
@@ -321,14 +322,14 @@ class Mind:
             try:
                 r = await self.hands[h]["door"].op(name, **args)
             except DoorError as e:
-                r = {"ok": False, "reason": str(e)}
+                r = {"ok": False, "reason": str(e), "code": "door_refused"}
             if not (isinstance(r, dict) and r.get("ok") is False):
                 if (t := _target_of(args)):
                     self.st.setdefault("hand_for", {})[t] = h
                     self.st["hand_for"] = dict(list(self.st["hand_for"].items())[-200:])
                 return r
             tried.append(f"{h}: {r.get('reason')}")
-            if not _OUT_OF_REACH.search(str(r.get("reason") or "")):
+            if r.get("code") not in OUT_OF_REACH:
                 break  # refused for what the op asks, not for where: every hand would say the same
         r = dict(r)
         r["reason"] = f"{r.get('reason')} (through your hand {', '.join(t.split(':')[0] for t in tried)})"
@@ -492,11 +493,11 @@ class Mind:
         sent = fixed
         fixed = self._drop_unsupported(name, fixed)
         r = await self._op(name, fixed)
-        bad = re.search(r"unexpected keyword argument '(\w+)'", str(r)) if isinstance(r, dict) else None
-        if bad and bad.group(1) in fixed:
+        bad = r.get("param") if isinstance(r, dict) and r.get("code") == "bad_args" else None
+        if bad and bad in fixed:
             # an older engine has no such parameter (Klhyts Refuge's say takes no gesture): drop it for this seat
             # from now on and send the call again, rather than spend the model's step on a refusal
-            self.st.setdefault("unsupported", {}).setdefault(name, []).append(bad.group(1))
+            self.st.setdefault("unsupported", {}).setdefault(name, []).append(bad)
             fixed = self._drop_unsupported(name, fixed)
             r = await self._op(name, fixed)
         if (dropped := sorted(set(sent) - set(fixed))):
@@ -549,8 +550,8 @@ class Mind:
         if ok and name == "say" and not fixed.get("to"):
             gone = self.names.absent_named(str(fixed.get("text", "")), self.present_names(), self.me)
             if gone:
-                notes.append(f"{', '.join(gone)} {'is' if len(gone) == 1 else 'are'} not here; only who is here "
-                             f"heard that. To reach them, go where they are")
+                notes.append(f"{', '.join(gone)} {'is' if len(gone) == 1 else 'are'} not here; only who is here heard "
+                             f"that")
         out = compact(r)
         if notes:
             out = f"(harness: {'; '.join(notes)})\n" + out
@@ -559,8 +560,7 @@ class Mind:
     async def _log_windows(self, evs: list[dict[str, Any]]) -> dict[str, Any]:
         """For menu_lists: the talk with whoever spoke to this seat and this body's own deeds, read from the world's
         log (a mind reads only its own body's). A window that came back full says the log goes further back."""
-        me_name = self.my_name()
-        speaker = next((e.get("actor") for e in evs if scene.to_me(e, self.me, me_name, self.names) and e.get("actor")), None)
+        speaker = next((e.get("actor") for e in evs if scene.to_me(e, self.me) and e.get("actor")), None)
 
         async def read(op: str, args: dict[str, Any]) -> Any:
             try:
@@ -679,15 +679,15 @@ class Mind:
         if until in self._linted:
             return None
         self._linted.add(until)
-        me = str((self.bundle.get("you") or {}).get("name") or "").lower()
-        known = [n.lower() for n in self.names.by_id.values()]
+        me = self.my_name().casefold()
+        known = [n.casefold() for n in self.names.by_id.values()]
         for m in re.finditer(r"heard\(\s*['\"]([^'\"]+)['\"]\s*\)", until):
-            w = m.group(1).strip().lower()
-            if me and (w == me or w in me.split()):
+            w = m.group(1).strip().casefold()  # a word that is (part of) a name, as the world spells it
+            if me and w in me:
                 return (f"heard('{m.group(1)}') wakes on your own lines too (your name is in them). to_me() already "
                         f"wakes you when someone addresses you. Sleep again with a fixed condition, or the same one "
                         f"if you meant it.")
-            if any(w == n or w in n.split() for n in known):
+            if any(w in n for n in known):
                 return (f"heard('{m.group(1)}') wakes on any line with the word '{m.group(1)}' in it, not on what "
                         f"{m.group(1)} says. To wake when they speak: heard('', by='{m.group(1)}'). Sleep again "
                         f"with a fixed condition, or the same one if you meant the word.")
@@ -1045,7 +1045,7 @@ class Mind:
         for e in events or []:
             if e.get("kind") in ("say", "talked") and e.get("actor") not in (None, self.me):
                 asked.pop(str(self.names.name(e.get("actor"))).lower(), None)  # they spoke: no longer unanswered
-            if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me, self.my_name(), self.names):
+            if e.get("kind") != "say" or e.get("seq") in have or not scene.to_me(e, self.me):
                 continue
             line = scene.event_line(e, self.me, self.names)
             if line:
@@ -1055,9 +1055,12 @@ class Mind:
         self.st["heard"] = keep[-int(self.cfg.get("heard_lines", 6)):]
 
     def _rate(self) -> float | None:
-        """World seconds per real second, from the briefing's pace line ("the clock runs at 4x real time")."""
-        m = re.search(r"(\d+(?:\.\d+)?)x real time", str(self.briefing.get("pace") or ""))
-        return float(m.group(1)) if m and float(m.group(1)) > 0 else None
+        """World seconds per real second: the briefing's pace_rate (0 when the clock is paused)."""
+        try:
+            rate = float(self.briefing.get("pace_rate") or 0)
+        except (TypeError, ValueError):
+            return None
+        return rate if rate > 0 else None
 
     def _layer(self, name: str) -> str:
         """Which layer a tool belongs to, for telemetry: a world verb, an engine op, the menu, an app, a harness
@@ -1173,7 +1176,7 @@ class Mind:
                  if h[0] not in cur and now - h[1] < float(self.cfg.get("heard_minutes", 60)) * 60]
         self._keep_heard(evs)
         me_name = self.my_name()
-        told = bool(heard) or any(scene.to_me(e, self.me, me_name, self.names) for e in evs)
+        told = bool(heard) or any(scene.to_me(e, self.me) for e in evs)
         user = prompts.wake(reason, card, agenda, self.shelves["seat"].index(), self.shelves["craft"].index(),
                             recent, heard, str(self.st.get("plan") or ""), told)
         user += self._companion_left(evs)
@@ -1226,7 +1229,7 @@ class Mind:
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_text}, {"role": "user", "content": user}]
         turn: dict[str, Any] = {"deeds": 0, "slept": False, "note": "", "calls": [], "nudges": nudges}
         turn["woke"] = woke(reason, events or [], self.me, me_name, self.names, bool(notes))
-        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me, me_name, self.names)]
+        turn["partners"] = [self.names.name(e.get("actor")) for e in evs if scene.to_me(e, self.me)]
         turn["spoken_to"] = bool(b.get("owed")) or bool(turn["partners"])
         tu = Usage()
         max_steps = int(self.cfg.get("max_steps", 16))
@@ -1463,24 +1466,26 @@ def undeclared(params: Any, takes: set[str] | None) -> list[str]:
     return sorted(k for k in params if k not in takes)
 
 
-def _words(text: str, skip: set[str]) -> set[str]:
-    out = set()
-    for w in re.findall(r"[a-z']+", text.lower()):
-        w = w.strip("'").removesuffix("'s")
-        if len(w) > 3 and w not in skip:
-            out.add(w)
-    return out
+def _pieces(text: str, names: Any = (), n: int = 5) -> set[str]:
+    """A line as its runs of n characters, casefolded, whole known names taken out: compared by shape, in any script,
+    with no words of a language."""
+    t = str(text).casefold()
+    for x in names:
+        if x:
+            t = t.replace(str(x).casefold(), " ")
+    t = " ".join(t.split())
+    return {t[i:i + n] for i in range(len(t) - n + 1)}
 
 
 def _repeats(text: str, said: list[str], names: Any = ()) -> str | None:
-    """A line this seat already said that `text` mostly repeats (content words, names left out), or None."""
-    skip = {w.lower() for n in names for w in str(n).split()}
-    mine = _words(text, skip)
-    if len(mine) < 6:  # a greeting or a short question is never news told twice
+    """A line this seat already said that `text` mostly repeats (half its 5-character runs, names left out), or
+    None. A short line (a greeting, a question) is never news told twice."""
+    names = list(names)
+    mine = _pieces(text, names)
+    if len(mine) < 48:
         return None
     for old in reversed(said):
-        both = mine & _words(old, skip)
-        if len(both) >= 5 and len(both) / len(mine) >= 0.6:
+        if len(mine & _pieces(old, names)) / len(mine) >= 0.5:
             return old
     return None
 
@@ -1521,7 +1526,7 @@ def woke(reason: str, events: list[dict[str, Any]], me: str, me_name: str, names
     event's kind, whether another seat (not a player) did it, and that character's name."""
     r = reason.lower()
     real = [e for e in events if e.get("kind") not in scene.NOISE and e.get("actor") != me]
-    to_me = [e for e in real if scene.to_me(e, me, me_name, names)]
+    to_me = [e for e in real if scene.to_me(e, me)]
     e = (to_me or real or [None])[-1]
     why = ("told" if r.startswith("your operator") else "reflex" if reflexed
            else "timeout" if r.startswith(("time is up", "something you scheduled")) else

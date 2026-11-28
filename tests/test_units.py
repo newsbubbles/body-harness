@@ -145,7 +145,8 @@ def test_absent_named():
              "present": [{"id": "e13", "name": "Hob"}, {"id": "e20", "name": "Old Tam"}, {"id": "e7", "name": "Mara"},
                          {"id": "e4", "name": "The Reeds"}]})
     assert n.absent_named("Morning, Hob. Boys back?", ["Mara"], "e7") == ["Hob"]
-    assert n.absent_named("Tam's drunk in the reeds", ["Mara"], "e7") == ["Old Tam"]
+    assert n.absent_named("Old Tam's drunk in the reeds", ["Mara"], "e7") == ["Old Tam"]
+    assert n.absent_named("Tam's drunk", ["Mara"], "e7") == []  # whole names only, as the engine's named() reads
     assert n.absent_named("Morning, Hob.", ["Hob", "Mara"], "e7") == []
     assert n.absent_named("Mara here, and the reeds", [], "e7") == []
 
@@ -250,17 +251,15 @@ def test_invented_tool_names_route_to_real_tools():
     assert route("fly", {}) is None
 
 
-def test_to_me_reads_target_to_and_a_name_word_that_is_mine():
+def test_to_me_reads_the_lines_to_and_never_its_words():
     me = "e1"
     say = lambda text, **k: {"kind": "say", "actor": "e2", "payload": {"text": text, **k}}
-    assert scene.to_me(say("Hi.", to="e1"), me, "Corra Venn")
-    assert scene.to_me(say("Corra, wait for me."), me, "Corra Venn")
-    assert not scene.to_me(say("Corral the goats."), me, "Corra Venn")
-    assert not scene.to_me(say("Corra, wait.", to="e3"), me, "Corra Venn")
-    assert not scene.to_me({"kind": "say", "actor": "e1", "payload": {"text": "Corra here."}}, me, "Corra Venn")
-    two = scene.Names({"e1": "Reeve Odo", "e3": "Reeve Hal"})  # a word two names share calls neither
-    assert not scene.to_me(say("Reeve, a word."), me, "Reeve Odo", two)
-    assert scene.to_me(say("Odo, a word."), me, "Reeve Odo", two)
+    assert scene.to_me(say("Hi.", to="e1"), me)
+    assert scene.to_me({"kind": "talked", "actor": "e2", "target": "e1", "payload": {}}, me)
+    assert not scene.to_me(say("Corra, wait for me."), me)  # a room line with my name: mentioned(), not to me
+    assert not scene.to_me(say("Corra, wait.", to="e3"), me)
+    assert not scene.to_me({"kind": "say", "actor": "e1", "payload": {"text": "Hi.", "to": "e1"}}, me)
+    assert scene.mentioned("Zoë Ægir, 李明 hier?", ["Zoë Ægir", "李明", "Corra"]) == {"Zoë Ægir", "李明"}  # any script
 
 
 def test_system_carries_the_body_and_dates_the_briefing():
@@ -606,7 +605,7 @@ def test_author_ops_go_through_the_hand_that_reaches_the_target():
         async def op(self, op, **a):
             self.calls.append(op)
             if op == "spawn" and a.get("parent") not in self.under:
-                return {"ok": False, "reason": f"your grant reaches only under {self.name}'s plot"}
+                return {"ok": False, "reason": f"your grant reaches only under {self.name}'s plot", "code": "out_of_grant"}
             if op == "spawn" and a.get("type") == "dragon":
                 return {"ok": False, "reason": "no schema dragon"}
             return {"ok": True, "by": self.name}
@@ -990,9 +989,10 @@ def test_a_lead_that_keeps_going_nowhere_is_named_once_its_notes_repeat_it():
 def test_the_card_says_whom_the_seat_has_met_from_the_worlds_knows():
     # Ossa met Rhosyn Vael twice at the Yard, then greeted her as new: the world knew, the card never said
     b = {"t": 90000, "you": {"id": "e1", "name": "Ossa", "state": {"memory": [
-            {"text": "Rhosyn is a Carrier, not new to the Yard"}, *[{"text": f"note {i}"} for i in range(12)]]}},
+            {"text": "Rhosyn Vael is a Carrier, not new to the Yard"}, *[{"text": f"note {i}"} for i in range(12)]]}},
          "here": {"name": "The Yard"},
-         "present": [{"id": "e2", "type": "person", "name": "Rhosyn Vael"}, {"id": "e3", "type": "person", "name": "A porter"},
+         "present": [{"id": "e2", "type": "person", "name": "Rhosyn Vael", "condition": "fine"},
+                     {"id": "e3", "type": "person", "name": "A porter", "condition": "fine"},
                      {"id": "e4", "type": "counter", "name": "The Yard's counter"}],
          "knows": [{"who": "e2", "name": "Rhosyn Vael", "count": 2, "met_t": 100, "standing": 1, "here": True,
                     "last_exchanges": [{"t": 100, "who": "e1", "kind": "say", "text": "Carrier work today?"},
@@ -1001,7 +1001,7 @@ def test_the_card_says_whom_the_seat_has_met_from_the_worlds_knows():
     line = next(x for x in c.splitlines() if x.strip().startswith("- Rhosyn Vael"))
     assert "met day 1" in line and "2 exchanges" in line and "standing 1" in line
     assert 'you last said (day 1): "Carrier work today?"' in line and 'they last said (day 1): "Always."' in line
-    assert "your note: Rhosyn is a Carrier" in line  # an old note, past the newest 8 the card shows
+    assert "your note: Rhosyn Vael is a Carrier" in line  # an old note, past the newest 8 the card shows
     assert "- A porter: no meeting on record" in c and "counter: no meeting" not in c
     assert "People here" not in scene.card({**b, "knows": None}, scene.Names({}), "e1")  # a world without knows
 

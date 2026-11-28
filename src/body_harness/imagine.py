@@ -59,19 +59,19 @@ OPEN_FOR, STALE_AFTER = 1800.0, 6 * 3600.0
 
 
 def _key(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "thing"
+    return re.sub(r"\W+", "_", name.casefold()).strip("_") or "thing"  # any script's letters stay
 
 
 def numbers(e: dict[str, Any]) -> dict[str, Any]:
-    """The numbers one entry of the card shows: 'hp': '12/12' in the brief view, state.hp and the rest of its
-    numeric state in the full one."""
+    """The numbers one entry of the card shows: its numeric state, and any gauge the brief view writes as 'n/max'
+    (whatever the world calls it: '12/12' under k gives k and max_k). No state key is named here."""
     out: dict[str, Any] = {}
     for src in (e.get("state") or {}, e):
         for k, v in src.items():
-            hp = re.match(r"\s*(-?\d+)\s*/\s*(\d+)\s*$", v) if k == "hp" and isinstance(v, str) else None
-            if hp:
-                out["hp"], out["max_hp"] = int(hp.group(1)), int(hp.group(2))
-            elif _num(v) and (src is not e or k in ("hp", "max_hp")):
+            gauge = re.match(r"\s*(-?\d+)\s*/\s*(\d+)\s*$", v) if isinstance(v, str) else None
+            if gauge:
+                out[_key(k)], out["max_" + _key(k)] = int(gauge.group(1)), int(gauge.group(2))
+            elif _num(v) and src is not e:
                 out[_key(k)] = v
     return out
 
@@ -174,10 +174,10 @@ class MindError(Exception):
     """A kept mind could not choose: what it returned, said so the seat can fix it."""
 
 
-def crashed(reason: str) -> bool:
-    """A refusal that is the rule breaking (an error inside it), not the rule's own check saying no."""
-    return bool(re.search(r"failed while|has no (apply|check)\(|is not allowed|has no attribute|is not defined|"
-                          r"not supported|out of fuel", str(reason)))
+def crashed(e: Exception) -> bool:
+    """A refusal that is the rule breaking (an error inside it), not the rule's own check saying no: the engine's
+    code script_error."""
+    return getattr(e, "code", None) == "script_error"
 
 
 def _rule_id(source: str) -> str:
@@ -374,7 +374,7 @@ class Imagination:
             except ScriptError as e:
                 return str(e)
             except Rejected as e:
-                if crashed(e.reason):
+                if crashed(e):
                     return e.reason
         return ""
 
@@ -594,7 +594,7 @@ class Imagination:
                 return {"ok": False, "reason": str(e), "hint": "fix it with imagine(minds=...); nothing was recorded",
                         "notes": notes}
             except Rejected as e:
-                if crashed(e.reason):  # a broken rule is not how things end: nothing is recorded
+                if crashed(e):  # a broken rule is not how things end: nothing is recorded
                     return {"ok": False, "reason": f"your rule {verb} breaks: {e.reason}",
                             "hint": ("someone in the plan has no value for a number the rule reads: give it with "
                                      "setup={name: {...}}" if "NoneType" in e.reason else "fix it with "
@@ -959,7 +959,7 @@ class Imagination:
             except MindError as e:
                 return {"ok": False, "id": r["id"], "reason": str(e), "hint": "fix it with imagine(minds=...)"}
             except Rejected as e:
-                if crashed(e.reason):
+                if crashed(e):
                     return {"ok": False, "id": r["id"], "reason": f"a rule breaks: {e.reason}",
                             "hint": "fix it with imagine(rules=...)"}
             except (ScriptError, KeyError) as e:

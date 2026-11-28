@@ -44,23 +44,12 @@ class Names:
             return "?" if i is None else str(i)
         return self.by_id.get(i, i)
 
-    def keys(self, name: str) -> list[str]:
-        """The words that pick `name` out: its words of 3+ letters that no other name this seat knows shares
-        (a title two people carry calls neither), else the whole name."""
-        taken = {w.lower() for n in set(self.by_id.values()) if n != name for w in n.replace(",", " ").split()}
-        return [w for w in name.replace(",", " ").split() if len(w) >= 3 and w.lower() not in taken] or [name]
-
     def absent_named(self, text: str, present: list[str], me: str = "") -> list[str]:
-        """People this seat knows who are named in `text` but are not here: a line said to them reaches nobody."""
-        here = {n.lower() for n in present}
-        out = []
-        for i in self.people:
-            n = self.by_id.get(i)
-            if not n or i == me or n.lower() in here:
-                continue
-            if any(re.search(r"\b" + re.escape(k) + r"\b", text) for k in self.keys(n)):
-                out.append(n)
-        return sorted(set(out))
+        """People this seat knows who are named in `text` (whole names) but are not here: a line said to them
+        reaches nobody."""
+        here = {n.casefold() for n in present}
+        people = [n for i in self.people if i != me and (n := self.by_id.get(i)) and n.casefold() not in here]
+        return sorted(mentioned(text, people))
 
     def resolve(self, text: str, among: list[str] | None = None,
                 fits: list[str] | None = None) -> tuple[str | None, list[str]]:
@@ -171,7 +160,7 @@ def known_lines(b: dict[str, Any], names: Names, me: str, day_seconds: float, pe
     for x in people:
         if not isinstance(x, dict) or not x.get("id"):
             continue
-        if x["id"] not in knows and x.get("type") not in ("person", "pet") and (x.get("state") or {}).get("hp") is None:
+        if x["id"] not in knows and not body(x):
             continue  # a counter or a sink: nobody to meet
         name = x.get("name") or names.name(x.get("id"))
         k = knows.get(x["id"])
@@ -186,9 +175,7 @@ def known_lines(b: dict[str, Any], names: Names, me: str, day_seconds: float, pe
             if e:
                 bits.append(f"{'you' if mine else 'they'} last said (day {day(e.get('t'))}): "
                             f"\"{str(e['text'])[:100]}\"")
-        first = str(name).split()[0].lower() if name else ""
-        note = next((m for m in reversed(mem) if str(name).lower() in m.lower()
-                     or (len(first) > 3 and re.search(rf"\b{re.escape(first)}\b", m.lower()))), None)
+        note = next((m for m in reversed(mem) if mentioned(m, [name])), None)
         if note:
             bits.append(f"your note: {note[:140]}")
         out.append(f"  - {name}: " + "; ".join(bits))
@@ -271,9 +258,8 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
         people = [x for x in (b.get("people") or []) if not (isinstance(x, dict) and x.get("id") == me)]
         things = list(b.get("things") or [])
     else:
-        people = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") not in ("thing", "sign")
-                  and x.get("id") != me]
-        things = [x for x in (b.get("present") or []) if isinstance(x, dict) and x.get("type") in ("thing", "sign")]
+        people = [x for x in (b.get("present") or []) if isinstance(x, dict) and body(x) and x.get("id") != me]
+        things = [x for x in (b.get("present") or []) if isinstance(x, dict) and not body(x)]
     lines.append("Here: " + (", ".join(_names(people, names)) or "nobody else"))
     lines += known_lines(b, names, me, day_seconds, people)
     if things:
@@ -306,7 +292,7 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     allev = events if events is not None else (b.get("events") or [])
     # what was said to you comes first and is never pushed out by a busy room's barks (models cannot tell addressed
     # from overheard on their own; the world's to= and target fields can)
-    mine = [e for e in allev if to_me(e, me, you.get("name") or "", names)]
+    mine = [e for e in allev if to_me(e, me)]
     told = event_lines(mine, me, names, 10)
     if told:
         lines.append("Said to you:")
@@ -318,17 +304,24 @@ def card(b: dict[str, Any], names: Names, me_id: str = "", day_seconds: float = 
     return "\n".join(lines)
 
 
-def to_me(e: dict[str, Any], me: str, my_name: str = "", names: Names | None = None) -> bool:
-    """A line aimed at me: said or asked to me, or a room line that calls me by a word of my name no other known
-    name shares (`names`), or by my whole name."""
+def to_me(e: dict[str, Any], me: str) -> bool:
+    """A line aimed at me: its `to` (or target) is me, as the engine's to_me() reads it. Words are never read for an
+    address, in any language; a room line with my name in it is mentioned(), not this."""
     if e.get("kind") not in ("say", "talked") or not me or e.get("actor") == me:
         return False
-    p = e.get("payload") or {}
-    if me in (p.get("to"), e.get("target")):
-        return True
-    keys = (names or Names()).keys(my_name) if my_name else []
-    return e.get("kind") == "say" and not p.get("to") and \
-        any(re.search(r"\b" + re.escape(k) + r"\b", str(p.get("text", "")), re.I) for k in keys)
+    return me in ((e.get("payload") or {}).get("to"), e.get("target"))
+
+
+def body(card: dict[str, Any]) -> bool:
+    """Someone, not something: a card the engine gives a condition (its creatures, of any type a world's schemas
+    make) or one a seat sits in. Never read from type names."""
+    return bool(card.get("condition") or card.get("embodied_by"))
+
+
+def mentioned(text: Any, names: Any) -> set[str]:
+    """The names in `names` that `text` carries whole, casefolded: any script, no word lists, no letter counts."""
+    t = str(text or "").casefold()
+    return {n for n in names if n and str(n).casefold() in t}
 
 
 def wait_card(w: dict[str, Any], names: Names, me_id: str, day_seconds: float = DAY) -> str:

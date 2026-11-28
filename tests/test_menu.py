@@ -55,7 +55,9 @@ def test_rank_puts_what_goals_notes_and_lines_name_first():
 
 
 def test_preopen_opens_the_speaker_who_is_named_and_what_a_goal_needs():
-    got = dict(menu.Menu(bundle(), scene.Names(), "e1").preopen())
+    b = bundle()
+    b["goals"][0]["text"] = "find the Pouch of salve for Brann"  # a goal names a thing by its whole name
+    got = dict(menu.Menu(b, scene.Names(), "e1").preopen())
     labels = " | ".join(got)
     assert "Brann" in labels and "Ossa" in labels and "Pouch of salve" in labels
     assert "your older talk with Brann" in labels and "your own deeds in the world's log" in labels
@@ -74,13 +76,13 @@ def test_pick_keeps_talk_with_one_other_and_a_bodys_own_deeds():
 def test_log_lists_number_each_event_and_put_what_the_line_names_first():
     b = bundle()
     talk = [{"seq": 2, "t": 0, "kind": "say", "actor": "e2", "target": "e1",
-             "payload": {"text": "The salve is in the blue chest at the Quay.", "to": "e1"}},
+             "payload": {"text": "Ossa keeps the salve in the blue chest at the Quay.", "to": "e1"}},
             {"seq": 5, "t": 900, "kind": "say", "actor": "e2", "target": "e1", "payload": {"text": "Tide's late.", "to": "e1"}}]
     m = menu.Menu(b, scene.Names(), "e1", lists={"with": "e2", "talk": talk, "deeds": [], "deeds_full": False})
     text = m.render()
     assert "Talk with Brann, in your log since t=0" in text and "Your deeds, in your log (0): none on record" in text
     n = next(i for i, w in enumerate(m.widgets, 1) if w.title.startswith("Talk with"))
-    assert "blue chest" in m.widgets[n - 1].items[0].line  # the line said now names salve: the old line leads
+    assert "blue chest" in m.widgets[n - 1].items[0].line  # the line said now names Ossa: the old line leads
     assert m.resolve(f"{n}.1") == ("op", "history", {"since": 1, "until": 2, "limit": 1}, {"full": True})
     assert not [l for l, _ in m.preopen() if "older talk" in l or "own deeds" in l]  # lists replace the blocks
 
